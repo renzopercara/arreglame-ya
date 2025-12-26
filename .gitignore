@@ -1,0 +1,22 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js compilación
+.next/
+out/
+
+# NestJS compilación
+dist/
+*.tsbuildinfo
+
+# Prisma
+.env
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# Logs y otros
+*.log
+.DS_Store
+.vercel

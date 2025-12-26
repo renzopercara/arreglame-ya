@@ -1,0 +1,49 @@
+{
+  "name": "arreglame-ya-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "sync": "npx cap sync",
+    "open:android": "npx cap open android",
+    "open:ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@apollo/client": "^4.0.11",
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/camera": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/geolocation": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
+    "@capacitor/push-notifications": "^6.0.0",
+    "@ducanh2912/next-pwa": "^10.2.5",
+    "@vis.gl/react-google-maps": "^1.0.0",
+    "arreglame-ya-monorepo": "file:../..",
+    "framer-motion": "^12.23.26",
+    "graphql": "^16.12.0",
+    "graphql-ws": "^5.14.3",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.344.0",
+    "next": "14.1.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-leaflet": "^4.2.1",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "@types/google.maps": "^3.55.0",
+    "@types/leaflet": "^1.9.21",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5"
+  }
+}

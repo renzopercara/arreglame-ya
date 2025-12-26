@@ -1,0 +1,489 @@
+# ==================================================
+# AUTHENTICATION & USER TYPES
+# ==================================================
+
+type User {
+  id: ID!
+  email: String!
+  role: UserRole!
+  status: UserStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum UserRole {
+  CLIENT
+  WORKER
+  ADMIN
+}
+
+enum UserStatus {
+  ANON
+  LOGGED_IN
+  BLOCKED
+  DEBTOR
+}
+
+# ==================================================
+# AUTH RESPONSES
+# ==================================================
+
+type AuthResponse {
+  accessToken: String!
+  user: User!
+}
+
+type UserWithProfile {
+  id: ID!
+  email: String!
+  role: UserRole!
+  name: String!
+  status: UserStatus!
+  rating: Float!
+  loyaltyPoints: Int
+  totalJobs: Int
+  mustAcceptTerms: Boolean!
+  workerStatus: String
+  kycStatus: String
+  bio: String
+  currentPlan: String!
+  balance: Float
+  createdAt: DateTime!
+}
+
+# ==================================================
+# WORKER PROFILE
+# ==================================================
+
+type WorkerProfile {
+  id: ID!
+  userId: String!
+  name: String!
+  rating: Float!
+  totalJobs: Int!
+  status: WorkerStatus!
+  latitude: Float
+  longitude: Float
+  reputationPoints: Int!
+  currentPlan: String!
+  acceptanceRate: Float!
+  cancellationRate: Float!
+  penaltyUntil: DateTime
+  bio: String
+  kycStatus: KYCStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum WorkerStatus {
+  ONLINE
+  PAUSED
+  OFFLINE
+  ON_JOB
+}
+
+enum KYCStatus {
+  PENDING_SUBMISSION
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+# ==================================================
+# CLIENT PROFILE
+# ==================================================
+
+type ClientProfile {
+  id: ID!
+  userId: String!
+  name: String!
+  rating: Float!
+  loyaltyPoints: Int!
+  reputationPoints: Int!
+  currentPlan: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# ==================================================
+# SERVICE REQUEST (JOB)
+# ==================================================
+
+type ServiceRequest {
+  id: ID!
+  status: JobStatus!
+  clientId: String!
+  workerId: String
+  latitude: Float!
+  longitude: Float!
+  address: String
+  description: String
+  squareMeters: Float!
+  gardenImageBefore: String!
+  gardenImageAfter: String
+  evidenceImages: [String!]
+  difficulty: Float!
+  estimatedHours: Float!
+  aiReasoning: String
+  price: PriceDetails!
+  pin: String!
+  extraTimeStatus: ExtraTimeStatus!
+  extraTimeMinutes: Int
+  extraTimeReason: String
+  createdAt: DateTime!
+  startedAt: DateTime
+  completedAt: DateTime
+  warrantyExpiresAt: DateTime
+  client: ClientProfile
+  worker: WorkerProfile
+}
+
+enum JobStatus {
+  CREATED
+  ACCEPTED
+  ASSIGNED
+  IN_PROGRESS
+  PENDING_CLIENT_APPROVAL
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  UNDER_REVIEW
+  RESOLVED
+}
+
+enum ExtraTimeStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+type PriceDetails {
+  total: Float!
+  workerNet: Float!
+  platformFee: Float!
+  taxes: Float!
+  currency: String!
+  calculationSnapshot: String
+}
+
+# ==================================================
+# WALLET & BILLING
+# ==================================================
+
+type Wallet {
+  id: ID!
+  userId: String!
+  balancePending: Float!
+  balanceAvailable: Float!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Transaction {
+  id: ID!
+  walletId: String!
+  jobId: String
+  type: TransactionType!
+  amount: Float!
+  status: TransactionStatus!
+  description: String
+  createdAt: DateTime!
+}
+
+enum TransactionType {
+  ESCROW_ALLOCATION
+  ESCROW_RELEASE
+  WITHDRAWAL
+  REFUND
+  PAYOUT
+  DISPUTE_REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+type PayoutRequest {
+  id: ID!
+  walletId: String!
+  amount: Float!
+  cbuAlias: String!
+  status: String!
+  createdAt: DateTime!
+  processedAt: DateTime
+}
+
+# ==================================================
+# CHAT & COMMUNICATION
+# ==================================================
+
+type ChatMessage {
+  id: ID!
+  jobId: String!
+  senderId: String!
+  content: String!
+  timestamp: DateTime!
+  sender: WorkerProfile
+}
+
+# ==================================================
+# LEGAL & COMPLIANCE
+# ==================================================
+
+type LegalDocument {
+  id: ID!
+  targetAudience: String!
+  version: String!
+  title: String!
+  content: String!
+  isActive: Boolean!
+  createdAt: DateTime!
+}
+
+type UserConsent {
+  id: ID!
+  userId: String!
+  documentId: String!
+  version: String!
+  acceptedAt: DateTime!
+}
+
+# ==================================================
+# JOB ESTIMATION & AI
+# ==================================================
+
+type EstimationResult {
+  difficultyMultiplier: Float!
+  estimatedHours: Float!
+  estimatedWorkload: String!
+  price: PriceDetails!
+}
+
+type AuditResult {
+  approved: Boolean!
+  score: Float!
+  reasoning: String!
+}
+
+type JobHistory {
+  id: ID!
+  status: JobStatus!
+  client: ClientProfile
+  worker: WorkerProfile
+  description: String
+  squareMeters: Float
+  price: PriceDetails
+  createdAt: DateTime!
+  completedAt: DateTime
+  myReview: Review
+  activeTicket: SupportTicket
+}
+
+type MatchResult {
+  batches: [[WorkerProfile!]!]!
+}
+
+# ==================================================
+# REVIEWS & SUPPORT
+# ==================================================
+
+type Review {
+  id: ID!
+  jobId: String!
+  rating: Int!
+  comment: String
+  authorId: String!
+  targetId: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type SupportTicket {
+  id: ID!
+  jobId: String!
+  reporterId: String!
+  category: String!
+  priority: String!
+  status: String!
+  subject: String!
+  description: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# ==================================================
+# REPUTATION
+# ==================================================
+
+type ReputationResponse {
+  points: Int!
+  currentPlan: String!
+  nextMilestone: Int
+}
+
+# ==================================================
+# EXTRA TIME
+# ==================================================
+
+type ExtraTimeResponse {
+  id: String!
+  extraTimeStatus: ExtraTimeStatus!
+  totalPrice: Float!
+}
+
+# ==================================================
+# INPUT TYPES
+# ==================================================
+
+input LoginInput {
+  email: String!
+  password: String!
+  role: UserRole!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  name: String!
+  role: UserRole!
+  termsAccepted: Boolean!
+  userAgent: String
+}
+
+input CreateJobInput {
+  clientId: String!
+  lat: Float!
+  lng: Float!
+  image: String!
+  description: String
+  difficulty: Float!
+  estimatedHours: Float!
+  squareMeters: Float!
+  hasHighWeeds: Boolean
+  scheduledFor: String
+}
+
+input EstimateJobInput {
+  image: String!
+  description: String
+  squareMeters: Float!
+  hasHighWeeds: Boolean
+  hasSlope: Boolean
+  complicatedAccess: Boolean
+}
+
+input SubmitKYCInput {
+  dniFront: String!
+  dniBack: String!
+  insuranceDoc: String!
+  selfie: String!
+}
+
+input SubmitReviewInput {
+  jobId: String!
+  rating: Int!
+  comment: String
+}
+
+input CreateSupportTicketInput {
+  jobId: String!
+  category: String!
+  subject: String!
+  description: String!
+}
+
+# ==================================================
+# QUERIES
+# ==================================================
+
+type Query {
+  # Auth
+  me: UserWithProfile
+  
+  # User Profiles
+  getPublicWorkerProfile(workerId: String!): WorkerProfile
+  
+  # Service Requests (Jobs)
+  estimateJob(input: EstimateJobInput!): EstimationResult
+  getJobHistory(jobId: String!): JobHistory
+  findBestWorkers(lat: Float!, lng: Float!, radiusKm: Float): MatchResult
+  nearbyJobs(lat: Float!, lng: Float!): [ServiceRequest!]!
+  chatMessages(jobId: String!): [ChatMessage!]!
+  
+  # Wallet
+  getWallet: Wallet
+  getWalletTransactions: [Transaction!]
+  
+  # Legal
+  latestTerms(role: String!): LegalDocument!
+  
+  # Reputation
+  healthCheckReputation: String!
+  getWorkerReputation(workerId: ID!): ReputationResponse!
+}
+
+# ==================================================
+# MUTATIONS
+# ==================================================
+
+type Mutation {
+  # Authentication
+  login(input: LoginInput!): AuthResponse!
+  register(input: RegisterInput!): AuthResponse!
+  
+  # Service Requests (Jobs)
+  createJob(input: CreateJobInput!): ServiceRequest!
+  startJob(jobId: String!, pin: String!): ServiceRequest!
+  arriveAtJob(workerId: String!, jobId: String!, lat: Float!, lng: Float!): Boolean!
+  completeJob(jobId: String!, imageAfter: String!, evidenceImages: [String!]): AuditResult!
+  
+  # Worker Profile
+  updateWorkerLocation(lat: Float!, lng: Float!): Boolean!
+  setWorkerStatus(status: String!): WorkerProfile!
+  submitKYC(input: SubmitKYCInput!): WorkerProfile!
+  
+  # Billing & Wallet
+  processPaymentIn(jobId: String!, paymentId: String!, totalAmount: Float!): Boolean!
+  releaseFunds(jobId: String!): Boolean!
+  requestPayout(amount: Float!, cbu: String!): PayoutRequest!
+  
+  # Legal
+  acceptTerms(documentId: String!): UserConsent!
+  acceptLatestTerms(userId: String!, documentId: String!): Boolean!
+  
+  # Chat & Communication
+  sendMessage(jobId: String!, senderId: String!, role: String!, content: String!): ChatMessage!
+  
+  # Reviews & Support
+  submitReview(input: SubmitReviewInput!): Review!
+  createSupportTicket(input: CreateSupportTicketInput!): SupportTicket!
+  
+  # Extra Time
+  requestExtraTime(jobId: String!, minutes: Int!, reason: String!): ServiceRequest!
+  respondToExtraTime(jobId: String!, approved: Boolean!): ExtraTimeResponse!
+}
+
+# ==================================================
+# SUBSCRIPTIONS
+# ==================================================
+
+type Subscription {
+  jobUpdated(jobId: String!): ServiceRequest!
+  workerLocationMoved(jobId: String!): LocationUpdate!
+  chatMessageAdded(jobId: String!): ChatMessage!
+}
+
+type LocationUpdate {
+  lat: Float!
+  lng: Float!
+}
+
+# ==================================================
+# SCALAR TYPES
+# ==================================================
+
+scalar DateTime

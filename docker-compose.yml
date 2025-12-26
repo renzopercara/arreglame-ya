@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Database Service: Postgres 16 + PostGIS 3.4
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: arreglame-ya-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin123}
+      POSTGRES_DB: ${DB_NAME:-arreglame_ya}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d arreglame_ya"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Optional: PgAdmin for visual database management
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: arreglame-ya-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

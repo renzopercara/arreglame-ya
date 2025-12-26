@@ -1,0 +1,43 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* IMPORTANTE: Estilos de Mapa */
+@import 'leaflet/dist/leaflet.css';
+
+:root {
+  --foreground-rgb: 15, 23, 42;
+  --background-start-rgb: 255, 255, 255;
+  --background-end-rgb: 248, 250, 252;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* Evitar selección en mobile app para sensación nativa */
+.select-none {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Fix Leaflet Z-Index conflicts */
+.leaflet-pane {
+  z-index: 0 !important;
+}
+.leaflet-top, .leaflet-bottom {
+  z-index: 500 !important;
+}
+
+/* Scrollbars ocultos para UI limpia */
+::-webkit-scrollbar {
+  display: none;
+}

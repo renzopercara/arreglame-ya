@@ -1,0 +1,35 @@
+{
+  "name": "arreglame-ya-monorepo",
+  "version": "1.0.0",
+  "description": "Marketplace de jardinería con IA y Geolocalización",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/mobile-app"
+  ],
+  "scripts": {
+    "start": "concurrently \"npm run start:api\" \"npm run start:web\"",
+    "start:api": "npm --prefix apps/api run start:dev",
+    "start:web": "npm --prefix apps/mobile-app run dev",
+    "build": "npm --prefix apps/api run build && npm --prefix apps/mobile-app run build",
+    "build:api": "npm --prefix apps/api run build",
+    "build:web": "npm --prefix apps/mobile-app run build",
+    "dev": "concurrently \"npm run start:api\" \"npm run start:web\"",
+    "db:up": "docker-compose up -d",
+    "db:down": "docker-compose down",
+    "db:logs": "docker-compose logs -f",
+    "db:migrate": "npm --prefix apps/api run prisma:migrate",
+    "db:migrate:deploy": "npm --prefix apps/api run prisma:migrate:deploy",
+    "db:generate": "npm --prefix apps/api run prisma:generate",
+    "db:studio": "npm --prefix apps/api run prisma:studio",
+    "db:seed": "npm --prefix apps/api run prisma:seed",
+    "lint": "npm --prefix apps/api run lint && npm --prefix apps/mobile-app run lint",
+    "test": "npm --prefix apps/api run test",
+    "test:e2e": "npm --prefix apps/api run test:e2e",
+    "install:all": "npm install && npm --prefix apps/api install && npm --prefix apps/mobile-app install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}

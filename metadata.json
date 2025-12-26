@@ -1,0 +1,8 @@
+{
+  "name": "Arreglame Ya",
+  "description": "Plataforma de servicios de jardinería on-demand con IA y geolocalización. Conectá con cortadores de pasto cercanos al instante.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

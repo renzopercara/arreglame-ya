@@ -1,0 +1,446 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// ENUMS
+enum UserRole {
+  CLIENT
+  WORKER
+  ADMIN
+}
+
+enum UserStatus {
+  ANON
+  LOGGED_IN
+  BLOCKED
+  DEBTOR
+}
+
+enum WorkerStatus {
+  ONLINE
+  PAUSED
+  OFFLINE
+  ON_JOB
+}
+
+enum JobStatus {
+  CREATED
+  ACCEPTED
+  ASSIGNED
+  IN_PROGRESS
+  PENDING_CLIENT_APPROVAL
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  UNDER_REVIEW
+  RESOLVED
+}
+
+enum KYCStatus {
+  PENDING_SUBMISSION
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ExtraTimeStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TargetAudience {
+  WORKER
+  CLIENT
+}
+
+enum TransactionType {
+  ESCROW_ALLOCATION
+  ESCROW_RELEASE
+  WITHDRAWAL
+  REFUND
+  PAYOUT
+  DISPUTE_REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+// ============================================
+// CORE USER MODELS
+// ============================================
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String
+  role         UserRole    @default(CLIENT)
+  status       UserStatus  @default(LOGGED_IN)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  workerProfile    WorkerProfile?
+  clientProfile    ClientProfile?
+  
+  // Mensajes relacionados al User directamente
+  sentMessages     ChatMessage[]  @relation("SenderRelation")
+  receivedMessages ChatMessage[]  @relation("ReceiverRelation")
+  
+  wallet           Wallet?
+  payoutRequests   PayoutRequest[]
+  userConsents     UserConsent[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model WorkerProfile {
+  id                 String         @id @default(uuid())
+  userId             String         @unique
+  name               String
+  rating             Float          @default(5.0)
+  totalJobs          Int            @default(0)
+  status             WorkerStatus   @default(OFFLINE)
+  location           Unsupported("geography(Point, 4326)")?
+  latitude           Float?
+  longitude          Float?
+  lastLocationUpdate DateTime?
+  reputationPoints   Int            @default(0)
+  currentPlan        String         @default("STARTER")
+  acceptanceRate     Float          @default(1.0)
+  cancellationRate   Float          @default(0.0)
+  penaltyUntil       DateTime?
+  bio                String?
+  kycStatus          KYCStatus      @default(PENDING_SUBMISSION)
+  dniFront           String?
+  dniBack            String?
+  insuranceDoc       String?
+  selfie             String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  // Relations
+  user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  serviceRequests   ServiceRequest[] @relation("WorkerServiceRequests")
+  reviewsGiven      Review[]         @relation("ReviewAuthor")
+  reviewsReceived   Review[]         @relation("ReviewTarget")
+
+  @@index([userId])
+  @@index([status])
+  @@index([currentPlan])
+  @@index([location])
+}
+
+model ClientProfile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  name             String
+  rating           Float    @default(5.0)
+  loyaltyPoints    Int      @default(0)
+  reputationPoints Int      @default(0)
+  currentPlan      String   @default("CLIENT_BASIC")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  serviceRequests ServiceRequest[] @relation("ClientServiceRequests")
+
+  @@index([userId])
+  @@index([currentPlan])
+}
+
+// ============================================
+// SERVICE REQUEST & BILLING
+// ============================================
+
+model ServiceRequest {
+  id                    String          @id @default(uuid())
+  status                JobStatus       @default(CREATED)
+  clientId              String
+  workerId              String?
+  location              Unsupported("geography(Point, 4326)")
+  latitude              Float
+  longitude             Float
+  address               String?
+  description           String?
+  squareMeters          Float
+  gardenImageBefore     String
+  gardenImageAfter      String?
+  evidenceImages        String[]
+  difficulty            Float           @default(1.0)
+  estimatedHours        Float
+  aiReasoning           String?
+  price                 Json            // { total, workerNet, platformFee, taxes, currency }
+  priceWorkerNet        Float?
+  pricePlatformFee      Float?
+  pin                   String          @default("0000")
+  extraTimeStatus       ExtraTimeStatus @default(NONE)
+  extraTimeMinutes      Int?
+  extraTimeReason       String?
+  
+  // Nota: disputeId removido de aquí para que Dispute sea el único dueño de la relación 1:1
+  
+  createdAt             DateTime        @default(now())
+  startedAt             DateTime?
+  completedAt           DateTime?
+  warrantyExpiresAt     DateTime?
+
+  // Relations
+  client          ClientProfile   @relation("ClientServiceRequests", fields: [clientId], references: [id], onDelete: Restrict)
+  worker          WorkerProfile?  @relation("WorkerServiceRequests", fields: [workerId], references: [id], onDelete: SetNull)
+  
+  // Relación 1:1 - El campo 'fields' está en el modelo Dispute
+  dispute         Dispute?        
+  
+  reviews         Review[]
+  supportTickets  SupportTicket[]
+  transactions    Transaction[]
+  chatMessages    ChatMessage[]
+
+  @@index([status])
+  @@index([clientId])
+  @@index([workerId])
+  @@index([createdAt])
+}
+
+model Dispute {
+  id                String    @id @default(uuid())
+  serviceRequestId  String    @unique
+  reason            String
+  resolution        String?
+  resolutionComment String?
+  aiAuditScore      Float?
+  createdAt         DateTime  @default(now())
+  resolvedAt        DateTime?
+
+  // Relations - Dispute es el dueño de la relación 1:1
+  serviceRequest    ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+}
+
+// ============================================
+// WALLET & BILLING
+// ============================================
+
+model Wallet {
+  id               String        @id @default(uuid())
+  userId           String        @unique
+  balancePending   Decimal       @default(0) @db.Decimal(14, 2)
+  balanceAvailable Decimal       @default(0) @db.Decimal(14, 2)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  user             User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions     Transaction[]
+  payoutRequests   PayoutRequest[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id             String            @id @default(uuid())
+  walletId       String
+  jobId          String?
+  type           TransactionType
+  amount         Decimal           @db.Decimal(14, 2)
+  status         TransactionStatus @default(PENDING)
+  description    String?
+  referenceId    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  // Relations
+  wallet         Wallet            @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  serviceRequest ServiceRequest?   @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([walletId])
+  @@index([type])
+  @@index([status])
+  @@index([jobId])
+}
+
+model PayoutRequest {
+  id          String    @id @default(uuid())
+  walletId    String
+  userId      String    // Añadido para consistencia con el modelo User
+  amount      Decimal   @db.Decimal(14, 2)
+  cbuAlias    String    // CBU or alias for payout
+  status      String    @default("REQUESTED") // REQUESTED, PROCESSING, COMPLETED, FAILED
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  // Relations
+  wallet      Wallet    @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([walletId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================
+// CHAT & COMMUNICATION
+// ============================================
+
+model ChatMessage {
+  id         String   @id @default(uuid())
+  jobId      String
+  senderId   String
+  receiverId String?  // Opcional si quieres tracking directo del receptor
+  senderRole String?
+  content    String
+  timestamp  DateTime @default(now())
+
+  // Relations
+  job      ServiceRequest @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  
+  // Relaciones con User (unificadas para evitar conflictos entre perfiles)
+  sender   User           @relation("SenderRelation", fields: [senderId], references: [id], onDelete: Restrict)
+  receiver User?          @relation("ReceiverRelation", fields: [receiverId], references: [id], onDelete: SetNull)
+
+  @@index([jobId])
+  @@index([senderId])
+  @@index([timestamp])
+}
+
+// ============================================
+// REVIEWS & SUPPORT
+// ============================================
+
+model Review {
+  id        String   @id @default(uuid())
+  jobId     String
+  rating    Int
+  comment   String?
+  authorId  String
+  targetId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  job    ServiceRequest @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  author WorkerProfile  @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  target WorkerProfile  @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Restrict)
+
+  @@index([jobId])
+  @@index([authorId])
+  @@index([targetId])
+}
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  jobId       String
+  reporterId  String
+  category    String
+  priority    String
+  status      String   @default("OPEN")
+  subject     String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  job         ServiceRequest @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@index([jobId])
+  @@index([reporterId])
+  @@index([status])
+}
+
+// ============================================
+// LEGAL & COMPLIANCE
+// ============================================
+
+model LegalDocument {
+  id             String         @id @default(uuid())
+  targetAudience TargetAudience
+  version        String         @unique
+  title          String
+  content        String
+  contentHash    String
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relations
+  userConsents   UserConsent[]
+
+  @@index([targetAudience])
+  @@index([version])
+}
+
+model UserConsent {
+  id          String   @id @default(uuid())
+  userId      String
+  documentId  String
+  version     String
+  contentHash String
+  ipAddress   String?
+  userAgent   String?
+  acceptedAt  DateTime @default(now())
+
+  // Relations
+  user     User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  document LegalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([documentId])
+  @@index([acceptedAt])
+}
+
+// ============================================
+// CONFIGURATION & SYSTEM
+// ============================================
+
+model PlanConfig {
+  id              String         @id @default(uuid())
+  code            String         @unique
+  targetAudience  TargetAudience
+  name            String
+  minPoints       Int            @default(0)
+  commissionFee   Float          @default(0.0)
+  priorityBonus   Int            @default(0)
+  benefits        Json
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([code])
+  @@index([targetAudience])
+}
+
+model ReputationRule {
+  id          String   @id @default(uuid())
+  actionKey   String   @unique
+  pointsDelta Int
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([actionKey])
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  type      String   @default("STRING")
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
