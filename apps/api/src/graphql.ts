@@ -99,32 +99,6 @@ export interface RegisterInput {
     userAgent?: Nullable<string>;
 }
 
-export interface UserInfo {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-    activeRole: string;
-    avatar?: Nullable<string>;
-    mustAcceptTerms: boolean;
-    mercadopagoCustomerId?: Nullable<string>;
-    mercadopagoAccessToken?: Nullable<string>;
-    status?: Nullable<string>;
-    loyaltyPoints?: Nullable<number>;
-    rating?: Nullable<number>;
-    balance?: Nullable<number>;
-    totalJobs?: Nullable<number>;
-    workerStatus?: Nullable<string>;
-    kycStatus?: Nullable<string>;
-    bio?: Nullable<string>;
-    currentPlan?: Nullable<string>;
-}
-
-export interface AuthResponse {
-    accessToken: string;
-    user: UserInfo;
-}
-
 export interface JobPrice {
     total: number;
     workerNet: number;
@@ -159,7 +133,7 @@ export interface Job {
     evidenceImages?: Nullable<string[]>;
     category?: Nullable<string>;
     imageUrl?: Nullable<string>;
-    provider?: Nullable<UserInfo>;
+    provider?: Nullable<string>;
 }
 
 export interface Review {
@@ -223,6 +197,32 @@ export interface UpdateLocationResponse {
     success: boolean;
 }
 
+export interface UserInfo {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    activeRole: string;
+    avatar?: Nullable<string>;
+    mustAcceptTerms: boolean;
+    mercadopagoCustomerId?: Nullable<string>;
+    mercadopagoAccessToken?: Nullable<string>;
+    status?: Nullable<string>;
+    loyaltyPoints?: Nullable<number>;
+    rating?: Nullable<number>;
+    balance?: Nullable<number>;
+    totalJobs?: Nullable<number>;
+    workerStatus?: Nullable<string>;
+    kycStatus?: Nullable<string>;
+    bio?: Nullable<string>;
+    currentPlan?: Nullable<string>;
+}
+
+export interface AuthResponse {
+    accessToken: string;
+    user: UserInfo;
+}
+
 export interface LegalDocument {
     id: string;
     version: string;
@@ -255,7 +255,7 @@ export interface MutationResponse {
 
 export interface IQuery {
     estimateJob(input: EstimateJobInput): JobEstimateResponse | Promise<JobEstimateResponse>;
-    getServices(category?: Nullable<string>, query?: Nullable<string>, location?: Nullable<string>): Job[] | Promise<Job[]>;
+    getServices(category?: Nullable<string>, query?: Nullable<string>, location?: Nullable<string>, latitude?: Nullable<number>, longitude?: Nullable<number>, radiusKm?: Nullable<number>): Job[] | Promise<Job[]>;
     healthCheckReputation(): string | Promise<string>;
     getWorkerReputation(workerId: string): ReputationInfo | Promise<ReputationInfo>;
     getServiceCategories(): CategoryInfo[] | Promise<CategoryInfo[]>;

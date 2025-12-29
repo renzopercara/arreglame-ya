@@ -34,10 +34,6 @@ export default function WelcomeHeader() {
             {user ? `Hola, ${firstName}` : 'Arreglame Ya'}
           </h1>
         )}
-        {/* Location selector / status */}
-        <div className="mt-3">
-          <LocationSelector />
-        </div>
       </div>
       
       {user && (
