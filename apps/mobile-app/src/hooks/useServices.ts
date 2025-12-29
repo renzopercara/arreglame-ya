@@ -5,8 +5,22 @@ import type { Service } from "@/components/ServiceCard";
 import { useQuery } from "@apollo/client/react";
 
 export const GET_SERVICES = gql`
-  query GetServices($category: String, $query: String, $location: String) {
-    getServices(category: $category, query: $query, location: $location) {
+  query GetServices(
+    $category: String
+    $query: String
+    $location: String
+    $latitude: Float
+    $longitude: Float
+    $radiusKm: Int
+  ) {
+    getServices(
+      category: $category
+      query: $query
+      location: $location
+      latitude: $latitude
+      longitude: $longitude
+      radiusKm: $radiusKm
+    ) {
       id
       title
       provider
@@ -21,6 +35,9 @@ interface UseServicesOptions {
   category?: string | null;
   query?: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
 }
 
 export default function useServices(options?: UseServicesOptions) {
@@ -30,6 +47,9 @@ export default function useServices(options?: UseServicesOptions) {
       category: options?.category || undefined,
       query: options?.query || undefined,
       location: options?.location || undefined,
+      latitude: options?.latitude || undefined,
+      longitude: options?.longitude || undefined,
+      radiusKm: options?.radiusKm || undefined,
     },
   });
 

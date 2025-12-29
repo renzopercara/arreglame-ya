@@ -8,17 +8,20 @@ import SearchBar from "@/components/SearchBar";
 import ServiceCard from "@/components/ServiceCard";
 import { ServiceGridSkeleton } from "@/components/ServiceCardSkeleton";
 import EmptySearchState from "@/components/EmptySearchState";
+import LocationSelector from "@/components/LocationSelector";
 import useServices from "@/hooks/useServices";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useLocationContext } from "@/contexts/LocationContext";
 
 /**
  * Search page with URL-first state management.
  * All search parameters live in the URL as single source of truth.
- * Features: debounced search (300ms), sticky filters, skeleton screens, animations.
+ * Features: debounced search (300ms), sticky filters, skeleton screens, animations, geolocation.
  */
 function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { latitude, longitude, cityName } = useLocationContext();
   
   // URL params as single source of truth
   const urlQuery = searchParams.get("q") || "";
@@ -48,10 +51,14 @@ function SearchContent() {
     setInputValue(urlQuery);
   }, [urlQuery]);
   
-  // Fetch services based on URL params
-  const { services, loading, error } = useServices({
+  // Fetch services based on URL params and location
+  const { services, loading, error, refetch } = useServices({
     category: urlCategory,
     query: urlQuery,
+    location: cityName,
+    latitude,
+    longitude,
+    radiusKm: 50,
   });
 
   const handleCategorySelect = (categoryId: string | null) => {
@@ -71,6 +78,11 @@ function SearchContent() {
     router.replace("/search", { scroll: false });
   };
 
+  const handleCityChange = () => {
+    // Refetch services when city changes
+    refetch();
+  };
+
   return (
     <div className="flex flex-col gap-6 pb-8">
       {/* Sticky header with search and filters */}
@@ -81,6 +93,9 @@ function SearchContent() {
             <h1 className="text-2xl font-bold text-slate-900">Encuentra el especialista ideal</h1>
           </div>
         </div>
+        
+        {/* Location selector */}
+        <LocationSelector onCityChange={handleCityChange} />
         
         <SearchBar 
           value={inputValue} 
@@ -136,7 +151,7 @@ function SearchContent() {
               animate={{ opacity: 1 }}
               className="text-sm text-slate-600"
             >
-              <strong>{services.length}</strong> servicios encontrados
+              <strong>{services.length}</strong> servicios encontrados {cityName && `en ${cityName}`}
             </motion.p>
             
             <AnimatePresence mode="popLayout">

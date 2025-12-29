@@ -218,6 +218,9 @@ export class JobsResolver {
     @Args('category', { nullable: true }) category?: string,
     @Args('query', { nullable: true }) query?: string,
     @Args('location', { nullable: true }) location?: string,
+    @Args('latitude', { type: () => Float, nullable: true }) latitude?: number,
+    @Args('longitude', { type: () => Float, nullable: true }) longitude?: number,
+    @Args('radiusKm', { type: () => Int, nullable: true }) radiusKm?: number,
   ): Promise<Job[]> {
     const whereClause: any = { status: 'CREATED' };
     if (location) {
@@ -250,7 +253,57 @@ export class JobsResolver {
       take: 50,
     });
 
+    // If coordinates are provided, filter and sort by proximity
+    if (latitude && longitude) {
+      const radius = radiusKm || 50; // Default 50km radius
+      const radiusMeters = radius * 1000;
+
+      const servicesWithDistance = services
+        .filter((s: any) => s.latitude != null && s.longitude != null) // Only services with valid coordinates
+        .map((s: any) => {
+          const distance = this.calculateHaversineDistance(
+            latitude,
+            longitude,
+            s.latitude,
+            s.longitude
+          );
+          return { ...s, distance };
+        });
+
+      // Filter by radius and sort by distance
+      const nearbyServices = servicesWithDistance
+        .filter((s: any) => s.distance <= radiusMeters)
+        .sort((a: any, b: any) => a.distance - b.distance);
+
+      return nearbyServices.map((s: any) => mapServiceRequestToJob(s));
+    }
+
     return services.map((s: any) => mapServiceRequestToJob(s));
+  }
+
+  /**
+   * Calculate distance between two points using Haversine formula
+   * Returns distance in meters
+   */
+  private calculateHaversineDistance(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number
+  ): number {
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
   }
 
   // ------------------------------------------

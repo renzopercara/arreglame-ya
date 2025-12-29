@@ -1,38 +1,41 @@
 "use client";
 
-import useLocation from "@/hooks/useLocation";
 import { MapPin, Loader, ChevronDown } from "lucide-react";
-
-const CITIES = ["Buenos Aires", "Córdoba", "Rosario", "Mendoza", "Mar del Plata"];
+import { useLocationContext } from "@/contexts/LocationContext";
+import { ENTRE_RIOS_CITIES } from "@/constants/cities";
 
 export default function LocationSelector({ onCityChange }: { onCityChange?: (city: string) => void }) {
-  const { status, city, neighborhood, setManualCity, refresh } = useLocation();
+  const { status, cityName, setManualCity, refreshLocation } = useLocationContext();
 
   const handleSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const c = e.target.value;
-    setManualCity(c);
-    onCityChange?.(c);
+    const selectedCity = e.target.value;
+    setManualCity(selectedCity);
+    onCityChange?.(selectedCity);
   };
 
-  if (status === "pending") {
+  if (status === "loading") {
     return (
       <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm border border-slate-200">
         <Loader className="h-4 w-4 animate-spin text-slate-400" />
-        <p className="text-sm text-slate-600">Buscando servicios cerca de ti...</p>
+        <p className="text-sm text-slate-600">Obteniendo ubicación...</p>
       </div>
     );
   }
 
-  if (status === "denied") {
+  if (status === "manual" || status === "error") {
     return (
-      <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm border border-amber-200">
-        <MapPin className="h-4 w-4 text-amber-500" />
-        <span className="text-sm text-slate-700">Selecciona tu ciudad:</span>
+      <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm border border-blue-200">
+        <MapPin className="h-4 w-4 text-blue-500" />
+        <span className="text-sm text-slate-700">Ciudad:</span>
         <div className="relative">
-          <select onChange={handleSelect} className="appearance-none bg-transparent pl-2 pr-6 text-sm font-semibold">
-            <option value="">Elegir...</option>
-            {CITIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+          <select 
+            value={cityName || ""} 
+            onChange={handleSelect} 
+            className="appearance-none bg-transparent pl-2 pr-6 text-sm font-semibold text-slate-800 cursor-pointer"
+          >
+            <option value="">Elegir ciudad...</option>
+            {ENTRE_RIOS_CITIES.map((c) => (
+              <option key={c.name} value={c.name}>{c.name}</option>
             ))}
           </select>
           <ChevronDown className="pointer-events-none absolute right-0 top-1 h-4 w-4 text-slate-400" />
@@ -41,12 +44,17 @@ export default function LocationSelector({ onCityChange }: { onCityChange?: (cit
     );
   }
 
+  // GPS mode
   return (
-    <button onClick={refresh} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm border border-slate-200">
-      <MapPin className="h-4 w-4 text-blue-600" />
+    <button 
+      onClick={refreshLocation} 
+      className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm border border-green-200 hover:bg-green-50 transition-colors"
+    >
+      <MapPin className="h-4 w-4 text-green-600" />
       <span className="text-sm font-semibold text-slate-800">
-        {neighborhood ? `${neighborhood}, ` : ""}{city || "Ubicación"}
+        📍 {cityName || "GPS activo"}
       </span>
     </button>
   );
 }
+
