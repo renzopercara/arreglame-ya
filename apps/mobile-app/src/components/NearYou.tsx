@@ -77,7 +77,7 @@ export default function NearYou() {
             <p className="text-base font-medium text-slate-800 mb-1">
               No pudimos cargar trabajadores cercanos
             </p>
-            <p className="text-sm text-slate-600">{error}</p>
+            <p className="text-sm text-slate-600">Intentá nuevamente</p>
           </div>
           <button
             onClick={() => refetch()}

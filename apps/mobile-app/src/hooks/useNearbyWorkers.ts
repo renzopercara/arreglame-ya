@@ -91,6 +91,7 @@ export default function useNearbyWorkers(
   // These create a circular distribution pattern for visualization
   const BASE_RADIUS = 0.01; // Approximately 1.1km at equator
   const RADIUS_VARIATION = 0.005; // Approximately 550m variation
+  const RADIUS_TIERS = 3; // Number of distance tiers for varied marker placement
 
   // Map workers to ServiceMapMarker format for the map component
   const markers = useMemo<ServiceMapMarker[]>(() => {
@@ -103,7 +104,7 @@ export default function useNearbyWorkers(
     // TODO: Update when API provides actual worker coordinates
     return workers.map((worker, index) => {
       const angle = (index / workers.length) * 2 * Math.PI;
-      const radius = BASE_RADIUS + (index % 3) * RADIUS_VARIATION;
+      const radius = BASE_RADIUS + (index % RADIUS_TIERS) * RADIUS_VARIATION;
       
       return {
         id: worker.id,
@@ -118,10 +119,8 @@ export default function useNearbyWorkers(
   }, [workers, latitude, longitude]);
 
   // Format error message for user-friendly display
-  // Preserve error details for debugging while showing friendly message
-  const friendlyError = error
-    ? "No pudimos cargar trabajadores cercanos. Intentá nuevamente."
-    : null;
+  // Following same pattern as useServices for consistency
+  const friendlyError = error ? error.message : null;
 
   // Log full error for debugging if available
   if (error && process.env.NODE_ENV === 'development') {
