@@ -27,6 +27,16 @@ export default function BottomNav() {
 
   const user = data?.me;
 
+  // Helper function to determine if a nav item is active
+  const isNavItemActive = (itemHref: string, currentPath: string): boolean => {
+    // Special case: Root path requires exact match to avoid matching all paths
+    if (itemHref === "/") {
+      return currentPath === "/";
+    }
+    // Other paths: exact match or sub-route match
+    return currentPath === itemHref || currentPath.startsWith(itemHref + "/");
+  };
+
   // Define navigation items based on auth state and activeRole
   const getNavItems = (): NavItem[] => {
     if (!user) {
@@ -82,12 +92,7 @@ export default function BottomNav() {
         <ul className="flex items-center justify-between gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            // Fix: Exact match for "/" to prevent it from always being active
-            // For other routes, check if pathname starts with the href
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname === item.href || pathname.startsWith(item.href + "/");
+            const isActive = isNavItemActive(item.href, pathname);
 
             return (
               <li key={item.href} className="flex-1">

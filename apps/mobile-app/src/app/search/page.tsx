@@ -85,7 +85,8 @@ function SearchContent() {
 
   return (
     <div className="flex flex-col gap-6 pb-8">
-      {/* Sticky header with search and filters */}
+      {/* Sticky header with search and filters 
+          Note: -mx-4 px-4 breaks out of parent container padding to create edge-to-edge header */}
       <header className="sticky top-0 z-50 flex flex-col gap-4 bg-slate-50 backdrop-blur-md pb-4 -mx-4 px-4 pt-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
