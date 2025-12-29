@@ -27,14 +27,14 @@ const GET_NEARBY_WORKERS = gql`
   }
 `;
 
-// Interface for the API response
+// Interface for the API response (matching GraphQL Service type)
 interface Worker {
   id: string;
   title: string;
   provider: string;
-  price: number;
+  price: number; // GraphQL returns Float
   category: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
 }
 
 interface GetNearbyWorkersResponse {
@@ -87,6 +87,11 @@ export default function useNearbyWorkers(
   // Extract workers from response
   const workers = data?.getServices ?? [];
 
+  // Constants for positioning markers around user location
+  // These create a circular distribution pattern for visualization
+  const BASE_RADIUS = 0.01; // Approximately 1.1km at equator
+  const RADIUS_VARIATION = 0.005; // Approximately 550m variation
+
   // Map workers to ServiceMapMarker format for the map component
   const markers = useMemo<ServiceMapMarker[]>(() => {
     if (!latitude || !longitude || !workers.length) {
@@ -94,11 +99,11 @@ export default function useNearbyWorkers(
     }
 
     // Since the API doesn't return lat/lng for each worker in the Service type,
-    // we'll distribute them around the user's location in a circular pattern
-    // This is a temporary solution until the API provides actual worker coordinates
+    // we distribute them around the user's location in a circular pattern
+    // TODO: Update when API provides actual worker coordinates
     return workers.map((worker, index) => {
       const angle = (index / workers.length) * 2 * Math.PI;
-      const radius = 0.01 + (index % 3) * 0.005; // Vary radius slightly
+      const radius = BASE_RADIUS + (index % 3) * RADIUS_VARIATION;
       
       return {
         id: worker.id,
@@ -107,15 +112,21 @@ export default function useNearbyWorkers(
         title: worker.title,
         price: worker.price,
         provider: worker.provider,
-        imageUrl: worker.imageUrl,
+        imageUrl: worker.imageUrl ?? undefined,
       };
     });
   }, [workers, latitude, longitude]);
 
   // Format error message for user-friendly display
+  // Preserve error details for debugging while showing friendly message
   const friendlyError = error
     ? "No pudimos cargar trabajadores cercanos. Intentá nuevamente."
     : null;
+
+  // Log full error for debugging if available
+  if (error && process.env.NODE_ENV === 'development') {
+    console.error('[useNearbyWorkers] GraphQL Error:', error);
+  }
 
   return {
     workers,
