@@ -1,10 +1,5 @@
-// apps/mobile-app/src/app/services/[id]/page.tsx
 import ServiceDetailClient from "./ServiceDetailClient";
 
-/**
- * generateStaticParams es necesario si usas "output: export" 
- * para definir qué IDs se generarán en el build.
- */
 export async function generateStaticParams() {
   return [
     { id: "service-123" },

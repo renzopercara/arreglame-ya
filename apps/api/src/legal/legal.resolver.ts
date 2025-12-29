@@ -1,14 +1,38 @@
 
-import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
+import { Resolver, Query, Mutation, Args, Context, ObjectType, Field } from '@nestjs/graphql';
 import { LegalService } from './legal.service';
 import { UseGuards } from '@nestjs/common';
 
-@Resolver('LegalDocument')
+@ObjectType('LegalDocument')
+export class LegalDocumentResponse {
+  @Field()
+  id: string;
+
+  @Field()
+  version: string;
+
+  @Field()
+  content: string;
+
+  @Field()
+  isActive: boolean;
+
+  @Field({ nullable: true })
+  role?: string;
+
+  @Field({ nullable: true })
+  createdAt?: Date;
+
+  @Field({ nullable: true })
+  updatedAt?: Date;
+}
+
+@Resolver()
 export class LegalResolver {
   constructor(private legalService: LegalService) {}
 
-  @Query()
-  async latestTerms(@Args('role') role: string) {
+  @Query(() => LegalDocumentResponse)
+  async latestTerms(@Args('role') role: string): Promise<LegalDocumentResponse> {
     const doc = await this.legalService.getActiveDocument(role as 'CLIENT' | 'WORKER');
     if (!doc) {
         // Fallback si no hay DB seed
@@ -22,12 +46,12 @@ export class LegalResolver {
     return doc;
   }
 
-  @Mutation()
+  @Mutation(() => Boolean)
   async acceptLatestTerms(
     @Args('userId') userId: string,
     @Args('documentId') documentId: string,
     @Context() context: any
-  ) {
+  ): Promise<boolean> {
     const ip = context.req?.ip || '0.0.0.0';
     const ua = context.req?.headers?.['user-agent'] || 'Unknown';
 

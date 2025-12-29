@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import BottomNav from "@/components/BottomNav";
+import { Providers } from './providers';
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -42,8 +43,10 @@ export default function RootLayout({
       <body className={`${inter.className} bg-gray-50 text-slate-900 select-none`}>
         {/* select-none: Evita selección de texto (sensación app nativa) */}
         <div className="mx-auto flex min-h-screen max-w-screen-sm flex-col bg-gray-50 px-4 pb-24 pt-6">
-          <main className="flex-1">{children}</main>
-          <BottomNav />
+          <Providers>
+            <main className="flex-1">{children}</main>
+            <BottomNav />
+          </Providers>
         </div>
       </body>
     </html>

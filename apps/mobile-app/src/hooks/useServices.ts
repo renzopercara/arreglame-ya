@@ -1,42 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { gql } from "@apollo/client";
 import type { Service } from "@/components/ServiceCard";
+import { useQuery } from "@apollo/client/react";
 
-const ENDPOINT = "/api/services";
-
-export default function useServices() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchServices = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(ENDPOINT, { cache: "no-store" });
-      if (!res.ok) {
-        throw new Error("No se pudieron obtener los servicios");
-      }
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : data?.services;
-      setServices(Array.isArray(list) ? list : []);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Error desconocido";
-      setError(message);
-    } finally {
-      setLoading(false);
+export const GET_SERVICES = gql`
+  query GetServices($category: String, $query: String, $location: String) {
+    getServices(category: $category, query: $query, location: $location) {
+      id
+      title
+      provider
+      price
+      category
+      imageUrl
     }
-  }, []);
+  }
+`;
 
-  useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+interface UseServicesOptions {
+  category?: string | null;
+  query?: string;
+  location?: string;
+}
 
-  return {
-    services,
-    loading,
-    error,
-    refetch: fetchServices,
-  };
+export default function useServices(options?: UseServicesOptions) {
+  const { data, loading, error, refetch } = useQuery<{ getServices: Service[] }>(GET_SERVICES, {
+    fetchPolicy: "cache-and-network",
+    variables: {
+      category: options?.category || undefined,
+      query: options?.query || undefined,
+      location: options?.location || undefined,
+    },
+  });
+
+  const services = data?.getServices ?? [];
+  const friendlyError = error ? error.message : null;
+
+  return { services, loading, error: friendlyError, refetch };
 }

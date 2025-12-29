@@ -1,0 +1,37 @@
+<h1>⚠️ {{title}}</h1>
+
+<p>Hola <strong>{{name}}</strong>,</p>
+
+<div class="highlight">
+  <p><strong>Se requiere tu acción.</strong> {{message}}</p>
+</div>
+
+{{#if details}}
+<div class="section">
+  <div class="section-title">Más información</div>
+  {{{details}}}
+</div>
+{{/if}}
+
+{{#if deadline}}
+<div class="section">
+  <div class="badge">⏰ Vence el {{deadline}}</div>
+  <p style="margin-top: 10px;">Por favor completa esta acción antes de la fecha indicada para evitar inconvenientes.</p>
+</div>
+{{/if}}
+
+<p style="text-align: center;">
+  <a href="{{actionUrl}}" class="cta-button">{{actionButtonText}}</a>
+</p>
+
+<div class="section">
+  <p style="font-size: 13px; color: #6b7280;">Si no puedes hacer clic en el botón, copia y pega esta URL en tu navegador:</p>
+  <p style="font-size: 12px; word-break: break-all; color: #2563eb;">{{actionUrl}}</p>
+</div>
+
+<div class="divider"></div>
+
+<p><strong>¿No solicitaste esta acción?</strong></p>
+<p>Si crees que recibiste este correo por error, <a href="{{supportUrl}}">contáctanos inmediatamente</a>.</p>
+
+<p>Saludos,<br><strong>El equipo de Arreglame Ya</strong></p>

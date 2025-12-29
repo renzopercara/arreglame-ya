@@ -1,33 +1,232 @@
-
-import { Resolver, Query, Mutation, Args, Subscription, Context } from '@nestjs/graphql';
+import {
+  Resolver,
+  Query,
+  Mutation,
+  Subscription,
+  Args,
+  Context,
+  ObjectType,
+  Field,
+  Float,
+  ID,
+  Int,
+  ResolveField,
+  Parent,
+} from '@nestjs/graphql';
 import { UnauthorizedException, Inject, UseGuards, BadRequestException } from '@nestjs/common';
 import { PubSubEngine } from 'graphql-subscriptions';
+import GraphQLJSON from 'graphql-type-json';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { AiVisionService } from '../ai/ai.service';
-import { BillingService } from '../billing/billing.service';
 import { ContentSecurityService } from '../security/content-security.service';
 import { CreateJobInput } from './dto/create-job.input';
 import { EstimateJobInput } from './dto/estimate-job.input';
 import { AuthGuard } from '../auth/auth.guard';
+import { UserInfoResponse } from '../auth/auth.resolver';
 
-@Resolver('ServiceRequest')
+// ============================================
+// OBJECT TYPES (GraphQL Code First)
+// ============================================
+
+@ObjectType()
+class JobPrice {
+  @Field(() => Float)
+  total!: number;
+
+  @Field(() => Float)
+  workerNet!: number;
+
+  @Field(() => Float)
+  platformFee!: number;
+
+  @Field(() => Float)
+  taxes!: number;
+
+  @Field()
+  currency!: string;
+
+  @Field({ nullable: true })
+  calculationSnapshot?: string;
+}
+
+@ObjectType()
+class JobEstimateResponse {
+  @Field(() => Float)
+  difficultyMultiplier!: number;
+
+  @Field(() => JobPrice)
+  price!: JobPrice;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  aiAnalysis?: any;
+}
+
+@ObjectType()
+class AuditResponse {
+  @Field()
+  approved!: boolean;
+
+  @Field(() => Float)
+  confidence!: number;
+
+  @Field(() => [String], { nullable: true })
+  observations?: string[];
+}
+
+@ObjectType()
+export class Job {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  status!: string;
+
+  @Field({ nullable: true })
+  description?: string;
+
+  @Field({ nullable: true })
+  title?: string;
+
+  @Field({ nullable: true })
+  address?: string;
+
+  @Field({ nullable: true })
+  city?: string;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  price?: any;
+
+  @Field({ nullable: true })
+  gardenImageBefore?: string;
+
+  @Field({ nullable: true })
+  gardenImageAfter?: string;
+
+  @Field(() => [String], { nullable: true })
+  evidenceImages?: string[];
+
+  @Field({ nullable: true })
+  category?: string;
+
+  @Field({ nullable: true })
+  imageUrl?: string;
+
+  @Field(() => UserInfoResponse, { nullable: true })
+  provider?: UserInfoResponse | null;
+
+  // Internal helper to resolve provider when not eagerly loaded
+  workerId?: string;
+}
+
+@ObjectType()
+class Review {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => Int)
+  rating!: number;
+
+  @Field({ nullable: true })
+  comment?: string;
+}
+
+const mapUserInfo = (user: any): UserInfoResponse | null => {
+  if (!user) return null;
+  const worker = user.workerProfile;
+  const client = user.clientProfile;
+  const wallet = user.wallet;
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: client?.name || worker?.name || user.name || '',
+    role: user.role,
+    activeRole: user.activeRole,
+    avatar: client?.avatar || null,
+    mustAcceptTerms: false,
+    mercadopagoCustomerId: user.mercadopagoCustomerId || null,
+    mercadopagoAccessToken: user.mercadopagoAccessToken || null,
+    status: user.status,
+    loyaltyPoints: client?.loyaltyPoints ?? 0,
+    rating: worker?.rating ?? client?.rating ?? null,
+    balance: wallet ? Number((wallet as any).balanceAvailable ?? 0) : null,
+    totalJobs: worker?.totalJobs ?? 0,
+    workerStatus: worker?.status ?? null,
+    kycStatus: worker?.kycStatus ?? null,
+    bio: worker?.bio ?? client?.bio ?? null,
+    currentPlan: worker?.currentPlan ?? client?.currentPlan ?? null,
+  } as UserInfoResponse;
+};
+
+const mapServiceRequestToJob = (s: any): Job => ({
+  id: s.id,
+  status: s.status,
+  description: s.description,
+  title: s.description || 'Servicio',
+  address: s.address,
+  city: s.city,
+  price: s.price,
+  gardenImageBefore: s.gardenImageBefore,
+  gardenImageAfter: s.gardenImageAfter,
+  evidenceImages: s.evidenceImages,
+  category: s.category ?? null,
+  imageUrl: s.gardenImageBefore || s.gardenImageAfter || (s.evidenceImages?.[0] ?? null),
+  provider: mapUserInfo(s.worker?.user),
+  workerId: s.workerId,
+});
+
+// ============================================
+// RESOLVER
+// ============================================
+
+@Resolver(() => Job)
 export class JobsResolver {
   constructor(
-    private prisma: PrismaService,
-    private aiService: AiVisionService,
-    private billingService: BillingService,
-    private securityService: ContentSecurityService,
-    @Inject('PUB_SUB') private pubSub: PubSubEngine,
+    private readonly prisma: PrismaService,
+    private readonly aiService: AiVisionService,
+    private readonly securityService: ContentSecurityService,
+    @Inject('PUB_SUB') private readonly pubSub: any, // any to allow asyncIterator
   ) {}
 
-  @Query('estimateJob')
+  // Resolve provider if not eagerly loaded
+  @ResolveField(() => UserInfoResponse, { nullable: true })
+  async provider(@Parent() job: any): Promise<UserInfoResponse | null> {
+    if (job.provider) return job.provider as UserInfoResponse;
+    const workerId = job.workerId;
+    if (!workerId) return null;
+
+    const worker = await (this.prisma.workerProfile as any).findUnique({
+      where: { id: workerId },
+      include: {
+        user: {
+          include: {
+            wallet: true,
+            workerProfile: true,
+            clientProfile: true,
+          },
+        },
+      },
+    });
+
+    return worker?.user ? mapUserInfo(worker.user) : null;
+  }
+
+  // ------------------------------------------
+  // QUERIES
+  // ------------------------------------------
+
+  @Query(() => JobEstimateResponse)
   @UseGuards(AuthGuard)
-  async estimateJob(@Args('input') input: EstimateJobInput) {
+  async estimateJob(@Args('input', { type: () => EstimateJobInput }) input: EstimateJobInput): Promise<JobEstimateResponse> {
     const aiResult = await this.aiService.estimateGardenWork(input.image, input.description || '');
-    
-    const difficultyAdjusted = input.hasHighWeeds ? aiResult.difficultyMultiplier * 1.3 : aiResult.difficultyMultiplier;
+
+    const difficultyAdjusted = input.hasHighWeeds
+      ? aiResult.difficultyMultiplier * 1.3
+      : aiResult.difficultyMultiplier;
+
     const workerNet = input.squareMeters * 150 * difficultyAdjusted;
-    const total = workerNet / 0.75; 
+    const total = workerNet / 0.75;
 
     return {
       ...aiResult,
@@ -38,276 +237,205 @@ export class JobsResolver {
         platformFee: total * 0.25,
         taxes: 0,
         currency: 'ARS',
-        calculationSnapshot: JSON.stringify({ ...aiResult, input })
-      }
+        calculationSnapshot: JSON.stringify({ ...aiResult, input }),
+      },
     };
   }
 
-  @Mutation('createJob')
+  @Query(() => [Job])
+  async getServices(
+    @Args('category', { nullable: true }) category?: string,
+    @Args('query', { nullable: true }) query?: string,
+    @Args('location', { nullable: true }) location?: string,
+  ): Promise<Job[]> {
+    const whereClause: any = { status: 'CREATED' };
+    if (location) {
+      whereClause.city = { equals: location, mode: 'insensitive' };
+    }
+    if (category) {
+      whereClause.category = category;
+    }
+    if (query) {
+      whereClause.description = { contains: query, mode: 'insensitive' };
+    }
+
+    const services = await (this.prisma.serviceRequest as any).findMany({
+      where: whereClause,
+      include: {
+        worker: {
+          include: {
+            user: {
+              include: {
+                wallet: true,
+                workerProfile: true,
+                clientProfile: true,
+              },
+            },
+          },
+        },
+        client: { include: { user: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return services.map((s: any) => mapServiceRequestToJob(s));
+  }
+
+  // ------------------------------------------
+  // MUTATIONS
+  // ------------------------------------------
+
+  @Mutation(() => Job)
   @UseGuards(AuthGuard)
-  async createJob(@Args('input') input: CreateJobInput) {
+  async createJob(@Args('input', { type: () => CreateJobInput }) input: CreateJobInput): Promise<Job> {
     const pin = Math.floor(1000 + Math.random() * 9000).toString();
-    
+
     const price = {
-        total: input.squareMeters * 200 * input.difficulty,
-        workerNet: input.squareMeters * 150 * input.difficulty,
-        platformFee: 50 * input.squareMeters,
-        taxes: 0,
-        currency: 'ARS'
+      total: input.squareMeters * 200 * input.difficulty,
+      workerNet: input.squareMeters * 150 * input.difficulty,
+      platformFee: 50 * input.squareMeters,
+      taxes: 0,
+      currency: 'ARS',
     };
 
-    const newJob = await (this.prisma as any).serviceRequest.create({
+    let city: string | null = null;
+    if (input.address) {
+      const parts = input.address.split(',').map((p) => p.trim());
+      if (parts.length >= 2) city = parts[parts.length - 2];
+    }
+
+    const created = await (this.prisma.serviceRequest as any).create({
       data: {
         clientId: input.clientId,
         status: 'CREATED',
         latitude: input.lat,
         longitude: input.lng,
+        address: input.address,
+        city,
         gardenImageBefore: input.image,
         description: input.description,
         difficulty: input.difficulty,
-        estimatedHours: input.estimatedHours,
         squareMeters: input.squareMeters,
         pin,
-        price: price as any
-      }
+        price,
+      },
     });
 
-    return newJob;
+    const full = await (this.prisma.serviceRequest as any).findUnique({
+      where: { id: created.id },
+      include: {
+        worker: {
+          include: {
+            user: {
+              include: {
+                wallet: true,
+                workerProfile: true,
+                clientProfile: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return mapServiceRequestToJob(full ?? created);
   }
 
-  @Mutation('startJob')
+  @Mutation(() => Job)
   @UseGuards(AuthGuard)
-  async startJob(@Args('jobId') jobId: string, @Args('pin') pin: string) {
-    const job = await (this.prisma as any).serviceRequest.findUnique({ 
-        where: { id: jobId }
-    });
-    
+  async startJob(
+    @Args('jobId') jobId: string,
+    @Args('pin') pin: string,
+  ): Promise<Job> {
+    const job = await (this.prisma.serviceRequest as any).findUnique({ where: { id: jobId } });
+
     if (!job || job.pin !== pin) {
-      throw new UnauthorizedException("PIN Incorrecto o trabajo no encontrado.");
+      throw new UnauthorizedException('PIN Incorrecto o trabajo no encontrado.');
     }
 
-    const updatedJob = await (this.prisma as any).serviceRequest.update({
+    const updatedJob = await (this.prisma.serviceRequest as any).update({
       where: { id: jobId },
-      data: { status: 'IN_PROGRESS', startedAt: new Date() }
+      data: { status: 'IN_PROGRESS', startedAt: new Date() },
     });
 
-    (this.pubSub as any).publish(`JOB_UPDATE_${jobId}`, { jobUpdated: updatedJob });
-    return updatedJob;
+    this.pubSub.publish(`JOB_UPDATE_${jobId}`, { jobUpdated: updatedJob });
+    return mapServiceRequestToJob(updatedJob);
   }
 
-  @Mutation('arriveAtJob')
+  @Mutation(() => Boolean)
   @UseGuards(AuthGuard)
   async arriveAtJob(
-    @Args('workerId') workerId: string, 
+    @Args('workerId') workerId: string,
     @Args('jobId') jobId: string,
-    @Args('lat') lat: number,
-    @Args('lng') lng: number
-  ) {
-     (this.pubSub as any).publish(`WORKER_LOCATION_${jobId}`, { workerLocationMoved: { lat, lng } });
-     return true;
+    @Args('lat', { type: () => Float }) lat: number,
+    @Args('lng', { type: () => Float }) lng: number,
+  ): Promise<boolean> {
+    this.pubSub.publish(`WORKER_LOCATION_${jobId}`, { workerLocationMoved: { lat, lng } });
+    return true;
   }
 
-  @Mutation('completeJob')
+  @Mutation(() => AuditResponse)
   @UseGuards(AuthGuard)
   async completeJob(
-      @Args('jobId') jobId: string, 
-      @Args('imageAfter') imageAfter: string,
-      @Args('evidenceImages') evidenceImages?: string[]
-  ) {
-      const job = await (this.prisma as any).serviceRequest.findUnique({ where: { id: jobId } });
-      
-      const audit = await this.aiService.auditJobCompletion(job.gardenImageBefore, imageAfter, evidenceImages || []);
-
-      if (audit.approved) {
-          const warrantyExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // +72 Hours
-          
-          await (this.prisma as any).serviceRequest.update({
-              where: { id: jobId },
-              data: { 
-                  status: 'PENDING_CLIENT_APPROVAL',
-                  gardenImageAfter: imageAfter,
-                  evidenceImages: evidenceImages || [],
-                  completedAt: new Date(),
-                  warrantyExpiresAt
-              }
-          });
-          const updated = await (this.prisma as any).serviceRequest.findUnique({ where: { id: jobId } });
-          (this.pubSub as any).publish(`JOB_UPDATE_${jobId}`, { jobUpdated: updated });
-      }
-
-      return audit;
-  }
-
-  // --- POST SALES LOGIC ---
-
-  @Query('getJobHistory')
-  @UseGuards(AuthGuard)
-  async getJobHistory(@Args('jobId') jobId: string, @Context() ctx: any) {
-    const userId = ctx.req.user.sub;
-    const job = await (this.prisma as any).serviceRequest.findUnique({
-        where: { id: jobId },
-        include: { 
-            client: true, 
-            worker: true,
-            tickets: { where: { status: { not: 'CLOSED' } } },
-            reviews: { where: { authorId: { in: [userId] } } } // SimplificaciÃƒ³n: busca por user ID, en prod serÃƒ­a profile ID
-        }
-    });
-
-    if (!job) throw new BadRequestException("Trabajo no encontrado");
-
-    // Buscamos si el usuario actual ya dejÃƒ³ review
-    const myReview = await (this.prisma as any).review.findFirst({
-        where: { jobId, author: { userId: userId } }
-    });
-
-    return {
-        ...job,
-        myReview,
-        activeTicket: job.tickets[0] || null
-    };
-  }
-
-  @Mutation('submitReview')
-  @UseGuards(AuthGuard)
-  async submitReview(@Args('input') input: any, @Context() ctx: any) {
-     const userId = ctx.req.user.sub;
-     const job = await (this.prisma as any).serviceRequest.findUnique({ where: { id: input.jobId }, include: { worker: true, client: true } });
-     if (!job) throw new BadRequestException("Job not found");
-
-     // Determinar perfil autor (Simplificado, asume cliente califica a worker)
-     const authorProfile = await (this.prisma as any).clientProfile.findUnique({ where: { userId } });
-     if (!authorProfile) throw new BadRequestException("Perfil no encontrado");
-
-     const review = await (this.prisma as any).review.create({
-         data: {
-             jobId: input.jobId,
-             rating: input.rating,
-             comment: input.comment,
-             authorId: authorProfile.id,
-             targetId: job.workerId
-         }
-     });
-
-     // LÃƒ³gica de Riesgo: Si califica <= 2, abrir ticket automÃƒ¡tico
-     if (input.rating <= 2) {
-         await (this.prisma as any).supportTicket.create({
-             data: {
-                 jobId: input.jobId,
-                 reporterId: userId,
-                 category: 'AUTOMATED_LOW_RATING',
-                 priority: 'HIGH',
-                 status: 'OPEN',
-                 subject: `Alerta Calidad: Baja calificaciÃƒ³n (${input.rating}Ã¢Ëœâ€¦)`,
-                 description: `El cliente calificÃƒ³ con ${input.rating} estrellas. Comentario: "${input.comment || 'Sin comentario'}". Requiere revisiÃƒ³n de QA.`
-             }
-         });
-     }
-
-     return review;
-  }
-
-  @Mutation('createSupportTicket')
-  @UseGuards(AuthGuard)
-  async createSupportTicket(@Args('input') input: any, @Context() ctx: any) {
-      const userId = ctx.req.user.sub;
-      return (this.prisma as any).supportTicket.create({
-          data: {
-              jobId: input.jobId,
-              reporterId: userId,
-              category: input.category,
-              priority: 'MEDIUM',
-              status: 'OPEN',
-              subject: input.subject,
-              description: input.description
-          }
-      });
-  }
-
-  // --- COMMUNICATION ---
-
-  @Mutation('sendMessage')
-  @UseGuards(AuthGuard)
-  async sendMessage(
     @Args('jobId') jobId: string,
-    @Args('senderId') senderId: string,
-    @Args('role') role: string,
-    @Args('content') content: string
-  ) {
-    await this.securityService.validateMessageContent(senderId, jobId, content);
+    @Args('imageAfter') imageAfter: string,
+    @Args('evidenceImages', { type: () => [String], nullable: true }) evidenceImages?: string[],
+  ): Promise<AuditResponse> {
+    const job = await (this.prisma.serviceRequest as any).findUnique({ where: { id: jobId } });
+    const audit = await this.aiService.auditJobCompletion(job.gardenImageBefore, imageAfter, evidenceImages || []);
 
-    const msg = await (this.prisma as any).chatMessage.create({
+    if (audit.approved) {
+      const warrantyExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+      await (this.prisma.serviceRequest as any).update({
+        where: { id: jobId },
+        data: {
+          status: 'PENDING_CLIENT_APPROVAL',
+          gardenImageAfter: imageAfter,
+          evidenceImages: evidenceImages || [],
+          completedAt: new Date(),
+          warrantyExpiresAt,
+        },
+      });
+      const updated = await (this.prisma.serviceRequest as any).findUnique({ where: { id: jobId } });
+      this.pubSub.publish(`JOB_UPDATE_${jobId}`, { jobUpdated: updated });
+    }
+
+    return audit;
+  }
+
+  @Mutation(() => Review)
+  @UseGuards(AuthGuard)
+  async submitReview(
+    @Args('input', { type: () => GraphQLJSON }) input: any,
+    @Context() ctx: any,
+  ): Promise<Review> {
+    const userId = ctx.req.user.sub;
+    const job = await (this.prisma.serviceRequest as any).findUnique({ where: { id: input.jobId } });
+    if (!job) throw new BadRequestException('Job not found');
+
+    const authorProfile = await (this.prisma as any).clientProfile.findUnique({ where: { userId } });
+
+    return (this.prisma.review as any).create({
       data: {
-        jobId,
-        senderId,
-        senderRole: role,
-        content
-      }
+        jobId: input.jobId,
+        rating: input.rating,
+        comment: input.comment,
+        authorId: authorProfile.id,
+        targetId: job.workerId,
+      },
     });
-
-    (this.pubSub as any).publish(`CHAT_MESSAGE_${jobId}`, { chatMessageAdded: { ...msg, timestamp: msg.timestamp.getTime() } });
-
-    return { ...msg, timestamp: msg.timestamp.getTime() };
   }
 
-  @Query('nearbyJobs')
-  @UseGuards(AuthGuard)
-  async nearbyJobs(@Args('lat') lat: number, @Args('lng') lng: number) {
-      return (this.prisma as any).serviceRequest.findMany({
-          where: { status: 'CREATED' },
-          take: 10
-      });
-  }
+  // ------------------------------------------
+  // SUBSCRIPTIONS
+  // ------------------------------------------
 
-  @Query('chatMessages')
-  @UseGuards(AuthGuard)
-  async chatMessages(@Args('jobId') jobId: string) {
-      const msgs = await (this.prisma as any).chatMessage.findMany({
-          where: { jobId },
-          orderBy: { timestamp: 'asc' }
-      });
-      return msgs.map((m: any) => ({...m, timestamp: m.timestamp.getTime() }));
-  }
-
-  @Mutation('requestExtraTime')
-  @UseGuards(AuthGuard)
-  async requestExtraTime(@Args('jobId') jobId: string, @Args('minutes') minutes: number, @Args('reason') reason: string) {
-      const updated = await (this.prisma as any).serviceRequest.update({
-          where: { id: jobId },
-          data: {
-              extraTimeMinutes: minutes,
-              extraTimeReason: reason,
-              extraTimeStatus: 'PENDING'
-          }
-      });
-      (this.pubSub as any).publish(`JOB_UPDATE_${jobId}`, { jobUpdated: updated });
-      return updated;
-  }
-
-  @Mutation('respondToExtraTime')
-  @UseGuards(AuthGuard)
-  async respondToExtraTime(@Args('jobId') jobId: string, @Args('approved') approved: boolean) {
-      const status = approved ? 'APPROVED' : 'REJECTED';
-      const updated = await (this.prisma as any).serviceRequest.update({
-          where: { id: jobId },
-          data: { extraTimeStatus: status }
-      });
-      (this.pubSub as any).publish(`JOB_UPDATE_${jobId}`, { jobUpdated: updated });
-      return { id: jobId, extraTimeStatus: status, totalPrice: updated.price.total };
-  }
-
-  @Subscription('jobUpdated')
+  @Subscription(() => Job, {
+    name: 'jobUpdated',
+    resolve: (payload) => payload.jobUpdated,
+  })
   jobUpdated(@Args('jobId') jobId: string) {
-    return (this.pubSub as any).asyncIterator(`JOB_UPDATE_${jobId}`);
-  }
-
-  @Subscription('workerLocationMoved')
-  workerLocationMoved(@Args('jobId') jobId: string) {
-    return (this.pubSub as any).asyncIterator(`WORKER_LOCATION_${jobId}`);
-  }
-
-  @Subscription('chatMessageAdded')
-  chatMessageAdded(@Args('jobId') jobId: string) {
-    return (this.pubSub as any).asyncIterator(`CHAT_MESSAGE_${jobId}`);
+    return this.pubSub.asyncIterator(`JOB_UPDATE_${jobId}`);
   }
 }

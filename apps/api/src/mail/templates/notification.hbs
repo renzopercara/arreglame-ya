@@ -1,0 +1,32 @@
+<h1>{{title}}</h1>
+
+<div class="highlight">
+  <p>{{message}}</p>
+</div>
+
+{{#if additionalInfo}}
+<div class="section">
+  <div class="section-title">Detalles</div>
+  {{{additionalInfo}}}
+</div>
+{{/if}}
+
+{{#if items}}
+<div class="section">
+  <ul class="features">
+    {{#each items}}
+    <li>{{this}}</li>
+    {{/each}}
+  </ul>
+</div>
+{{/if}}
+
+{{#if ctaText}}
+<p style="text-align: center;">
+  <a href="{{ctaUrl}}" class="cta-button">{{ctaText}}</a>
+</p>
+{{/if}}
+
+<div class="section">
+  <p><em>Esta es una notificación automática de Arreglame Ya. Por favor no responda a este correo.</em></p>
+</div>

@@ -2,13 +2,16 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createHash } from 'crypto';
+import { UserRegisteredEvent } from './events/user-events.listener';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   private hashPassword(password: string): string {
@@ -47,8 +50,14 @@ export class AuthService {
                 email,
                 passwordHash,
                 role,
+                activeRole: role === 'WORKER' ? 'PROVIDER' : 'CLIENT',
                 status: 'LOGGED_IN'
             }
+        });
+
+        // Crear perfiles duales para flexibilidad
+        await tx.customerProfile.create({
+            data: { userId: newUser.id, name }
         });
 
         if (role === 'CLIENT') {
@@ -67,10 +76,20 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = await this.jwtService.signAsync(payload);
 
+    // Emitir evento para enviar email de bienvenida
+    this.eventEmitter.emit('user.registered', { email: user.email, name } as UserRegisteredEvent);
+
     return { accessToken, user };
   }
 
   async findUserById(id: string) {
     return (this.prisma as any).user.findUnique({ where: { id } });
+  }
+
+  async switchActiveRole(userId: string, activeRole: 'CLIENT' | 'PROVIDER') {
+    return (this.prisma as any).user.update({
+      where: { id: userId },
+      data: { activeRole },
+    });
   }
 }

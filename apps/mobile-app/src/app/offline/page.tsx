@@ -1,20 +1,16 @@
-import React from 'react';
-import { WifiOff } from 'lucide-react';
+// apps/mobile-app/src/app/offline/page.tsx
+"use client";
 
 export default function OfflinePage() {
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-slate-100 p-6 text-center">
-      <div className="bg-white p-6 rounded-full shadow-lg mb-6">
-        <WifiOff size={48} className="text-slate-400" />
-      </div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-2">Sin Conexión</h1>
-      <p className="text-slate-500 mb-8">
-        Parece que perdiste la conexión a internet. 
-        Revisá tu señal para continuar usando Arreglame Ya.
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
+      <h1 className="text-2xl font-bold text-slate-900">Sin conexión</h1>
+      <p className="mt-2 text-slate-600">
+        Parece que no tienes internet. Revisa tu conexión para seguir usando Arreglame Ya.
       </p>
       <button 
-        onClick={() => window.location.reload()}
-        className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold active:scale-95 transition-transform"
+        onClick={() => window.location.reload()} 
+        className="mt-6 rounded-xl bg-blue-600 px-6 py-2 text-white font-semibold"
       >
         Reintentar
       </button>

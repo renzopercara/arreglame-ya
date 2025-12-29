@@ -1,220 +1,545 @@
+/**
+ * Billing Service - Enterprise Grade
+ * 
+ * Responsabilidades:
+ * - Procesamiento de pagos (escrow management)
+ * - Cálculo de comisiones y impuestos
+ * - Gestión de carteras (wallets)
+ * - Solicitudes de retiro (payouts)
+ * - Auditoría y compliance
+ * 
+ * Características:
+ * - Transacciones ACID
+ * - Idempotencia
+ * - Logging detallado
+ * - Error handling profesional
+ */
 
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '../config/config.service';
+import { CommissionService } from './commission.service';
+import { PaymentAuditLog, throwBillingException } from './billing.exceptions';
+import { WalletBalance, TransactionHistory } from './billing.entity';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
+  private readonly MIN_WITHDRAWAL = 5000; // ARS
+  private readonly MAX_WITHDRAWAL = 1000000; // ARS
 
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private commissionService: CommissionService,
   ) {}
 
   /**
-   * Inicializa la billetera de un usuario si no existe.
+   * Asegura que la billetera exista para un usuario
+   * @param userId ID del usuario
+   * @returns Billetera creada o existente
    */
   async ensureWalletExists(userId: string) {
-    const wallet = await (this.prisma as any).wallet.findUnique({ where: { userId } });
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { userId },
+    });
+
     if (!wallet) {
-      return (this.prisma as any).wallet.create({
-        data: { userId }
+      PaymentAuditLog.log('info', 'WALLET_CREATED', { userId });
+      return this.prisma.wallet.create({
+        data: { userId },
       });
     }
+
     return wallet;
   }
 
   /**
-   * PROCESO DE INGRESO (CLIENT PAYS)
-   * El cliente paga. El dinero entra a la plataforma. 
-   * Se asigna el monto neto al "Pending Balance" del trabajador (Escrow).
+   * Obtener saldo de billetera
+   * @param userId ID del usuario
+   * @returns Balance con detalles
    */
-  async processPaymentIn(jobId: string, paymentId: string, totalAmount: number) {
-    const job = await (this.prisma as any).serviceRequest.findUnique({
-        where: { id: jobId },
-        include: { worker: true }
-    });
+  async getWalletBalance(userId: string): Promise<WalletBalance> {
+    const wallet = await this.ensureWalletExists(userId);
 
-    if (!job.workerId) throw new BadRequestException("No worker assigned to hold funds for.");
-
-    // 1. Asegurar wallets
-    const workerWallet = await this.ensureWalletExists(job.workerId);
-
-    // 2. Calcular Split Real
-    // Neto = Total - ComisiÃƒ³n - Impuestos
-    // Usamos los valores guardados en el Job para consistencia
-    const workerNet = job.priceWorkerNet; 
-    const platformFee = job.pricePlatformFee;
-
-    // 3. Crear Transacciones (Ledger)
-    return (this.prisma as any).$transaction(async (tx: any) => {
-        // A. Registro de entrada total (Para contabilidad interna de plataforma - Opcional aquÃƒ­, 
-        // pero importante si tuviÃƒ©ramos una Wallet de Plataforma en DB).
-
-        // B. AsignaciÃƒ³n a Escrow del Trabajador
-        await tx.transaction.create({
-            data: {
-                walletId: workerWallet.id,
-                jobId: jobId,
-                type: 'ESCROW_ALLOCATION',
-                amount: workerNet,
-                status: 'COMPLETED',
-                description: `Fondos en garantÃƒ­a por trabajo #${jobId.slice(0,8)}`,
-                referenceId: paymentId
-            }
-        });
-
-        // C. Actualizar Saldo Pendiente
-        await tx.wallet.update({
-            where: { id: workerWallet.id },
-            data: { balancePending: { increment: workerNet } }
-        });
-
-        // D. Actualizar Estado del Job
-        await tx.serviceRequest.update({
-            where: { id: jobId },
-            data: { status: 'IN_PROGRESS' } // O 'ACCEPTED' si el pago es previo
-        });
-    });
+    return {
+      userId,
+      balancePending: Number(wallet.balancePending),
+      balanceAvailable: Number(wallet.balanceAvailable),
+      totalBalance: Number(wallet.balancePending) + Number(wallet.balanceAvailable),
+      currency: 'ARS',
+      lastUpdated: wallet.updatedAt,
+    };
   }
 
   /**
-   * RELEASE ESCROW (LIBERACIÃƒâ€œN DE FONDOS)
-   * Mueve el dinero de Pending a Available.
-   * Se ejecuta cuando el cliente confirma o por auto-release timer.
+   * Procesar pago entrante (cliente → plataforma → trabajador escrow)
+   * 
+   * Flujo:
+   * 1. Validar servicio y trabajador asignado
+   * 2. Asegurar billetera del trabajador
+   * 3. Crear transacción de entrada
+   * 4. Actualizar saldo pending (escrow)
+   * 5. Actualizar estado del servicio
+   * 
+   * @param jobId ID del servicio
+   * @param paymentId ID de pago de Mercado Pago
+   * @param totalAmount Monto total del cliente
+   * @param idempotencyKey Clave para evitar duplicados
+   */
+  async processPaymentIn(
+    jobId: string,
+    paymentId: string,
+    totalAmount: number,
+    idempotencyKey?: string,
+  ) {
+    try {
+      // 1. Validaciones
+      const job = await this.prisma.serviceRequest.findUnique({
+        where: { id: jobId },
+        include: { worker: { include: { user: true } } },
+      });
+
+      if (!job) {
+        throwBillingException('SERVICE_NOT_FOUND');
+      }
+
+      if (!job.workerId) {
+        throwBillingException(
+          'SERVICE_INVALID_PRICE',
+          'No hay trabajador asignado para este servicio',
+        );
+      }
+
+      // Si el servicio ya está marcado como completado, evitamos reprocesar
+      if (String(job.status) === 'COMPLETED') {
+        throwBillingException('SERVICE_ALREADY_PAID');
+      }
+
+      const effectiveIdempotencyKey = idempotencyKey ?? paymentId;
+
+      // 3. Calcular comisión
+      const breakdown = this.commissionService.calculateCommissionBreakdown(
+        totalAmount,
+      );
+
+      // 4. Asegurar billetera del trabajador
+      const workerWallet = await this.ensureWalletExists(job.workerId);
+
+      // 5. Transacción ACID
+      const result = await this.prisma.$transaction(async (tx) => {
+        // A. Crear transacción en estado PENDING con idempotencia
+        let transaction;
+        try {
+          transaction = await tx.transaction.create({
+            data: {
+              walletId: workerWallet.id,
+              jobId: jobId,
+              type: 'ESCROW_ALLOCATION',
+              amount: new Prisma.Decimal(breakdown.workerNetAmount),
+              status: 'PENDING',
+              description: `Fondos en escrow por trabajo #${jobId.slice(0, 8)}`,
+              referenceId: paymentId,
+              // Campo único para idempotencia (debe existir en el schema)
+              idempotencyKey: effectiveIdempotencyKey,
+            },
+          });
+        } catch (error) {
+          // Si es clave duplicada (idempotencia), ignoramos de forma segura
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2002'
+          ) {
+            PaymentAuditLog.log('info', 'PAYMENT_DUPLICATE', {
+              jobId,
+              idempotencyKey: effectiveIdempotencyKey,
+              paymentId,
+            });
+            // No arrojamos error, salimos con estado de ya procesado
+            return { transaction: null, breakdown, alreadyProcessed: true };
+          }
+          throw error;
+        }
+
+        // B. Actualizar saldo pending del trabajador (Decimal)
+        await tx.wallet.update({
+          where: { id: workerWallet.id },
+          data: { balancePending: { increment: new Prisma.Decimal(breakdown.workerNetAmount) } },
+        });
+
+        // C. Actualizar estado del servicio y campos de precio
+        await tx.serviceRequest.update({
+          where: { id: jobId },
+          data: {
+            status: 'ACCEPTED',
+            // Asignar breakdown a campos específicos
+            // Nota: si el schema usa Decimal, Prisma.Decimal; si usa Float, número
+            priceWorkerNet: breakdown.workerNetAmount,
+            pricePlatformFee: breakdown.platformFee,
+            // Mantener JSON de precio para transparencia
+            price: {
+              total: breakdown.totalAmount,
+              workerNet: breakdown.workerNetAmount,
+              platformFee: breakdown.platformFee,
+              taxAmount: breakdown.taxAmount,
+              gatewayFee: breakdown.paymentGatewayFee,
+              currency: 'ARS',
+            },
+          },
+        });
+
+        // D. Marcar transacción como COMPLETED y auditar el cambio
+        const completed = await tx.transaction.update({
+          where: { id: transaction.id },
+          data: { status: 'COMPLETED' },
+        });
+
+        PaymentAuditLog.log('info', 'TRANSACTION_COMPLETED', {
+          transactionId: completed.id,
+          type: completed.type,
+          amount: completed.amount?.toString?.() ?? breakdown.workerNetAmount,
+          status: 'COMPLETED',
+        });
+
+        return { transaction: completed, breakdown, alreadyProcessed: false };
+      });
+
+      // 6. Logging de auditoría
+      PaymentAuditLog.log(
+        'info',
+        'PAYMENT_IN_PROCESSED',
+        {
+          jobId,
+          paymentId,
+          totalAmount,
+          workerNetAmount: breakdown.workerNetAmount,
+          workerId: job.workerId,
+          platformFee: breakdown.platformFee,
+        },
+        false,
+      );
+
+      if (result.alreadyProcessed) {
+        return { status: 'already_processed' };
+      }
+
+      return {
+        status: 'completed',
+        transaction: result.transaction,
+        breakdown: result.breakdown,
+      };
+    } catch (error) {
+      PaymentAuditLog.log('error', 'PAYMENT_IN_FAILED', {
+        jobId,
+        paymentId,
+        error: error.message,
+      });
+
+      // Mapear errores conocidos
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          // Duplicado
+          throwBillingException('PAYMENT_DUPLICATE');
+        }
+      }
+      if ((error as any)?.errorCode) throw error as any;
+      throw new InternalServerErrorException('Error procesando pago');
+    }
+  }
+
+  /**
+   * Liberar fondos en escrow tras completar servicio
+   * 
+   * Movimiento: balancePending → balanceAvailable
+   * 
+   * @param jobId ID del servicio completado
    */
   async releaseFunds(jobId: string) {
-    const job = await (this.prisma as any).serviceRequest.findUnique({
-      where: { id: jobId },
-      include: { worker: true }
-    });
-
-    if (!job || job.status === 'COMPLETED') return; // Idempotencia bÃƒ¡sica
-
-    const workerWallet = await this.ensureWalletExists(job.workerId);
-    
-    // El monto a liberar es el que calculamos al inicio (priceWorkerNet)
-    // MÃƒ¡s cualquier ajuste aprobado (TODO: Sumar adjustments)
-    const amountToRelease = job.priceWorkerNet;
-
-    await (this.prisma as any).$transaction(async (tx: any) => {
-      // 1. Mover de Pending a Available
-      await tx.wallet.update({
-        where: { id: workerWallet.id },
-        data: { 
-          balancePending: { decrement: amountToRelease },
-          balanceAvailable: { increment: amountToRelease }
-        }
-      });
-
-      // 2. Registrar TransacciÃƒ³n de LiberaciÃƒ³n
-      await tx.transaction.create({
-        data: {
-          walletId: workerWallet.id,
-          jobId: jobId,
-          type: 'ESCROW_RELEASE',
-          amount: amountToRelease,
-          status: 'COMPLETED',
-          description: `LiberaciÃƒ³n de pago #${jobId.slice(0,8)}`,
-        }
-      });
-
-      // 3. Marcar trabajo como Completado (Financieramente cerrado)
-      await tx.serviceRequest.update({
+    try {
+      const job = await this.prisma.serviceRequest.findUnique({
         where: { id: jobId },
-        data: { status: 'COMPLETED', completedAt: new Date() }
+        include: { worker: true },
       });
-      
-      // 4. (Opcional) Trigger Reputation update
+
+      if (!job) {
+        throwBillingException('SERVICE_NOT_FOUND');
+      }
+
+      // Si el trabajo no está en un estado aceptado/avanzado, evitar liberar
+      if (job.status !== 'ACCEPTED' && job.status !== 'IN_PROGRESS') {
+        throwBillingException(
+          'SERVICE_INVALID_PRICE',
+          `No se pueden liberar fondos: estado actual es ${job.status}`,
+        );
+      }
+
+      // Idempotencia
+      if (String(job.status) === 'COMPLETED') {
+        return { status: 'already_released' };
+      }
+
+      const workerWallet = await this.ensureWalletExists(job.workerId);
+      const amountToRelease = job.priceWorkerNet;
+
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Mover de escrow a disponible (Decimal)
+        await tx.wallet.update({
+          where: { id: workerWallet.id },
+          data: {
+            balancePending: { decrement: new Prisma.Decimal(amountToRelease) },
+            balanceAvailable: { increment: new Prisma.Decimal(amountToRelease) },
+          },
+        });
+
+        // 2. Registrar liberación PENDING → COMPLETED
+        const pendingRelease = await tx.transaction.create({
+          data: {
+            walletId: workerWallet.id,
+            jobId: jobId,
+            type: 'ESCROW_RELEASE',
+            amount: new Prisma.Decimal(amountToRelease),
+            status: 'PENDING',
+            description: `Fondos liberados tras completar servicio #${jobId.slice(0, 8)}`,
+          },
+        });
+
+        const completedRelease = await tx.transaction.update({
+          where: { id: pendingRelease.id },
+          data: { status: 'COMPLETED' },
+        });
+
+        PaymentAuditLog.log('info', 'TRANSACTION_COMPLETED', {
+          transactionId: completedRelease.id,
+          type: completedRelease.type,
+          amount: completedRelease.amount?.toString?.() ?? amountToRelease,
+          status: 'COMPLETED',
+        });
+
+        // 3. Marcar servicio como completado
+        await tx.serviceRequest.update({
+          where: { id: jobId },
+          data: { status: 'COMPLETED', completedAt: new Date() },
+        });
+      });
+
+      PaymentAuditLog.log('info', 'ESCROW_RELEASED', {
+        jobId,
+        workerId: job.workerId,
+        amount: amountToRelease,
+      });
+
+      return { status: 'released', amount: amountToRelease };
+    } catch (error) {
+      PaymentAuditLog.log('error', 'ESCROW_RELEASE_FAILED', {
+        jobId,
+        error: error.message,
+      });
+
+      if (error.errorCode) throw error;
+      throw new InternalServerErrorException('Error liberando fondos');
+    }
+  }
+
+  /**
+   * Obtener historial de transacciones
+   * @param userId ID del usuario
+   * @param limit Cantidad de transacciones a retornar
+   * @returns Array de transacciones
+   */
+  async getTransactionHistory(
+    userId: string,
+    limit: number = 50,
+  ): Promise<TransactionHistory[]> {
+    const wallet = await this.ensureWalletExists(userId);
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: { walletId: wallet.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
     });
 
-    this.logger.log(`Funds released for Job ${jobId}: $${amountToRelease}`);
-    return true;
+    const currentBalance = Number(wallet.balanceAvailable) + Number(wallet.balancePending);
+    return transactions.map((t) => ({
+      id: t.id,
+      walletId: t.walletId,
+      type: t.type as any,
+      amount: Number(t.amount),
+      status: t.status as any,
+      description: t.description ?? '',
+      referenceId: t.referenceId ?? undefined,
+      createdAt: t.createdAt,
+      completedAt: t.updatedAt,
+      balance: currentBalance,
+    }));
   }
 
   /**
-   * AJUSTE DE PRECIO (MUTATION)
-   * Agrega costos extra (Materiales, Tiempo).
-   * Requiere pago inmediato del cliente por la diferencia.
+   * Solicitar retiro de fondos
+   * 
+   * Validaciones:
+   * - Saldo suficiente
+   * - Monto dentro de límites
+   * - CBU/alias válido
+   * 
+   * @param userId ID del trabajador
+   * @param amount Monto a retirar
+   * @param cbuAlias CBU o alias para transferencia
    */
-  async createAdjustment(jobId: string, amount: number, reason: string, isCommissionable: boolean = true) {
-     // 1. Calcular comisiÃƒ³n sobre el ajuste
-     const config = await this.configService.get('platformFeePercentage') || 0.25;
-     const commission = isCommissionable ? Math.round(amount * config) : 0;
-     const workerNetDelta = amount - commission;
+  async requestPayout(userId: string, amount: number, cbuAlias: string) {
+    try {
+      // 1. Validaciones
+      if (amount < this.MIN_WITHDRAWAL) {
+        throwBillingException(
+          'WALLET_INSUFFICIENT_BALANCE',
+          `El retiro mínimo es de ARS ${this.MIN_WITHDRAWAL}`,
+        );
+      }
 
-     // 2. Actualizar el Job (Solo metadatos, el saldo se toca al pagar)
-     const job = await (this.prisma as any).serviceRequest.update({
-         where: { id: jobId },
-         data: {
-             priceTotal: { increment: amount },
-             priceWorkerNet: { increment: workerNetDelta },
-             pricePlatformFee: { increment: commission },
-             // Si son materiales, sumar a priceMaterials tambiÃƒ©n
-         }
-     });
+      if (amount > this.MAX_WITHDRAWAL) {
+        throwBillingException(
+          'SERVICE_INVALID_PRICE',
+          `El retiro máximo es de ARS ${this.MAX_WITHDRAWAL}`,
+        );
+      }
 
-     return {
-         newTotal: job.priceTotal,
-         amountToPay: amount,
-         workerNetDelta,
-         paymentLink: "https://mercadopago..." // AquÃƒ­ generarÃƒ­amos link por la diferencia
-     };
-  }
+      if (!cbuAlias || cbuAlias.length < 3) {
+        throwBillingException(
+          'SERVICE_INVALID_PRICE',
+          'CBU o alias inválido',
+        );
+      }
 
-  /**
-   * SOLICITUD DE RETIRO (PAYOUT)
-   */
-  async requestPayout(userId: string, amount: number, cbu: string) {
+      // 2. Verificar saldo
       const wallet = await this.ensureWalletExists(userId);
-      const minWithdrawal = 5000; // Configurable
+      const availableBalance = Number(wallet.balanceAvailable);
 
-      if (amount < minWithdrawal) {
-          throw new BadRequestException(`El retiro mÃƒ­nimo es de $${minWithdrawal}`);
+      if (availableBalance < amount) {
+        throwBillingException(
+          'WALLET_INSUFFICIENT_BALANCE',
+          `Tu saldo disponible es de ARS ${availableBalance.toFixed(2)}`,
+        );
       }
 
-      if (wallet.balanceAvailable < amount) {
-          throw new BadRequestException("Saldo insuficiente.");
-      }
-
-      await (this.prisma as any).$transaction(async (tx: any) => {
-          // 1. Descontar saldo disponible (Bloquear fondos)
+      // 3. Crear solicitud de retiro
+      const payoutRequest = await this.prisma.$transaction(
+        async (tx) => {
+          // A. Descontar saldo (bloquear fondos)
           await tx.wallet.update({
-              where: { id: wallet.id },
-              data: { balanceAvailable: { decrement: amount } }
+            where: { id: wallet.id },
+            data: { balanceAvailable: { decrement: new Prisma.Decimal(amount) } },
           });
 
-          // 2. Crear registro de TransacciÃƒ³n (DÃƒ©bito)
+          // B. Registrar transacción de salida
           await tx.transaction.create({
-              data: {
-                  walletId: wallet.id,
-                  type: 'WITHDRAWAL',
-                  amount: -amount, // Negativo
-                  status: 'PENDING',
-                  description: `Solicitud retiro a CBU ${cbu.slice(-4)}`
-              }
+            data: {
+              walletId: wallet.id,
+              type: 'WITHDRAWAL',
+              amount: new Prisma.Decimal(-amount),
+              status: 'PENDING',
+              description: `Solicitud de retiro a ${cbuAlias.slice(-4)}`,
+            },
           });
 
-          // 3. Crear Payout Request para admin/procesador
-          await tx.payoutRequest.create({
-              data: {
-                  walletId: wallet.id,
-                  amount,
-                  cbuAlias: cbu,
-                  status: 'REQUESTED'
-              }
+          // C. Crear payout request
+          return tx.payoutRequest.create({
+            data: {
+              walletId: wallet.id,
+              userId,
+              amount,
+              cbuAlias,
+              status: 'REQUESTED',
+            },
           });
+        },
+      );
+
+      PaymentAuditLog.log('info', 'PAYOUT_REQUESTED', {
+        userId,
+        amount,
+        cbuAlias: cbuAlias.slice(-4),
+        payoutId: payoutRequest.id,
       });
 
-      return { status: 'REQUESTED', remainingBalance: wallet.balanceAvailable - amount };
+      return {
+        status: 'requested',
+        payoutId: payoutRequest.id,
+        amount,
+        remainingBalance: availableBalance - amount,
+        estimatedCompletion: '2-3 días hábiles',
+      };
+    } catch (error) {
+      PaymentAuditLog.log('error', 'PAYOUT_REQUEST_FAILED', {
+        userId,
+        amount,
+        error: error.message,
+      });
+
+      if (error.errorCode) throw error;
+      throw new InternalServerErrorException('Error solicitando retiro');
+    }
   }
 
-  async applyCancellationFee(clientId: string, amount: number) {
-      await (this.prisma as any).user.update({
-          where: { id: clientId },
-          data: { status: 'DEBTOR' }
+  /**
+   * Crear ajuste de precio (materiales, tiempo extra)
+   * 
+   * @param jobId ID del servicio
+   * @param amount Monto del ajuste
+   * @param reason Descripción del ajuste
+   * @param isCommissionable Si aplican comisiones
+   */
+  async createAdjustment(
+    jobId: string,
+    amount: number,
+    reason: string,
+    isCommissionable: boolean = true,
+  ) {
+    if (amount <= 0) {
+      throwBillingException('SERVICE_INVALID_PRICE', 'El monto debe ser mayor a 0');
+    }
+
+    try {
+      const job = await this.prisma.serviceRequest.findUnique({
+        where: { id: jobId },
       });
-      // TODO: Crear deuda en una tabla ClientDebt si fuera necesario
+
+      if (!job) {
+        throwBillingException('SERVICE_NOT_FOUND');
+      }
+
+      const breakdown = this.commissionService.calculateCommissionBreakdown(amount);
+      const workerNetDelta = isCommissionable
+        ? breakdown.workerNetAmount
+        : amount;
+
+      const updated = await this.prisma.serviceRequest.update({
+        where: { id: jobId },
+        data: {
+          // Si el schema es Decimal, Prisma.Decimal; en Float aceptará número
+          priceWorkerNet: { increment: workerNetDelta },
+          pricePlatformFee: { increment: breakdown.platformFee },
+        },
+      });
+
+      PaymentAuditLog.log('info', 'ADJUSTMENT_CREATED', {
+        jobId,
+        amount,
+        reason,
+        workerNetDelta,
+      });
+
+      return {
+        adjustment: {
+          amount,
+          workerNetAmount: workerNetDelta,
+          platformFee: breakdown.platformFee,
+          reason,
+        },
+        newTotal: updated.priceWorkerNet,
+      };
+    } catch (error) {
+      if (error.errorCode) throw error;
+      throw new InternalServerErrorException('Error creando ajuste');
+    }
   }
 }

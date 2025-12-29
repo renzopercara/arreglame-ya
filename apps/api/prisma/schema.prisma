@@ -78,6 +78,57 @@ enum TransactionStatus {
   FAILED
 }
 
+enum ActiveRole {
+  CLIENT
+  PROVIDER
+}
+
+enum ServiceCategory {
+  MAINTENANCE
+  PAINTING
+  HVAC
+  ELECTRICAL
+  PLUMBING
+}
+
+enum ServiceSubcategory {
+  // MAINTENANCE
+  LAWN_MOWING
+  GARDEN_CLEANUP
+  TREE_TRIMMING
+  PRESSURE_WASHING
+  
+  // PAINTING
+  INTERIOR_PAINTING
+  EXTERIOR_PAINTING
+  WALL_REPAIR
+  
+  // HVAC
+  AC_INSTALLATION
+  AC_REPAIR
+  AC_MAINTENANCE
+  HEATING_INSTALLATION
+  
+  // ELECTRICAL
+  OUTLET_INSTALLATION
+  LIGHTING_INSTALLATION
+  CIRCUIT_BREAKER
+  WIRING_REPAIR
+  
+  // PLUMBING
+  LEAK_REPAIR
+  PIPE_INSTALLATION
+  DRAIN_CLEANING
+  FAUCET_INSTALLATION
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
+
 // ============================================
 // CORE USER MODELS
 // ============================================
@@ -88,12 +139,19 @@ model User {
   passwordHash String
   role         UserRole    @default(CLIENT)
   status       UserStatus  @default(LOGGED_IN)
+  activeRole   ActiveRole  @default(CLIENT) // Rol activo para UI dinámica
+  
+  // Mercado Pago integration fields
+  mercadopagoCustomerId   String? // For clients (payers)
+  mercadopagoAccessToken  String? // For workers (receivers)
+  
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
   // Relations
   workerProfile    WorkerProfile?
   clientProfile    ClientProfile?
+  customerProfile  CustomerProfile? // Perfil para clientes/compradores
   
   // Mensajes relacionados al User directamente
   sentMessages     ChatMessage[]  @relation("SenderRelation")
@@ -102,19 +160,25 @@ model User {
   wallet           Wallet?
   payoutRequests   PayoutRequest[]
   userConsents     UserConsent[]
+  notifications    Notification[]
 
   @@index([email])
   @@index([status])
+  @@index([activeRole])
 }
 
 model WorkerProfile {
   id                 String         @id @default(uuid())
   userId             String         @unique
   name               String
+  bio                String?
+  trade              String? // Oficio (Plomero, Electricista, etc.)
+  hourlyRate         Float? // Precio por hora
+  availability       Json? // Estructura flexible para horarios
   rating             Float          @default(5.0)
   totalJobs          Int            @default(0)
   status             WorkerStatus   @default(OFFLINE)
-  location           Unsupported("geography(Point, 4326)")?
+  // location           Unsupported("geography(Point, 4326)")? // Commented: Use latitude/longitude instead
   latitude           Float?
   longitude          Float?
   lastLocationUpdate DateTime?
@@ -123,7 +187,6 @@ model WorkerProfile {
   acceptanceRate     Float          @default(1.0)
   cancellationRate   Float          @default(0.0)
   penaltyUntil       DateTime?
-  bio                String?
   kycStatus          KYCStatus      @default(PENDING_SUBMISSION)
   dniFront           String?
   dniBack            String?
@@ -141,7 +204,7 @@ model WorkerProfile {
   @@index([userId])
   @@index([status])
   @@index([currentPlan])
-  @@index([location])
+  // @@index([location]) // Removed: location field is now commented out
 }
 
 model ClientProfile {
@@ -163,19 +226,48 @@ model ClientProfile {
   @@index([currentPlan])
 }
 
+model CustomerProfile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  name             String
+  bio              String?
+  phone            String?
+  avatar           String?
+  rating           Float    @default(5.0)
+  totalOrders      Int      @default(0)
+  loyaltyPoints    Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 // ============================================
 // SERVICE REQUEST & BILLING
 // ============================================
 
 model ServiceRequest {
-  id                    String          @id @default(uuid())
-  status                JobStatus       @default(CREATED)
+  id                    String              @id @default(uuid())
+  status                JobStatus           @default(CREATED)
+  paymentStatus         String              @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+  
+  // Service Classification (NEW)
+  category              ServiceCategory?
+  subcategory           ServiceSubcategory?
+  metadata              Json?               // Flexible storage for subcategory-specific data
+  difficultyLevel       DifficultyLevel     @default(MEDIUM)
+  
   clientId              String
   workerId              String?
-  location              Unsupported("geography(Point, 4326)")
+  // location              Unsupported("geography(Point, 4326)") // Commented: Use latitude/longitude instead
   latitude              Float
   longitude             Float
   address               String?
+  city                  String?         // City name for precise filtering
+  coverageRadius        Float           @default(15.0) // Search radius in km
   description           String?
   squareMeters          Float
   gardenImageBefore     String
@@ -191,6 +283,7 @@ model ServiceRequest {
   extraTimeStatus       ExtraTimeStatus @default(NONE)
   extraTimeMinutes      Int?
   extraTimeReason       String?
+  paidAt                DateTime?       // When payment was completed
   
   // Nota: disputeId removido de aquí para que Dispute sea el único dueño de la relación 1:1
   
@@ -211,10 +304,16 @@ model ServiceRequest {
   transactions    Transaction[]
   chatMessages    ChatMessage[]
 
+  // Billing performance indices
   @@index([status])
+  @@index([paymentStatus]) // Quick lookup of payment status
   @@index([clientId])
   @@index([workerId])
   @@index([createdAt])
+  @@index([paidAt]) // Revenue analytics queries
+  // Composite indices for common billing queries
+  @@index([clientId, paymentStatus])
+  @@index([workerId, paymentStatus])
 }
 
 model Dispute {
@@ -250,7 +349,9 @@ model Wallet {
   transactions     Transaction[]
   payoutRequests   PayoutRequest[]
 
+  // Billing performance indices
   @@index([userId])
+  @@index([updatedAt]) // For recent wallet activity queries
 }
 
 model Transaction {
@@ -262,6 +363,7 @@ model Transaction {
   status         TransactionStatus @default(PENDING)
   description    String?
   referenceId    String?
+  idempotencyKey String?           @unique
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -269,10 +371,15 @@ model Transaction {
   wallet         Wallet            @relation(fields: [walletId], references: [id], onDelete: Restrict)
   serviceRequest ServiceRequest?   @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
-  @@index([walletId])
-  @@index([type])
-  @@index([status])
-  @@index([jobId])
+  // Billing performance indices
+  @@index([walletId]) // Quick lookup of wallet transactions
+  @@index([jobId])    // Fast service request transaction lookups
+  @@index([type])     // Filter by transaction type (PAYMENT_RECEIVED, REFUND, etc.)
+  @@index([status])   // Query pending/completed transactions
+  @@index([referenceId]) // Idempotency: find transaction by payment gateway ID
+  @@index([createdAt]) // Historical/audit queries
+  // Composite index for common billing queries
+  @@index([walletId, status, createdAt])
 }
 
 model PayoutRequest {
@@ -443,4 +550,26 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 
   @@index([key])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO, SUCCESS, WARNING, ERROR
+  read      Boolean  @default(false)
+  data      Json? // Datos adicionales (deeplink, metadata)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
 }

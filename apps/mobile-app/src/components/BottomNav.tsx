@@ -2,17 +2,79 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, User, ClipboardList } from "lucide-react";
+import { useQuery } from "@apollo/client/react";
+import { Home, Search, User, ClipboardList, Briefcase, MessageSquare, LayoutDashboard } from "lucide-react";
+import { ME_QUERY } from "@/graphql/queries";
 
-const navItems = [
-  { href: "/", label: "Inicio", icon: Home },
-  { href: "/search", label: "Buscar", icon: Search },
-  { href: "/profile", label: "Perfil", icon: User },
-  { href: "/login", label: "Acceso", icon: ClipboardList },
-];
+interface NavItem {
+  href: string;
+  label: string;
+  icon: any;
+}
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { data, loading } = useQuery<{
+    me: {
+      id: string;
+      email: string;
+      role: string;
+      activeRole?: 'CLIENT' | 'PROVIDER';
+    }
+  }>(ME_QUERY, {
+    errorPolicy: 'ignore', // Ignore errors if not authenticated
+  });
+
+  const user = data?.me;
+
+  // Define navigation items based on auth state and activeRole
+  const getNavItems = (): NavItem[] => {
+    if (!user) {
+      // Not logged in
+      return [
+        { href: "/", label: "Inicio", icon: Home },
+        { href: "/search", label: "Buscar", icon: Search },
+        { href: "/login", label: "Acceso", icon: User },
+      ];
+    }
+
+    if (user.activeRole === 'PROVIDER' || user.role === 'WORKER') {
+      // Provider/Worker mode
+      return [
+        { href: "/worker/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/worker/jobs", label: "Trabajos", icon: Briefcase },
+        { href: "/worker/chat", label: "Chat", icon: MessageSquare },
+        { href: "/profile", label: "Perfil", icon: User },
+      ];
+    }
+
+    // Client mode (default)
+    return [
+      { href: "/", label: "Inicio", icon: Home },
+      { href: "/search", label: "Buscar", icon: Search },
+      { href: "/bookings", label: "Pedidos", icon: ClipboardList },
+      { href: "/profile", label: "Perfil", icon: User },
+    ];
+  };
+
+  const navItems = getNavItems();
+
+  if (loading) {
+    return (
+      <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-screen-sm -translate-x-1/2 px-4">
+        <nav className="rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur">
+          <div className="flex items-center justify-between gap-1 h-16 animate-pulse">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <div className="h-10 w-10 rounded-xl bg-gray-200" />
+                <div className="h-3 w-12 rounded bg-gray-200" />
+              </div>
+            ))}
+          </div>
+        </nav>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-screen-sm -translate-x-1/2 px-4">
@@ -22,7 +84,7 @@ export default function BottomNav() {
             const Icon = item.icon;
             const isActive =
               pathname === item.href ||
-              (item.href !== "/auth/login" && pathname.startsWith(item.href));
+              (item.href !== "/login" && pathname.startsWith(item.href));
 
             return (
               <li key={item.href} className="flex-1">
@@ -43,7 +105,7 @@ export default function BottomNav() {
                   >
                     <Icon className="h-5 w-5" strokeWidth={2.5} />
                   </div>
-                  <span>{item.label}</span>
+                  <span className="truncate">{item.label}</span>
                 </Link>
               </li>
             );

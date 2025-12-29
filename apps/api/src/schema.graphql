@@ -37,6 +37,7 @@ type UserWithProfile {
   id: ID!
   email: String!
   role: UserRole!
+  activeRole: ActiveRole!
   name: String!
   status: UserStatus!
   rating: Float!
@@ -48,7 +49,14 @@ type UserWithProfile {
   bio: String
   currentPlan: String!
   balance: Float
+  mercadopagoCustomerId: String
+  mercadopagoAccessToken: String
   createdAt: DateTime!
+}
+
+enum ActiveRole {
+  CLIENT
+  PROVIDER
 }
 
 # ==================================================
@@ -138,6 +146,19 @@ type ServiceRequest {
   worker: WorkerProfile
 }
 
+# ==================================================
+# SERVICES (LISTING FOR CLIENT APP)
+# ==================================================
+
+type Service {
+  id: ID!
+  title: String!
+  provider: String!
+  price: Float!
+  category: String!
+  imageUrl: String
+}
+
 enum JobStatus {
   CREATED
   ACCEPTED
@@ -215,6 +236,11 @@ type PayoutRequest {
   status: String!
   createdAt: DateTime!
   processedAt: DateTime
+}
+
+type PaymentPreference {
+  preferenceId: String!
+  initPoint: String!
 }
 
 # ==================================================
@@ -414,6 +440,12 @@ type Query {
   nearbyJobs(lat: Float!, lng: Float!): [ServiceRequest!]!
   chatMessages(jobId: String!): [ChatMessage!]!
   
+  # Fetch a single service/job by ID
+  getService(id: String!): ServiceRequest
+
+  # List services for marketplace (mapped from ServiceRequest)
+  getServices(category: String, query: String, location: String): [Service!]!
+  
   # Wallet
   getWallet: Wallet
   getWalletTransactions: [Transaction!]
@@ -424,7 +456,12 @@ type Query {
   # Reputation
   healthCheckReputation: String!
   getWorkerReputation(workerId: ID!): ReputationResponse!
+  
+  # Notifications
+  getNotifications(limit: Int): [Notification!]!
+  getUnreadCount: UnreadCountResult!
 }
+
 
 # ==================================================
 # MUTATIONS
@@ -434,12 +471,16 @@ type Mutation {
   # Authentication
   login(input: LoginInput!): AuthResponse!
   register(input: RegisterInput!): AuthResponse!
+  switchActiveRole(activeRole: ActiveRole!): UserWithProfile!
   
   # Service Requests (Jobs)
   createJob(input: CreateJobInput!): ServiceRequest!
   startJob(jobId: String!, pin: String!): ServiceRequest!
   arriveAtJob(workerId: String!, jobId: String!, lat: Float!, lng: Float!): Boolean!
   completeJob(jobId: String!, imageAfter: String!, evidenceImages: [String!]): AuditResult!
+  
+  # Mercado Pago / Payments
+  createPaymentPreference(serviceRequestId: String!): PaymentPreference!
   
   # Worker Profile
   updateWorkerLocation(lat: Float!, lng: Float!): Boolean!
@@ -465,7 +506,13 @@ type Mutation {
   # Extra Time
   requestExtraTime(jobId: String!, minutes: Int!, reason: String!): ServiceRequest!
   respondToExtraTime(jobId: String!, approved: Boolean!): ExtraTimeResponse!
+  
+  # Notifications
+  markNotificationAsRead(notificationId: String!): Notification!
+  markAllNotificationsAsRead: MutationResult!
+  deleteNotification(notificationId: String!): MutationResult!
 }
+
 
 # ==================================================
 # SUBSCRIPTIONS
@@ -483,7 +530,31 @@ type LocationUpdate {
 }
 
 # ==================================================
+# NOTIFICATIONS
+# ==================================================
+
+type Notification {
+  id: ID!
+  userId: String!
+  title: String!
+  message: String!
+  type: String!
+  read: Boolean!
+  data: JSON
+  createdAt: DateTime!
+}
+
+type UnreadCountResult {
+  count: Int!
+}
+
+type MutationResult {
+  success: Boolean!
+}
+
+# ==================================================
 # SCALAR TYPES
 # ==================================================
 
 scalar DateTime
+scalar JSON

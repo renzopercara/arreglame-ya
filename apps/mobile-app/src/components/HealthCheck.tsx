@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { gql } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
 
 interface HealthStatus {
   status: 'ok' | 'error';
@@ -8,6 +10,13 @@ interface HealthStatus {
   isConnected: boolean;
   isLoading: boolean;
 }
+
+// Consulta GraphQL simple para verificar conectividad
+const HEALTH_QUERY = gql`
+  query HealthCheck {
+    healthCheckReputation
+  }
+`;
 
 export function HealthCheck() {
   const [health, setHealth] = useState<HealthStatus>({
@@ -17,43 +26,33 @@ export function HealthCheck() {
     isLoading: true,
   });
 
+  const { data, error, loading, refetch } = useQuery<{ healthCheckReputation: string }>(HEALTH_QUERY, {
+    fetchPolicy: 'network-only',
+  });
+
   useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const response = await fetch('/api/health', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+    if (loading) return;
+    if (error) {
+      setHealth({
+        status: 'error',
+        message: `Error de conexión: ${error.message}`,
+        isConnected: false,
+        isLoading: false,
+      });
+      return;
+    }
+    setHealth({
+      status: 'ok',
+      message: data?.healthCheckReputation || 'Conexión exitosa',
+      isConnected: true,
+      isLoading: false,
+    });
+  }, [data, error, loading]);
 
-        if (response.ok) {
-          const data = await response.json();
-          setHealth({
-            status: 'ok',
-            message: data.message || 'Conexión exitosa',
-            isConnected: true,
-            isLoading: false,
-          });
-        } else {
-          throw new Error(`HTTP ${response.status}`);
-        }
-      } catch (error) {
-        setHealth({
-          status: 'error',
-          message: `Error de conexión: ${error instanceof Error ? error.message : 'Desconocido'}`,
-          isConnected: false,
-          isLoading: false,
-        });
-      }
-    };
-
-    checkHealth();
-    // Reintento cada 5 segundos
-    const interval = setInterval(checkHealth, 5000);
-
+  useEffect(() => {
+    const interval = setInterval(() => refetch(), 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refetch]);
 
   const bgColor = health.isConnected
     ? 'bg-green-50 border-green-200'

@@ -2,7 +2,7 @@
 import { Module } from '@nestjs/common';
 import { JobsResolver } from './jobs.resolver';
 import { AiVisionService } from '../ai/ai.service';
-import { BillingService } from '../billing/billing.service';
+import { BillingModule } from '../billing/billing.module';
 import { GeoService } from '../geo/geo.service';
 import { MatchingService } from '../matching/matching.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,11 +12,10 @@ import { ContentSecurityService } from '../security/content-security.service';
 import { PubSubModule } from '../common/pubsub.module';
 
 @Module({
-  imports: [ConfigModule, ReputationModule, PubSubModule],
+  imports: [ConfigModule, ReputationModule, PubSubModule, BillingModule],
   providers: [
     JobsResolver,
     AiVisionService,
-    BillingService,
     GeoService,
     MatchingService,
     PrismaService,

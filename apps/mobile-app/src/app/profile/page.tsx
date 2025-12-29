@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { ArrowLeft, Bell, Clock3, LogOut, MapPin, ShieldCheck, Star, User } from "lucide-react";
+import PaymentReadinessBanner from "@/components/PaymentReadinessBanner";
+import ProfileProgressBanner from "@/components/ProfileProgressBanner";
 
 export default function ProfilePage() {
   return (
     <div className="flex flex-col gap-6">
+      {/* Payment readiness banner */}
+      <PaymentReadinessBanner />
+      
+      {/* Profile progress banner */}
+      <ProfileProgressBanner />
       <header className="flex items-center gap-3">
         <Link
           href="/search"

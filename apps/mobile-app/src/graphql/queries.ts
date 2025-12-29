@@ -1,6 +1,40 @@
 
 import { gql } from '@apollo/client';
 
+// Query para detalle de servicio (usada por Codegen)
+export const GET_SERVICE = gql`
+  query GetService($id: String!) {
+    getService(id: $id) {
+      id
+      status
+      description
+      squareMeters
+      latitude
+      longitude
+      address
+      gardenImageBefore
+      gardenImageAfter
+      price {
+        total
+        workerNet
+        platformFee
+        taxes
+        currency
+      }
+      client {
+        id
+        name
+      }
+      worker {
+        id
+        name
+      }
+      createdAt
+      completedAt
+    }
+  }
+`;
+
 // ... (Queries anteriores)
 
 // AUTH & USER
@@ -10,6 +44,7 @@ export const ME_QUERY = gql`
       id
       name
       role
+      activeRole
       status
       mustAcceptTerms
       loyaltyPoints
@@ -20,6 +55,8 @@ export const ME_QUERY = gql`
       kycStatus
       bio
       currentPlan
+      mercadopagoCustomerId
+      mercadopagoAccessToken
     }
   }
 `;
@@ -161,9 +198,29 @@ export const REGISTER_MUTATION = gql`
   }
 `;
 
+export const SWITCH_ACTIVE_ROLE = gql`
+  mutation SwitchActiveRole($activeRole: ActiveRole!) {
+    switchActiveRole(activeRole: $activeRole) {
+      id
+      activeRole
+      name
+      role
+    }
+  }
+`;
+
 export const ACCEPT_LATEST_TERMS = gql`
   mutation AcceptLatestTerms($userId: String!, $documentId: String!) {
     acceptLatestTerms(userId: $userId, documentId: $documentId)
+  }
+`;
+
+export const CREATE_PAYMENT_PREFERENCE = gql`
+  mutation CreatePaymentPreference($serviceRequestId: String!) {
+    createPaymentPreference(serviceRequestId: $serviceRequestId) {
+      preferenceId
+      initPoint
+    }
   }
 `;
 
@@ -380,6 +437,57 @@ export const CHAT_SUBSCRIPTION = gql`
       senderRole
       content
       timestamp
+    }
+  }
+`;
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+export const GET_NOTIFICATIONS = gql`
+  query GetNotifications($limit: Int) {
+    getNotifications(limit: $limit) {
+      id
+      title
+      message
+      type
+      read
+      data
+      createdAt
+    }
+  }
+`;
+
+export const GET_UNREAD_COUNT = gql`
+  query GetUnreadCount {
+    getUnreadCount {
+      count
+    }
+  }
+`;
+
+export const MARK_NOTIFICATION_AS_READ = gql`
+  mutation MarkNotificationAsRead($notificationId: String!) {
+    markNotificationAsRead(notificationId: $notificationId) {
+      id
+      read
+    }
+  }
+`;
+
+export const MARK_ALL_AS_READ = gql`
+  mutation MarkAllNotificationsAsRead {
+    markAllNotificationsAsRead {
+      success
+    }
+  }
+`;
+
+export const DELETE_NOTIFICATION = gql`
+  mutation DeleteNotification($notificationId: String!) {
+    deleteNotification(notificationId: $notificationId) {
+      success
     }
   }
 `;

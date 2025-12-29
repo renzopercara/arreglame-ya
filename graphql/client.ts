@@ -3,7 +3,7 @@ import { setContext } from '@apollo/client/link/context';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
 import { getMainDefinition } from '@apollo/client/utilities';
-import { StorageAdapter } from '../lib/adapters/storage.ts';
+import { StorageAdapter } from '../lib/adapters/storage';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
 const WS_URL = API_URL.replace(/^http/, 'ws');

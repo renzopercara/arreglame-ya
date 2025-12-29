@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar, Clock, MapPin, ReceiptText, Loader2, Info, ChevronLeft } from "lucide-react";
 
@@ -9,17 +9,7 @@ import { Calendar, Clock, MapPin, ReceiptText, Loader2, Info, ChevronLeft } from
  * estándar para asegurar la compatibilidad con el entorno de previsualización.
  */
 
-interface Booking {
-  id: string;
-  serviceId: string;
-  title: string;
-  price: string;
-  status: "pending" | "confirmed" | "cancelled" | "completed" | "in_progress";
-  ts: number;
-  window: string;
-  location: string;
-  image?: string;
-}
+import useBookings, { Booking } from "@/hooks/useBookings";
 
 const STATUS_STYLES: Record<Booking["status"], string> = {
   pending: "bg-amber-50 text-amber-700 border border-amber-100",
@@ -57,66 +47,11 @@ function BookingSkeleton() {
 }
 
 export default function App() {
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const { bookings, loading, refetch } = useBookings();
   const [tab, setTab] = useState<TabId>("upcoming");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [cancelingId, setCancelingId] = useState<string | null>(null);
-
-  // Mock de datos para la previsualización
-  const fetchBookings = async () => {
-    setLoading(true);
-    // Simulamos carga de API
-    setTimeout(() => {
-      const mockData: Booking[] = [
-        {
-          id: "1",
-          serviceId: "s1",
-          title: "Corte de Cabello Premium",
-          price: "$2.500",
-          status: "confirmed",
-          ts: Date.now() + 86400000,
-          window: "14:00 - 15:00",
-          location: "Av. Corrientes 1234",
-          image: "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=200&h=200&fit=crop"
-        },
-        {
-          id: "2",
-          serviceId: "s2",
-          title: "Limpieza Facial Profunda",
-          price: "$3.800",
-          status: "in_progress",
-          ts: Date.now() + 3600000,
-          window: "10:00 - 11:30",
-          location: "Calle Falsa 123",
-          image: "https://images.unsplash.com/photo-1570172619664-283833c1d205?w=200&h=200&fit=crop"
-        }
-      ];
-      setBookings(mockData);
-      setLoading(false);
-    }, 1000);
-  };
-
-  useEffect(() => {
-    fetchBookings();
-  }, []);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchBookings();
-    setRefreshing(false);
-  };
-
-  const cancelBooking = async (id: string) => {
-    setCancelingId(id);
-    setTimeout(() => {
-      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status: "cancelled" } : b)));
-      setToast({ type: "success", message: "Reserva cancelada correctamente" });
-      setCancelingId(null);
-      setTimeout(() => setToast(null), 3000);
-    }, 1000);
-  };
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
 
   const { upcoming, past } = useMemo(() => {
     const now = Date.now();
@@ -244,16 +179,7 @@ export default function App() {
                 <button className="flex-1 py-2.5 bg-slate-100 text-slate-800 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors">
                   Ver detalle
                 </button>
-                {tab === "upcoming" && b.status !== "in_progress" && (
-                  <button 
-                    onClick={() => cancelBooking(b.id)}
-                    disabled={cancelingId === b.id}
-                    className="flex-1 py-2.5 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                  >
-                    {cancelingId === b.id && <Loader2 size={14} className="animate-spin" />}
-                    Cancelar
-                  </button>
-                )}
+                {/* Cancelación pendiente de implementación vía GraphQL */}
                 <button className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">
                   <ReceiptText size={18} />
                 </button>

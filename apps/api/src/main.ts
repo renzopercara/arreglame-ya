@@ -13,8 +13,7 @@ async function bootstrap() {
 
   // Habilitar CORS con origen configurable
   const corsOrigin = process.env.CORS_ORIGIN?.split(',') || [
-    'http://localhost:3000',
-    'http://localhost:3001',
+    'http://localhost:3000', // Frontend Next.js
   ];
 
   app.enableCors({
@@ -24,8 +23,8 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
-  // Prefijo global /api
-  app.setGlobalPrefix('api');
+  // Prefijo global /api sin afectar /graphql
+  app.setGlobalPrefix('api', { exclude: ['graphql'] });
 
   const port = process.env.API_PORT || 3001;
   await app.listen(port);

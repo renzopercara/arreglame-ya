@@ -1,96 +1,191 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import CategoryGrid from "@/components/CategoryGrid";
 import SearchBar from "@/components/SearchBar";
 import ServiceCard from "@/components/ServiceCard";
+import { ServiceGridSkeleton } from "@/components/ServiceCardSkeleton";
+import EmptySearchState from "@/components/EmptySearchState";
 import useServices from "@/hooks/useServices";
+import { useDebounce } from "@/hooks/useDebounce";
 
-export default function SearchPage() {
-  const { services, loading, error, refetch } = useServices();
+/**
+ * Search page with URL-first state management.
+ * All search parameters live in the URL as single source of truth.
+ * Features: debounced search (300ms), sticky filters, skeleton screens, animations.
+ */
+function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [query, setQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
+  
+  // URL params as single source of truth
+  const urlQuery = searchParams.get("q") || "";
+  const urlCategory = searchParams.get("category");
+  
+  // Local input state (uncontrolled for better UX)
+  const [inputValue, setInputValue] = useState(urlQuery);
+  
+  // Debounce input value before updating URL (300ms)
+  const debouncedQuery = useDebounce(inputValue, 300);
+  
+  // Sync URL when debounced value changes
   useEffect(() => {
-    const initialQuery = searchParams.get("q") || "";
-    const initialCategory = searchParams.get("category");
-    setQuery(initialQuery);
-    setSelectedCategory(initialCategory);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const updateUrl = (nextQuery: string, nextCategory: string | null) => {
-    const params = new URLSearchParams();
-    if (nextQuery.trim()) params.set("q", nextQuery.trim());
-    if (nextCategory) params.set("category", nextCategory);
-    const qs = params.toString();
-    router.replace(`/search${qs ? `?${qs}` : ""}`);
-  };
-
-  const handleQueryChange = (value: string) => {
-    setQuery(value);
-    updateUrl(value, selectedCategory);
-  };
-
-  const handleCategorySelect = (id: string | null) => {
-    const next = id === selectedCategory ? null : id;
-    setSelectedCategory(next);
-    updateUrl(query, next);
-  };
-
-  const filtered = useMemo(() => {
-    return services.filter((svc) => {
-      const matchesQuery =
-        svc.title.toLowerCase().includes(query.toLowerCase()) ||
-        svc.provider.toLowerCase().includes(query.toLowerCase());
-      const matchesCategory = selectedCategory ? svc.category === selectedCategory : true;
-      return matchesQuery && matchesCategory;
-    });
-  }, [services, query, selectedCategory]);
-
+    const params = new URLSearchParams(searchParams.toString());
+    
+    if (debouncedQuery.trim()) {
+      params.set("q", debouncedQuery.trim());
+    } else {
+      params.delete("q");
+    }
+    
+    router.replace(`/search?${params.toString()}`, { scroll: false });
+  }, [debouncedQuery, router, searchParams]);
+  
+  // Initialize input from URL on mount
   useEffect(() => {
-    refetch();
-  }, [refetch]);
+    setInputValue(urlQuery);
+  }, [urlQuery]);
+  
+  // Fetch services based on URL params
+  const { services, loading, error } = useServices({
+    category: urlCategory,
+    query: urlQuery,
+  });
+
+  const handleCategorySelect = (categoryId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    if (categoryId) {
+      params.set("category", categoryId);
+    } else {
+      params.delete("category");
+    }
+    
+    router.replace(`/search?${params.toString()}`, { scroll: false });
+  };
+
+  const handleClearFilters = () => {
+    setInputValue("");
+    router.replace("/search", { scroll: false });
+  };
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6 pb-8">
+      {/* Sticky header with search and filters */}
+      <header className="sticky top-0 z-10 flex flex-col gap-4 bg-slate-50/95 backdrop-blur-sm pb-4 -mx-6 px-6 pt-2">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-blue-600">Explora</p>
             <h1 className="text-2xl font-bold text-slate-900">Encuentra el especialista ideal</h1>
           </div>
-          <button
-            onClick={refetch}
-            className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:-translate-y-0.5 hover:shadow-md"
-            type="button"
-          >
-            Recargar
-          </button>
         </div>
-        <SearchBar value={query} onChange={handleQueryChange} onFilterClick={() => handleCategorySelect(null)} />
-        <CategoryGrid onSelect={handleCategorySelect} activeId={selectedCategory} />
+        
+        <SearchBar 
+          value={inputValue} 
+          onChange={setInputValue} 
+          onFilterClick={handleClearFilters}
+          placeholder="Buscar servicios..."
+        />
+        
+        <CategoryGrid 
+          onSelect={handleCategorySelect} 
+          activeId={urlCategory} 
+        />
       </header>
 
-      <section className="flex flex-col gap-3">
-        {loading && <p className="text-sm text-slate-500">Cargando servicios...</p>}
+      {/* Results section with animations */}
+      <section className="flex flex-col gap-4">
+        {/* Loading skeleton */}
+        {loading && <ServiceGridSkeleton count={4} />}
+        
+        {/* Error state */}
         {error && (
-          <p className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-600">
-            Ocurrió un error al cargar los servicios. Intenta nuevamente.
-          </p>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl bg-red-50 border border-red-200 p-4 text-center"
+          >
+            <p className="text-sm font-semibold text-red-600">
+              Ocurrió un error al cargar los servicios. Intenta nuevamente.
+            </p>
+          </motion.div>
         )}
-        {!loading && filtered.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm font-semibold text-slate-500">
-            No encontramos resultados para tu búsqueda.
-          </div>
+
+        {/* Empty state */}
+        {!loading && !error && services.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <EmptySearchState 
+              query={urlQuery}
+              category={urlCategory}
+              onClearFilters={handleClearFilters}
+            />
+          </motion.div>
         )}
-        {filtered.map((service) => (
-          <ServiceCard key={service.id} service={service} />
-        ))}
+
+        {/* Service results with stagger animation */}
+        {!loading && !error && services.length > 0 && (
+          <>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-sm text-slate-600"
+            >
+              <strong>{services.length}</strong> servicios encontrados
+            </motion.p>
+            
+            <AnimatePresence mode="popLayout">
+              <motion.div 
+                layout
+                className="grid grid-cols-1 gap-4"
+              >
+                {services.map((service, index) => (
+                  <motion.div
+                    key={service.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ 
+                      duration: 0.3,
+                      delay: index * 0.05, // Stagger effect
+                    }}
+                  >
+                    <ServiceCard service={service} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          </>
+        )}
       </section>
     </div>
+  );
+}
+
+// Main export with Suspense boundary
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col gap-6 pb-8">
+        <div className="flex flex-col gap-4">
+          <div className="h-16 bg-slate-200 rounded-xl animate-pulse" />
+          <div className="h-12 bg-slate-200 rounded-lg animate-pulse" />
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-24 bg-slate-200 rounded-2xl animate-pulse" />
+            ))}
+          </div>
+        </div>
+        <ServiceGridSkeleton count={3} />
+      </div>
+    }>
+      <SearchContent />
+    </Suspense>
   );
 }

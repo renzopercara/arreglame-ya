@@ -10,6 +10,10 @@ import { PubSubModule } from './common/pubsub.module';
 import { LegalModule } from './legal/legal.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { BillingModule } from './billing/billing.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import GraphQLJSON from 'graphql-type-json';
 
 @Module({
   imports: [
@@ -20,8 +24,13 @@ import { HealthModule } from './health/health.module';
     WorkerModule,
     LegalModule,
     AuthModule,
+    NotificationsModule,
+    BillingModule,
+    WebhooksModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
+      autoSchemaFile: true,
+      resolvers: { JSON: GraphQLJSON },
       typePaths: ['./**/*.graphql'],
       definitions: {
         path: 'src/graphql.ts',
@@ -34,3 +43,4 @@ import { HealthModule } from './health/health.module';
   providers: [PrismaService],
 })
 export class AppModule {}
+
