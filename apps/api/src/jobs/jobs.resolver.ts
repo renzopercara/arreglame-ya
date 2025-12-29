@@ -10,8 +10,6 @@ import {
   Float,
   ID,
   Int,
-  ResolveField,
-  Parent,
 } from '@nestjs/graphql';
 import { UnauthorizedException, Inject, UseGuards, BadRequestException } from '@nestjs/common';
 import { PubSubEngine } from 'graphql-subscriptions';
@@ -112,11 +110,8 @@ export class Job {
   @Field({ nullable: true })
   imageUrl?: string;
 
-  @Field(() => UserInfoResponse, { nullable: true })
-  provider?: UserInfoResponse | null;
-
-  // Internal helper to resolve provider when not eagerly loaded
-  workerId?: string;
+  @Field(() => String, { nullable: true })
+  provider?: string | null;
 }
 
 @ObjectType()
@@ -172,8 +167,7 @@ const mapServiceRequestToJob = (s: any): Job => ({
   evidenceImages: s.evidenceImages,
   category: s.category ?? null,
   imageUrl: s.gardenImageBefore || s.gardenImageAfter || (s.evidenceImages?.[0] ?? null),
-  provider: mapUserInfo(s.worker?.user),
-  workerId: s.workerId,
+  provider: s.worker?.user?.name || s.worker?.user?.email || 'Anónimo',
 });
 
 // ============================================
@@ -188,29 +182,6 @@ export class JobsResolver {
     private readonly securityService: ContentSecurityService,
     @Inject('PUB_SUB') private readonly pubSub: any, // any to allow asyncIterator
   ) {}
-
-  // Resolve provider if not eagerly loaded
-  @ResolveField(() => UserInfoResponse, { nullable: true })
-  async provider(@Parent() job: any): Promise<UserInfoResponse | null> {
-    if (job.provider) return job.provider as UserInfoResponse;
-    const workerId = job.workerId;
-    if (!workerId) return null;
-
-    const worker = await (this.prisma.workerProfile as any).findUnique({
-      where: { id: workerId },
-      include: {
-        user: {
-          include: {
-            wallet: true,
-            workerProfile: true,
-            clientProfile: true,
-          },
-        },
-      },
-    });
-
-    return worker?.user ? mapUserInfo(worker.user) : null;
-  }
 
   // ------------------------------------------
   // QUERIES
