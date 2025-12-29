@@ -82,9 +82,12 @@ export default function BottomNav() {
         <ul className="flex items-center justify-between gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
+            // Fix: Exact match for "/" to prevent it from always being active
+            // For other routes, check if pathname starts with the href
             const isActive =
-              pathname === item.href ||
-              (item.href !== "/login" && pathname.startsWith(item.href));
+              item.href === "/"
+                ? pathname === "/"
+                : pathname === item.href || pathname.startsWith(item.href + "/");
 
             return (
               <li key={item.href} className="flex-1">
