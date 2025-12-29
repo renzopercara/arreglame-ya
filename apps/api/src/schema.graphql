@@ -444,7 +444,14 @@ type Query {
   getService(id: String!): ServiceRequest
 
   # List services for marketplace (mapped from ServiceRequest)
-  getServices(category: String, query: String, location: String): [Service!]!
+  getServices(
+    category: String
+    query: String
+    location: String
+    latitude: Float
+    longitude: Float
+    radiusKm: Int
+  ): [Service!]!
   
   # Wallet
   getWallet: Wallet

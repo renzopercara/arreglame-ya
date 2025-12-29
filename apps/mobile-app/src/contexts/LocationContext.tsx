@@ -1,0 +1,117 @@
+"use client";
+
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { GeoService } from "@/lib/adapters/geo";
+import { ENTRE_RIOS_CITIES, DEFAULT_CITY, findCityByName, City } from "@/constants/cities";
+
+export type LocationStatus = "loading" | "gps" | "manual" | "error";
+
+interface LocationContextValue {
+  status: LocationStatus;
+  latitude?: number;
+  longitude?: number;
+  cityName?: string;
+  city?: City;
+  error?: string;
+  setManualCity: (cityName: string) => void;
+  refreshLocation: () => void;
+}
+
+const LocationContext = createContext<LocationContextValue | undefined>(undefined);
+
+interface LocationProviderProps {
+  children: ReactNode;
+}
+
+export function LocationProvider({ children }: LocationProviderProps) {
+  const [status, setStatus] = useState<LocationStatus>("loading");
+  const [latitude, setLatitude] = useState<number | undefined>();
+  const [longitude, setLongitude] = useState<number | undefined>();
+  const [cityName, setCityName] = useState<string | undefined>();
+  const [city, setCity] = useState<City | undefined>();
+  const [error, setError] = useState<string | undefined>();
+
+  const tryGPSLocation = useCallback(async () => {
+    setStatus("loading");
+    setError(undefined);
+
+    try {
+      // Check permissions first
+      const permission = await GeoService.checkPermissions();
+      
+      if (permission === "denied") {
+        // If denied, immediately fall back to manual
+        setStatus("manual");
+        setCityName(DEFAULT_CITY.name);
+        setCity(DEFAULT_CITY);
+        setLatitude(DEFAULT_CITY.lat);
+        setLongitude(DEFAULT_CITY.lng);
+        return;
+      }
+
+      // Try to get GPS position
+      const position = await GeoService.getCurrentPosition();
+      setLatitude(position.lat);
+      setLongitude(position.lng);
+      setStatus("gps");
+      
+      // Find nearest city (simple approach: just use default for now)
+      // In a production app, you'd calculate distances to all cities
+      setCityName(DEFAULT_CITY.name);
+      setCity(DEFAULT_CITY);
+
+    } catch (err: any) {
+      console.error("[LocationProvider] GPS failed:", err);
+      setError(err.message || "No se pudo obtener la ubicación");
+      
+      // Fallback to manual selection
+      setStatus("manual");
+      setCityName(DEFAULT_CITY.name);
+      setCity(DEFAULT_CITY);
+      setLatitude(DEFAULT_CITY.lat);
+      setLongitude(DEFAULT_CITY.lng);
+    }
+  }, []);
+
+  // Initialize location on mount
+  useEffect(() => {
+    tryGPSLocation();
+  }, [tryGPSLocation]);
+
+  const setManualCity = useCallback((name: string) => {
+    const selectedCity = findCityByName(name);
+    if (selectedCity) {
+      setCityName(selectedCity.name);
+      setCity(selectedCity);
+      setLatitude(selectedCity.lat);
+      setLongitude(selectedCity.lng);
+      setStatus("manual");
+      setError(undefined);
+    }
+  }, []);
+
+  const refreshLocation = useCallback(() => {
+    tryGPSLocation();
+  }, [tryGPSLocation]);
+
+  const value: LocationContextValue = {
+    status,
+    latitude,
+    longitude,
+    cityName,
+    city,
+    error,
+    setManualCity,
+    refreshLocation,
+  };
+
+  return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
+}
+
+export function useLocationContext() {
+  const context = useContext(LocationContext);
+  if (context === undefined) {
+    throw new Error("useLocationContext must be used within LocationProvider");
+  }
+  return context;
+}

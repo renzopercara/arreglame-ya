@@ -3,6 +3,7 @@
 import React from 'react';
 import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
 import { ApolloProvider } from '@apollo/client/react';
+import { LocationProvider } from '@/contexts/LocationContext';
 
 // Endpoint GraphQL unificado (NestJS corre en 3001 por defecto)
 // Usa NEXT_PUBLIC_GRAPHQL_URL para apuntar exactamente a /graphql
@@ -14,5 +15,11 @@ const client = new ApolloClient({
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <ApolloProvider client={client}>{children}</ApolloProvider>;
+  return (
+    <ApolloProvider client={client}>
+      <LocationProvider>
+        {children}
+      </LocationProvider>
+    </ApolloProvider>
+  );
 }
