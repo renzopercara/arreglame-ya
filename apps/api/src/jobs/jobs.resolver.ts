@@ -258,15 +258,17 @@ export class JobsResolver {
       const radius = radiusKm || 50; // Default 50km radius
       const radiusMeters = radius * 1000;
 
-      const servicesWithDistance = services.map((s: any) => {
-        const distance = this.calculateHaversineDistance(
-          latitude,
-          longitude,
-          s.latitude,
-          s.longitude
-        );
-        return { ...s, distance };
-      });
+      const servicesWithDistance = services
+        .filter((s: any) => s.latitude != null && s.longitude != null) // Only services with valid coordinates
+        .map((s: any) => {
+          const distance = this.calculateHaversineDistance(
+            latitude,
+            longitude,
+            s.latitude,
+            s.longitude
+          );
+          return { ...s, distance };
+        });
 
       // Filter by radius and sort by distance
       const nearbyServices = servicesWithDistance

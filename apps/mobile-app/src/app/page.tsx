@@ -44,16 +44,19 @@ export default function HomePage() {
   };
 
   // Convert services to map markers
+  // TODO: Add lat/lng to Service model and use actual coordinates
+  // For now, using center of Entre Ríos as placeholder
   const mapMarkers: ServiceMapMarker[] = services
-    .filter(s => s.imageUrl) // Only show services with valid coordinates
-    .map(s => ({
+    .filter(s => s.image) // Only show services with images
+    .map((s, index) => ({
       id: s.id,
-      lat: -32.0333, // For demo - in production, get from service data
-      lng: -60.3000,
+      // Spread markers around the current location for demo
+      lat: (latitude || -32.0333) + (Math.random() - 0.5) * 0.1,
+      lng: (longitude || -60.3000) + (Math.random() - 0.5) * 0.1,
       title: s.title,
-      price: s.price,
+      price: parseFloat(s.price.replace(/[^0-9.-]+/g, "")) || 0,
       provider: s.provider || "Proveedor",
-      imageUrl: s.imageUrl,
+      imageUrl: s.image,
     }));
 
   return (
