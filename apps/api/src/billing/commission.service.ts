@@ -71,6 +71,9 @@ export class CommissionService {
    * - baseAmount = 1000 ARS (total / 1.05)
    * - platformFee = 50 ARS
    * - workerNetAmount = 950 ARS
+   * 
+   * Note: Uses division which may introduce floating-point precision issues.
+   * For critical financial calculations, consider using a Decimal library.
    */
   calculateFromTotalAmount(totalAmount: number): CommissionBreakdownDto {
     const safeTotal = Math.max(0, totalAmount);

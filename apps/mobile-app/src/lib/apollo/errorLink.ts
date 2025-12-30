@@ -56,17 +56,16 @@ function parseErrorMessage(message: string): string {
  */
 function clearSession() {
   try {
-    // Clear all auth-related storage
+    // Clear only auth-related storage to avoid affecting other app functionality
     if (typeof window !== 'undefined') {
+      // Clear specific auth keys
       localStorage.removeItem('ay_auth_token');
-      sessionStorage.clear();
+      localStorage.removeItem('ay_user_id');
+      localStorage.removeItem('ay_user_role');
       
-      // Clear cookies if needed
-      document.cookie.split(';').forEach((c) => {
-        document.cookie = c
-          .replace(/^ +/, '')
-          .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
-      });
+      // Clear session storage auth keys
+      sessionStorage.removeItem('ay_auth_token');
+      sessionStorage.removeItem('ay_user_id');
     }
   } catch (error) {
     console.error('Error clearing session:', error);
@@ -74,13 +73,35 @@ function clearSession() {
 }
 
 /**
+ * Allowed paths for redirect (whitelist to prevent open redirect attacks)
+ */
+const ALLOWED_REDIRECT_PATHS = [
+  '/',
+  '/dashboard',
+  '/profile',
+  '/jobs',
+  '/wallet',
+  '/history',
+  '/settings',
+];
+
+/**
+ * Validates if a path is allowed for redirect
+ */
+function isAllowedRedirectPath(path: string): boolean {
+  return ALLOWED_REDIRECT_PATHS.some(allowed => 
+    path === allowed || path.startsWith(allowed + '/')
+  );
+}
+
+/**
  * Redirige a login
  */
 function redirectToLogin() {
   if (typeof window !== 'undefined') {
-    // Save current path for redirect after login
+    // Save current path for redirect after login (with validation)
     const currentPath = window.location.pathname;
-    if (currentPath !== '/login' && currentPath !== '/') {
+    if (currentPath !== '/login' && currentPath !== '/' && isAllowedRedirectPath(currentPath)) {
       sessionStorage.setItem('redirectAfterLogin', currentPath);
     }
     

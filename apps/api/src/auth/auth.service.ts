@@ -8,6 +8,8 @@ import { randomBytes } from 'crypto';
 import { UserRegisteredEvent } from './events/user-events.listener';
 
 // Rate limiting store (in production, use Redis)
+// TODO: Replace with Redis for production deployment
+// This in-memory implementation is for development only
 const loginAttempts = new Map<string, { count: number; lastAttempt: Date }>();
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -135,6 +137,17 @@ export class AuthService {
     // Validate password strength
     if (password.length < 8) {
       throw new BadRequestException('La contraseña debe tener al menos 8 caracteres');
+    }
+    
+    // Check for at least one uppercase, one lowercase, and one number
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+      throw new BadRequestException(
+        'La contraseña debe contener al menos una mayúscula, una minúscula y un número'
+      );
     }
 
     const passwordHash = await this.hashPassword(password);
