@@ -78,10 +78,11 @@ export class BillingService {
    * 
    * Flujo:
    * 1. Validar servicio y trabajador asignado
-   * 2. Asegurar billetera del trabajador
-   * 3. Crear transacción de entrada
-   * 4. Actualizar saldo pending (escrow)
-   * 5. Actualizar estado del servicio
+   * 2. Verificar email y KYC (SEGURIDAD)
+   * 3. Asegurar billetera del trabajador
+   * 4. Crear transacción de entrada
+   * 5. Actualizar saldo pending (escrow)
+   * 6. Actualizar estado del servicio
    * 
    * @param jobId ID del servicio
    * @param paymentId ID de pago de Mercado Pago
@@ -98,7 +99,10 @@ export class BillingService {
       // 1. Validaciones
       const job = await this.prisma.serviceRequest.findUnique({
         where: { id: jobId },
-        include: { worker: { include: { user: true } } },
+        include: { 
+          worker: { include: { user: true } },
+          client: { include: { user: true } }
+        },
       });
 
       if (!job) {
@@ -112,6 +116,20 @@ export class BillingService {
         );
       }
 
+      // 2. SEGURIDAD: Verificar email del cliente
+      if (!job.client?.user?.isEmailVerified) {
+        throw new BadRequestException(
+          'Debes verificar tu email antes de realizar pagos. Revisa tu bandeja de entrada.'
+        );
+      }
+
+      // 3. SEGURIDAD: Verificar KYC del trabajador antes de asignar fondos
+      if (!job.worker?.isKycVerified || job.worker?.kycStatus !== 'APPROVED') {
+        throw new BadRequestException(
+          'El trabajador debe completar su verificación de identidad (KYC) antes de recibir pagos.'
+        );
+      }
+
       // Si el servicio ya está marcado como completado, evitamos reprocesar
       if (String(job.status) === 'COMPLETED') {
         throwBillingException('SERVICE_ALREADY_PAID');
@@ -119,12 +137,12 @@ export class BillingService {
 
       const effectiveIdempotencyKey = idempotencyKey ?? paymentId;
 
-      // 3. Calcular comisión
-      const breakdown = this.commissionService.calculateCommissionBreakdown(
+      // 4. Calcular comisión usando el nuevo modelo (5% + 5%)
+      const breakdown = this.commissionService.calculateFromTotalAmount(
         totalAmount,
       );
 
-      // 4. Asegurar billetera del trabajador
+      // 5. Asegurar billetera del trabajador
       const workerWallet = await this.ensureWalletExists(job.workerId);
 
       // 5. Transacción ACID
@@ -266,6 +284,13 @@ export class BillingService {
         throwBillingException('SERVICE_NOT_FOUND');
       }
 
+      // SEGURIDAD: Verificar KYC del trabajador antes de liberar fondos
+      if (!job.worker?.isKycVerified || job.worker?.kycStatus !== 'APPROVED') {
+        throw new BadRequestException(
+          'El trabajador debe completar su verificación de identidad (KYC) antes de recibir pagos.'
+        );
+      }
+
       // Si el trabajo no está en un estado aceptado/avanzado, evitar liberar
       if (job.status !== 'ACCEPTED' && job.status !== 'IN_PROGRESS') {
         throwBillingException(
@@ -388,7 +413,36 @@ export class BillingService {
    */
   async requestPayout(userId: string, amount: number, cbuAlias: string) {
     try {
-      // 1. Validaciones
+      // 0. SEGURIDAD: Verificar que el usuario sea un trabajador con KYC aprobado
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { workerProfile: true },
+      });
+
+      if (!user) {
+        throw new BadRequestException('Usuario no encontrado');
+      }
+
+      // Solo trabajadores pueden solicitar retiros
+      if (user.role !== 'WORKER') {
+        throw new BadRequestException('Solo los trabajadores pueden solicitar retiros');
+      }
+
+      // Verificar email
+      if (!user.isEmailVerified) {
+        throw new BadRequestException(
+          'Debes verificar tu email antes de solicitar retiros. Revisa tu bandeja de entrada.'
+        );
+      }
+
+      // Verificar KYC
+      if (!user.workerProfile?.isKycVerified || user.workerProfile?.kycStatus !== 'APPROVED') {
+        throw new BadRequestException(
+          'Debes completar tu verificación de identidad (KYC) antes de poder retirar fondos.'
+        );
+      }
+
+      // 1. Validaciones de monto
       if (amount < this.MIN_WITHDRAWAL) {
         throwBillingException(
           'WALLET_INSUFFICIENT_BALANCE',
