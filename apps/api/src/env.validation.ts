@@ -103,5 +103,5 @@ export function validateEnvironment(): EnvironmentVariables {
     console.log('');
   }
 
-  return process.env as EnvironmentVariables;
+  return process.env as unknown as EnvironmentVariables;
 }
