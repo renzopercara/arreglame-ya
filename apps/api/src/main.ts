@@ -23,14 +23,18 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
-  // Prefijo global /api sin afectar /graphql
-  app.setGlobalPrefix('api', { exclude: ['graphql'] });
+  // Prefijo global /api sin afectar /graphql y /health
+  app.setGlobalPrefix('api', { exclude: ['graphql', 'health'] });
 
   const port = process.env.API_PORT || 3001;
   await app.listen(port);
   
-  console.log(`✅ Backend corriendo en: http://localhost:${port}/graphql`);
+  console.log(`\n🚀 ========================================`);
+  console.log(`✅ Backend corriendo en: http://localhost:${port}`);
+  console.log(`✅ GraphQL Playground: http://localhost:${port}/graphql`);
+  console.log(`✅ Health Check: http://localhost:${port}/health`);
   console.log(`✅ CORS habilitado para: ${corsOrigin.join(', ')}`);
+  console.log(`========================================\n`);
   
 }
 bootstrap();

@@ -15,6 +15,7 @@
 1. **⚡ Quick Start** → [QUICK_START.md](./QUICK_START.md) *(2 minutos)*
 2. **📖 Guía Completa** → [EXECUTION_GUIDE.md](./EXECUTION_GUIDE.md) *(10 minutos)*
 3. **🚀 Producción** → [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) *(antes de deploy)*
+4. **🔧 GraphQL Connection Issues** → [QUICK_START_GRAPHQL_FIX.md](./QUICK_START_GRAPHQL_FIX.md) *(troubleshooting)*
 
 ---
 
@@ -62,8 +63,8 @@ npm start
 ```
 
 **URLs:**
-- 🔧 API GraphQL: http://localhost:3000/graphql
-- 🌐 Frontend: http://localhost:3001
+- 🔧 API GraphQL: http://localhost:3001/graphql
+- 🌐 Frontend: http://localhost:3000
 
 ---
 
@@ -71,7 +72,7 @@ npm start
 
 ### Desarrollo
 ```bash
-npm start              # Levanta API (3000) + Frontend (3001)
+npm start              # Levanta API (3001) + Frontend (3000)
 npm run start:api      # Solo API
 npm run start:web      # Solo Frontend
 ```
