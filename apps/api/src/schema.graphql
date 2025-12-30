@@ -7,6 +7,8 @@ type User {
   email: String!
   role: UserRole!
   status: UserStatus!
+  isEmailVerified: Boolean!
+  emailVerifiedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -46,11 +48,13 @@ type UserWithProfile {
   mustAcceptTerms: Boolean!
   workerStatus: String
   kycStatus: String
+  isKycVerified: Boolean
   bio: String
   currentPlan: String!
   balance: Float
   mercadopagoCustomerId: String
   mercadopagoAccessToken: String
+  isEmailVerified: Boolean!
   createdAt: DateTime!
 }
 
@@ -79,6 +83,12 @@ type WorkerProfile {
   penaltyUntil: DateTime
   bio: String
   kycStatus: KYCStatus!
+  isKycVerified: Boolean!
+  legalName: String
+  taxId: String
+  dateOfBirth: DateTime
+  kycSubmittedAt: DateTime
+  kycApprovedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -180,9 +190,10 @@ enum ExtraTimeStatus {
 }
 
 type PriceDetails {
-  total: Float!
-  workerNet: Float!
-  platformFee: Float!
+  base: Float!          # Base amount (monto base del servicio)
+  total: Float!         # Total amount client pays (base + fees)
+  workerNet: Float!     # Amount worker receives (base - fees)
+  platformFee: Float!   # Platform commission
   taxes: Float!
   currency: String!
   calculationSnapshot: String
@@ -478,6 +489,8 @@ type Mutation {
   # Authentication
   login(input: LoginInput!): AuthResponse!
   register(input: RegisterInput!): AuthResponse!
+  verifyEmail(token: String!): GenericResponse!
+  resendVerificationEmail(email: String!): GenericResponse!
   switchActiveRole(activeRole: ActiveRole!): UserWithProfile!
   
   # Service Requests (Jobs)
@@ -557,6 +570,11 @@ type UnreadCountResult {
 
 type MutationResult {
   success: Boolean!
+}
+
+type GenericResponse {
+  success: Boolean!
+  message: String!
 }
 
 # ==================================================

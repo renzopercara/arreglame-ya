@@ -141,6 +141,11 @@ model User {
   status       UserStatus  @default(LOGGED_IN)
   activeRole   ActiveRole  @default(CLIENT) // Rol activo para UI dinámica
   
+  // Email Verification (Security)
+  isEmailVerified      Boolean  @default(false)
+  emailVerificationToken String?
+  emailVerifiedAt      DateTime?
+  
   // Mercado Pago integration fields
   mercadopagoCustomerId   String? // For clients (payers)
   mercadopagoAccessToken  String? // For workers (receivers)
@@ -187,11 +192,20 @@ model WorkerProfile {
   acceptanceRate     Float          @default(1.0)
   cancellationRate   Float          @default(0.0)
   penaltyUntil       DateTime?
+  
+  // KYC Fields (Know Your Customer - Regulatory Compliance)
   kycStatus          KYCStatus      @default(PENDING_SUBMISSION)
-  dniFront           String?
-  dniBack            String?
-  insuranceDoc       String?
-  selfie             String?
+  isKycVerified      Boolean        @default(false) // Calculated field for quick checks
+  legalName          String?        // Full legal name from ID
+  taxId              String?        // DNI / Tax ID number
+  dateOfBirth        DateTime?      // For age verification
+  dniFront           String?        // ID front image URL
+  dniBack            String?        // ID back image URL
+  insuranceDoc       String?        // Insurance document URL
+  selfie             String?        // Selfie for identity verification
+  kycSubmittedAt     DateTime?      // When KYC was submitted
+  kycApprovedAt      DateTime?      // When KYC was approved
+  
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 

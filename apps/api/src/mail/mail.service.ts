@@ -21,6 +21,35 @@ export class MailService {
   }
 
   /**
+   * Envía un email de verificación con token
+   * @param email - Correo del usuario
+   * @param name - Nombre del usuario
+   * @param verificationToken - Token de verificación
+   */
+  async sendVerificationEmail(email: string, name: string, verificationToken: string): Promise<void> {
+    const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${verificationToken}`;
+    
+    try {
+      await this.sendActionRequiredEmail(
+        email,
+        name,
+        'Verifica tu cuenta',
+        'Para completar tu registro y habilitar todas las funcionalidades financieras, por favor verifica tu dirección de email.',
+        verificationUrl,
+        'Verificar Email',
+        {
+          deadline: '24 horas',
+          details: 'No podrás realizar operaciones de pago hasta que verifiques tu email.',
+        }
+      );
+      this.logger.log(`✅ Email de verificación enviado a: ${email}`);
+    } catch (error) {
+      this.logger.error(`❌ Error enviando email de verificación a ${email}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Envía un email de bienvenida a un usuario recién registrado
    * @param email - Correo del usuario
    * @param name - Nombre del usuario

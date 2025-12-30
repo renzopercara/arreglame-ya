@@ -1,10 +1,16 @@
 
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { createHash } from 'crypto';
+import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { UserRegisteredEvent } from './events/user-events.listener';
+
+// Rate limiting store (in production, use Redis)
+const loginAttempts = new Map<string, { count: number; lastAttempt: Date }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 @Injectable()
 export class AuthService {
@@ -14,25 +20,109 @@ export class AuthService {
     private eventEmitter: EventEmitter2,
   ) {}
 
-  private hashPassword(password: string): string {
-    return createHash('sha256').update(password).digest('hex');
+  private async hashPassword(password: string): Promise<string> {
+    const saltRounds = 10;
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  private async comparePasswords(plainPassword: string, hashedPassword: string): Promise<boolean> {
+    return bcrypt.compare(plainPassword, hashedPassword);
+  }
+
+  private generateEmailVerificationToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
+  private checkRateLimit(email: string): void {
+    const attempts = loginAttempts.get(email);
+    const now = new Date();
+
+    if (attempts) {
+      const timeSinceLastAttempt = now.getTime() - attempts.lastAttempt.getTime();
+
+      if (attempts.count >= MAX_LOGIN_ATTEMPTS && timeSinceLastAttempt < LOCKOUT_DURATION_MS) {
+        const remainingTime = Math.ceil((LOCKOUT_DURATION_MS - timeSinceLastAttempt) / 60000);
+        throw new UnauthorizedException(
+          `Demasiados intentos fallidos. Intenta nuevamente en ${remainingTime} minutos.`
+        );
+      }
+
+      // Reset counter if lockout period has passed
+      if (timeSinceLastAttempt >= LOCKOUT_DURATION_MS) {
+        loginAttempts.delete(email);
+      }
+    }
+  }
+
+  private recordFailedAttempt(email: string): void {
+    const attempts = loginAttempts.get(email);
+    const now = new Date();
+
+    if (attempts) {
+      loginAttempts.set(email, {
+        count: attempts.count + 1,
+        lastAttempt: now,
+      });
+    } else {
+      loginAttempts.set(email, {
+        count: 1,
+        lastAttempt: now,
+      });
+    }
+  }
+
+  private clearFailedAttempts(email: string): void {
+    loginAttempts.delete(email);
   }
 
   async login(email: string, password: string, role: string) {
+    // Check rate limiting
+    this.checkRateLimit(email);
+
     const user = await (this.prisma as any).user.findUnique({
       where: { email },
     });
 
-    if (!user || user.passwordHash !== this.hashPassword(password)) {
-      throw new UnauthorizedException('Credenciales invÃƒ¡lidas');
+    // Generic error message for security (don't reveal if user exists)
+    const genericError = 'Credenciales incorrectas';
+
+    if (!user) {
+      this.recordFailedAttempt(email);
+      // Log internally for security monitoring
+      console.warn(`Login attempt for non-existent user: ${email}`);
+      throw new UnauthorizedException(genericError);
+    }
+
+    const passwordMatch = await this.comparePasswords(password, user.passwordHash);
+
+    if (!passwordMatch) {
+      this.recordFailedAttempt(email);
+      // Log internally for security monitoring
+      console.warn(`Failed login attempt for user: ${email}`);
+      throw new UnauthorizedException(genericError);
     }
 
     if (user.role !== role) {
-        throw new UnauthorizedException(`Este usuario no tiene el rol de ${role}`);
+      this.recordFailedAttempt(email);
+      throw new UnauthorizedException(`Este usuario no tiene el rol de ${role}`);
     }
 
+    // Check if email is verified (for financial operations later)
+    // Note: We allow login even without verification, but block financial operations
+    if (!user.isEmailVerified) {
+      console.log(`User ${email} logged in without email verification`);
+    }
+
+    // Clear failed attempts on successful login
+    this.clearFailedAttempts(email);
+
     // JWT Payload seguro
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { 
+      sub: user.id, 
+      email: user.email, 
+      role: user.role,
+      isEmailVerified: user.isEmailVerified 
+    };
     const accessToken = await this.jwtService.signAsync(payload);
 
     return { accessToken, user };
@@ -40,9 +130,15 @@ export class AuthService {
 
   async register(email: string, password: string, name: string, role: string) {
     const existing = await (this.prisma as any).user.findUnique({ where: { email } });
-    if (existing) throw new ConflictException('El email ya estÃƒ¡ registrado');
+    if (existing) throw new ConflictException('El email ya está registrado');
 
-    const passwordHash = this.hashPassword(password);
+    // Validate password strength
+    if (password.length < 8) {
+      throw new BadRequestException('La contraseña debe tener al menos 8 caracteres');
+    }
+
+    const passwordHash = await this.hashPassword(password);
+    const emailVerificationToken = this.generateEmailVerificationToken();
 
     const user = await (this.prisma as any).$transaction(async (tx: any) => {
         const newUser = await tx.user.create({
@@ -51,7 +147,9 @@ export class AuthService {
                 passwordHash,
                 role,
                 activeRole: role === 'WORKER' ? 'PROVIDER' : 'CLIENT',
-                status: 'LOGGED_IN'
+                status: 'LOGGED_IN', // User can login, but email needs verification
+                isEmailVerified: false, // Requires email verification
+                emailVerificationToken,
             }
         });
 
@@ -66,20 +164,101 @@ export class AuthService {
             });
         } else if (role === 'WORKER') {
             await tx.workerProfile.create({
-                data: { userId: newUser.id, name }
+                data: { 
+                  userId: newUser.id, 
+                  name,
+                  kycStatus: 'PENDING_SUBMISSION',
+                  isKycVerified: false
+                }
             });
         }
 
         return newUser;
     });
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { 
+      sub: user.id, 
+      email: user.email, 
+      role: user.role,
+      isEmailVerified: user.isEmailVerified 
+    };
     const accessToken = await this.jwtService.signAsync(payload);
 
-    // Emitir evento para enviar email de bienvenida
-    this.eventEmitter.emit('user.registered', { email: user.email, name } as UserRegisteredEvent);
+    // Emitir evento para enviar email de verificación
+    this.eventEmitter.emit('user.registered', { 
+      email: user.email, 
+      name,
+      verificationToken: emailVerificationToken 
+    } as UserRegisteredEvent);
 
     return { accessToken, user };
+  }
+
+  async verifyEmail(token: string) {
+    const user = await (this.prisma as any).user.findFirst({
+      where: { emailVerificationToken: token },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Token de verificación inválido o expirado');
+    }
+
+    await (this.prisma as any).user.update({
+      where: { id: user.id },
+      data: {
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+        emailVerificationToken: null, // Clear token after use
+      },
+    });
+
+    return { success: true, message: 'Email verificado correctamente' };
+  }
+
+  async resendVerificationEmail(email: string) {
+    const user = await (this.prisma as any).user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Usuario no encontrado');
+    }
+
+    if (user.isEmailVerified) {
+      throw new BadRequestException('El email ya está verificado');
+    }
+
+    const emailVerificationToken = this.generateEmailVerificationToken();
+
+    await (this.prisma as any).user.update({
+      where: { id: user.id },
+      data: { emailVerificationToken },
+    });
+
+    // Emit event to send verification email
+    const profile = await this.getProfileName(user.id, user.role);
+    this.eventEmitter.emit('user.registered', {
+      email: user.email,
+      name: profile?.name || 'Usuario',
+      verificationToken: emailVerificationToken,
+    } as UserRegisteredEvent);
+
+    return { success: true, message: 'Email de verificación enviado' };
+  }
+
+  private async getProfileName(userId: string, role: string): Promise<{ name: string } | null> {
+    if (role === 'CLIENT') {
+      return await (this.prisma as any).clientProfile.findUnique({
+        where: { userId },
+        select: { name: true },
+      });
+    } else if (role === 'WORKER') {
+      return await (this.prisma as any).workerProfile.findUnique({
+        where: { userId },
+        select: { name: true },
+      });
+    }
+    return null;
   }
 
   async findUserById(id: string) {

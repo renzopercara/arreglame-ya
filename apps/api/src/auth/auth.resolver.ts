@@ -58,10 +58,16 @@ export class UserInfoResponse {
   kycStatus?: string;
 
   @Field({ nullable: true })
+  isKycVerified?: boolean;
+
+  @Field({ nullable: true })
   bio?: string;
 
   @Field({ nullable: true })
   currentPlan?: string;
+
+  @Field({ nullable: true })
+  isEmailVerified?: boolean;
 }
 
 @ObjectType('AuthResponse')
@@ -71,6 +77,15 @@ export class AuthResponse {
 
   @Field(() => UserInfoResponse)
   user: UserInfoResponse;
+}
+
+@ObjectType('GenericResponse')
+export class GenericResponse {
+  @Field()
+  success: boolean;
+
+  @Field()
+  message: string;
 }
 
 @Resolver()
@@ -114,8 +129,10 @@ export class AuthResolver {
       totalJobs: worker?.totalJobs ?? 0,
       workerStatus: worker?.status ?? null,
       kycStatus: worker?.kycStatus ?? null,
+      isKycVerified: worker?.isKycVerified ?? false,
       bio: worker?.bio ?? client?.bio ?? null,
       currentPlan: worker?.currentPlan ?? client?.currentPlan ?? null,
+      isEmailVerified: user.isEmailVerified ?? false,
     } as UserInfoResponse;
   }
 
@@ -156,6 +173,16 @@ export class AuthResolver {
       accessToken,
       user: this.toUserInfo(fullUser, !hasAccepted),
     };
+  }
+
+  @Mutation(() => GenericResponse)
+  async verifyEmail(@Args('token') token: string): Promise<GenericResponse> {
+    return this.authService.verifyEmail(token);
+  }
+
+  @Mutation(() => GenericResponse)
+  async resendVerificationEmail(@Args('email') email: string): Promise<GenericResponse> {
+    return this.authService.resendVerificationEmail(email);
   }
 
   @Query(() => UserInfoResponse, { nullable: true })

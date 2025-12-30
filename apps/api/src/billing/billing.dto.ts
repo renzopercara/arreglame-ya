@@ -49,10 +49,11 @@ export class CreatePaymentPreferenceDto {
 
 // 4. Desglose de comisiones para la UI
 export class CommissionBreakdownDto {
-  @IsNumber() totalAmount: number;
-  @IsNumber() platformFee: number;
+  @IsNumber() baseAmount: number;       // Monto base del servicio
+  @IsNumber() totalAmount: number;      // Lo que paga el cliente (base + fee)
+  @IsNumber() platformFee: number;      // Comisión de plataforma
+  @IsNumber() workerNetAmount: number;  // Lo que recibe el trabajador (base - fee)
   @IsNumber() paymentGatewayFee: number;
-  @IsNumber() workerNetAmount: number;
   @IsNumber() taxAmount: number;
   @IsString() currency: string;
 }
