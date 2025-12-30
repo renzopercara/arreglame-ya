@@ -4,8 +4,10 @@ import React, { useState } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { useGetServiceQuery } from '@/graphql/generated';
 import { CREATE_PAYMENT_PREFERENCE } from '@/graphql/queries';
+import { toast } from 'sonner';
 import useProtectedAction from '@/hooks/useProtectedAction';
 import AuthModal from '@/components/AuthModal';
+import LoadingButton from '@/components/LoadingButton';
 
 interface ServiceDetailClientProps {
   serviceId: string;
@@ -26,7 +28,7 @@ export default function ServiceDetailClient({ serviceId }: ServiceDetailClientPr
   const handleHire = async () => {
     executeProtected(
       async () => {
-        try {
+        const paymentPromise = async () => {
           const { data: prefData } = await createPreference({
             variables: { serviceRequestId: serviceId },
           });
@@ -34,11 +36,22 @@ export default function ServiceDetailClient({ serviceId }: ServiceDetailClientPr
           if (prefData?.createPaymentPreference?.initPoint) {
             // Redirect to Mercado Pago checkout
             window.location.href = prefData.createPaymentPreference.initPoint;
+          } else {
+            throw new Error('No se pudo generar el link de pago');
           }
-        } catch (err: any) {
-          console.error('Payment creation failed:', err);
-          alert(`Error al crear el pago: ${err.message}`);
-        }
+          return prefData;
+        };
+
+        toast.promise(paymentPromise(), {
+          loading: 'Asegurando tu transacción...',
+          success: 'Redirigiendo a Mercado Pago...',
+          error: (err) => {
+            if (err.networkError) {
+              return 'Error de conexión. Verifica tu internet.';
+            }
+            return err.message || 'Error al procesar el pago';
+          },
+        });
       },
       { requirePaymentMethod: true }
     );
@@ -46,12 +59,41 @@ export default function ServiceDetailClient({ serviceId }: ServiceDetailClientPr
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-pulse rounded-xl border p-6 shadow-sm bg-white">
-          <div className="h-4 w-48 bg-gray-200 rounded" />
-          <div className="mt-4 h-3 w-64 bg-gray-100 rounded" />
-          <div className="mt-2 h-3 w-40 bg-gray-100 rounded" />
-        </div>
+      <div className="flex flex-col min-h-screen p-4 bg-gray-50">
+        <header className="py-4 border-b mb-4">
+          <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+        </header>
+        <main className="flex-1">
+          <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
+            {/* ID skeleton */}
+            <div className="space-y-2">
+              <div className="h-3 w-32 bg-gray-200 rounded" />
+              <div className="h-10 w-full bg-gray-100 rounded" />
+            </div>
+            {/* Status skeleton */}
+            <div className="space-y-2">
+              <div className="h-3 w-20 bg-gray-200 rounded" />
+              <div className="h-6 w-24 bg-gray-200 rounded" />
+            </div>
+            {/* Description skeleton */}
+            <div className="space-y-2">
+              <div className="h-3 w-28 bg-gray-200 rounded" />
+              <div className="h-4 w-full bg-gray-100 rounded" />
+              <div className="h-4 w-3/4 bg-gray-100 rounded" />
+            </div>
+            {/* Grid skeleton */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="h-3 w-20 bg-gray-200 rounded" />
+                <div className="h-4 w-16 bg-gray-100 rounded" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-16 bg-gray-200 rounded" />
+                <div className="h-5 w-24 bg-gray-100 rounded" />
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -140,13 +182,14 @@ export default function ServiceDetailClient({ serviceId }: ServiceDetailClientPr
 
         <footer className="py-4 space-y-3">
           {isAvailable && (
-            <button 
+            <LoadingButton
               onClick={handleHire}
-              disabled={paymentLoading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg font-medium hover:from-amber-600 hover:to-orange-700 transition-all shadow-lg disabled:opacity-50"
+              loading={paymentLoading}
+              loadingText="Asegurando pago..."
+              className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg font-medium hover:from-amber-600 hover:to-orange-700 transition-all shadow-lg"
             >
-              {paymentLoading ? 'Procesando...' : '💳 Contratar Servicio'}
-            </button>
+              💳 Contratar Servicio
+            </LoadingButton>
           )}
           <button 
             onClick={() => window.history.back()}

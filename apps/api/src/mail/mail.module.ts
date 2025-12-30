@@ -25,7 +25,7 @@ import { MailService } from './mail.service';
           from: `"Arreglame Ya" <${configService.get('MAIL_FROM') || configService.get('MAIL_SMTP_USER')}>`,
         },
         template: {
-          dir: join(__dirname, 'templates'),
+          dir: join(process.cwd(), 'dist/mail/templates'),
           adapter: new HandlebarsAdapter(),
           options: {
             strict: true,
