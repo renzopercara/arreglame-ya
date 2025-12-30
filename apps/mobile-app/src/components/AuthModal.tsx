@@ -88,6 +88,33 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
         onClose();
       }
     } catch (e: any) {
+      // Manejo robusto de errores según el runbook de ingeniería
+      if (e.networkError) {
+        console.error('[Network Error] API no disponible:', {
+          url: process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql',
+          error: e.networkError,
+        });
+        alert(
+          '❌ Error de conexión\n\n' +
+          'El servidor no está disponible. Por favor:\n' +
+          '1. Verifica que el backend esté corriendo en el puerto 3001\n' +
+          '2. Revisa la consola del servidor para errores\n' +
+          '3. Confirma que la URL del API sea correcta\n\n' +
+          `URL esperada: ${process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql'}`
+        );
+        return;
+      }
+
+      if (e.graphQLErrors && e.graphQLErrors.length > 0) {
+        e.graphQLErrors.forEach((gqlError: any) => {
+          console.error(`[GraphQL Error]: ${gqlError.message}`, gqlError);
+        });
+        alert(`Error: ${e.graphQLErrors[0].message || 'Error en la operación'}`);
+        return;
+      }
+
+      // Error genérico
+      console.error('[Auth Error]:', e);
       alert(e.message || "Error en autenticación");
     }
   };
