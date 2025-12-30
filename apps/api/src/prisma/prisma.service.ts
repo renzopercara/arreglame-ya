@@ -22,13 +22,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       this.logger.error('❌ Failed to connect to database');
       this.logger.error(`Error: ${error.message}`);
       
-      // Provide helpful hints for common errors
-      if (error.message?.includes('Environment variable not found: DATABASE_URL')) {
+      // Provide helpful hints for common errors using error codes
+      const errorCode = (error as any)?.errorCode || (error as any)?.code;
+      
+      if (errorCode === 'P1012' || error.message?.includes('Environment variable not found')) {
         this.logger.error('💡 Hint: Make sure DATABASE_URL is set in your .env file');
-      } else if (error.message?.includes('Can\'t reach database server')) {
+      } else if (errorCode === 'P1001' || error.message?.includes('Can\'t reach database')) {
         this.logger.error('💡 Hint: Make sure your database server is running');
         this.logger.error('   Try: npm run db:up (to start Docker Postgres)');
-      } else if (error.message?.includes('Authentication failed')) {
+      } else if (errorCode === 'P1002' || error.message?.includes('timed out')) {
+        this.logger.error('💡 Hint: Database server took too long to respond');
+      } else if (errorCode === 'P1003' || error.message?.includes('does not exist')) {
+        this.logger.error('💡 Hint: The specified database does not exist');
+      } else if (error.message?.includes('Authentication failed') || error.message?.includes('password authentication failed')) {
         this.logger.error('💡 Hint: Check your database credentials in DATABASE_URL');
       }
       

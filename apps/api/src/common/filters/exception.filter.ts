@@ -90,34 +90,48 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    // Check if this is an HTTP context
+    const contextType = host.getType();
+    
+    if (contextType === 'http') {
+      const ctx = host.switchToHttp();
+      const response = ctx.getResponse<Response>();
+      const request = ctx.getRequest<Request>();
 
-    const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+      const status =
+        exception instanceof HttpException
+          ? exception.getStatus()
+          : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
-      exception instanceof Error
-        ? exception.message
-        : 'Internal server error';
+      const message =
+        exception instanceof Error
+          ? exception.message
+          : 'Internal server error';
 
-    // Log the error
-    this.logger.error(
-      `Unhandled Exception: ${request.method} ${request.url}`,
-      exception instanceof Error ? exception.stack : exception,
-    );
+      // Log the error
+      this.logger.error(
+        `Unhandled Exception: ${request.method} ${request.url}`,
+        exception instanceof Error ? exception.stack : exception,
+      );
 
-    // Return error response
-    response.status(status).json({
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      message: process.env.NODE_ENV === 'production' 
-        ? 'Internal server error' 
-        : message,
-    });
+      // Return error response
+      response.status(status).json({
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        message: process.env.NODE_ENV === 'production' 
+          ? 'Internal server error' 
+          : message,
+      });
+    } else {
+      // For non-HTTP contexts (GraphQL, WebSocket, etc.), just log the error
+      this.logger.error(
+        `Unhandled Exception in ${contextType} context`,
+        exception instanceof Error ? exception.stack : exception,
+      );
+      
+      // Re-throw for GraphQL to handle
+      throw exception;
+    }
   }
 }

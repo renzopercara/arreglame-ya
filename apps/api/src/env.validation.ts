@@ -103,5 +103,23 @@ export function validateEnvironment(): EnvironmentVariables {
     console.log('');
   }
 
-  return process.env as unknown as EnvironmentVariables;
+  // Return properly typed object with validated values
+  return {
+    DATABASE_URL: process.env.DATABASE_URL!,
+    JWT_SECRET: process.env.JWT_SECRET!,
+    JWT_EXPIRATION: process.env.JWT_EXPIRATION,
+    NODE_ENV: process.env.NODE_ENV!,
+    API_PORT: process.env.API_PORT,
+    CORS_ORIGIN: process.env.CORS_ORIGIN,
+    FRONTEND_URL: process.env.FRONTEND_URL!,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY,
+    MAIL_SMTP_HOST: process.env.MAIL_SMTP_HOST,
+    MAIL_SMTP_PORT: process.env.MAIL_SMTP_PORT,
+    MAIL_SMTP_USER: process.env.MAIL_SMTP_USER,
+    MAIL_SMTP_PASS: process.env.MAIL_SMTP_PASS,
+    MAIL_FROM: process.env.MAIL_FROM,
+    GRAPHQL_PLAYGROUND: process.env.GRAPHQL_PLAYGROUND,
+    GRAPHQL_DEBUG: process.env.GRAPHQL_DEBUG,
+  };
 }
