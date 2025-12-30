@@ -43,7 +43,7 @@ export default function LoadingButton({
         </>
       ) : (
         <>
-          {icon && icon}
+          {icon}
           <span>{children}</span>
         </>
       )}

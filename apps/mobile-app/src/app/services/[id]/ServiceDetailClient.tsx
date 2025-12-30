@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import useProtectedAction from '@/hooks/useProtectedAction';
 import AuthModal from '@/components/AuthModal';
 import LoadingButton from '@/components/LoadingButton';
-import { ServiceGridSkeleton } from '@/components/ServiceCardSkeleton';
 
 interface ServiceDetailClientProps {
   serviceId: string;
