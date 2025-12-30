@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import { motion } from 'framer-motion';
 import { User, Briefcase, Loader2 } from 'lucide-react';
 import { SWITCH_ACTIVE_ROLE, ME_QUERY } from '@/graphql/queries';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function RoleToggle() {
   const { data, loading: queryLoading } = useQuery<{
@@ -29,13 +29,14 @@ export default function RoleToggle() {
       toast.success(
         `Cambiaste a modo ${newRole === 'CLIENT' ? 'Cliente' : 'Proveedor'}`,
         {
-          icon: newRole === 'CLIENT' ? '👤' : '🔧',
+          description: newRole === 'CLIENT' ? '👤 Busca y contrata servicios' : '🔧 Recibe y gestiona trabajos',
           duration: 3000,
         }
       );
     },
     onError: (error) => {
-      toast.error(`Error al cambiar de rol: ${error.message}`);
+      // Error will be handled by global error link
+      console.error('Error switching role:', error);
     },
   });
 
