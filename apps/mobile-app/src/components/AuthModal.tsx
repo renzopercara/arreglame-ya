@@ -6,9 +6,11 @@ import { useForm } from "react-hook-form";
 import { gql } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
 import { ArrowLeft, Mail, Lock, User, UserCog, X } from "lucide-react";
+import { toast } from "sonner";
 import { StorageAdapter } from "@/lib/adapters/storage";
 import { LOGIN_MUTATION, REGISTER_MUTATION } from "@/graphql/queries";
 import { motion, AnimatePresence } from "framer-motion";
+import LoadingButton from "@/components/LoadingButton";
 
 type Mode = "login" | "register";
 
@@ -54,7 +56,7 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
   const [registerUser] = useMutation<RegisterResult>(REGISTER_MUTATION);
 
   const onSubmit = async (values: FormValues) => {
-    try {
+    const mutationPromise = async () => {
       if (mode === "login") {
         const { data } = await login({
           variables: { email: values.email, password: values.password, role: values.role },
@@ -65,7 +67,7 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
           onSuccess?.();
           onClose();
         }
-        return;
+        return data;
       }
 
       // Register flow
@@ -87,36 +89,23 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
         onSuccess?.();
         onClose();
       }
-    } catch (e: any) {
-      // Manejo robusto de errores según el runbook de ingeniería
-      if (e.networkError) {
-        console.error('[Network Error] API no disponible:', {
-          url: process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql',
-          error: e.networkError,
-        });
-        alert(
-          '❌ Error de conexión\n\n' +
-          'El servidor no está disponible. Por favor:\n' +
-          '1. Verifica que el backend esté corriendo en el puerto 3001\n' +
-          '2. Revisa la consola del servidor para errores\n' +
-          '3. Confirma que la URL del API sea correcta\n\n' +
-          `URL esperada: ${process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql'}`
-        );
-        return;
-      }
+      return data;
+    };
 
-      if (e.graphQLErrors && e.graphQLErrors.length > 0) {
-        e.graphQLErrors.forEach((gqlError: any) => {
-          console.error(`[GraphQL Error]: ${gqlError.message}`, gqlError);
-        });
-        alert(`Error: ${e.graphQLErrors[0].message || 'Error en la operación'}`);
-        return;
-      }
-
-      // Error genérico
-      console.error('[Auth Error]:', e);
-      alert(e.message || "Error en autenticación");
-    }
+    toast.promise(mutationPromise(), {
+      loading: mode === "login" ? "Iniciando sesión..." : "Creando tu cuenta...",
+      success: mode === "login" ? "¡Sesión iniciada con éxito!" : "¡Cuenta creada exitosamente!",
+      error: (err) => {
+        // Professional error handling
+        if (err.networkError) {
+          return "Error de conexión. Verifica tu internet.";
+        }
+        if (err.graphQLErrors && err.graphQLErrors.length > 0) {
+          return err.graphQLErrors[0].message || "Error en la operación";
+        }
+        return err.message || "Ha ocurrido un error. Intenta nuevamente.";
+      },
+    });
   };
 
   return (
@@ -214,13 +203,14 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
           </button>
         </div>
 
-        <button
+        <LoadingButton
           type="submit"
-          disabled={isSubmitting}
-          className="mt-2 flex items-center justify-center rounded-3xl bg-blue-600 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 disabled:opacity-60"
+          loading={isSubmitting}
+          loadingText="Procesando..."
+          className="mt-2 rounded-3xl bg-blue-600 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-blue-700"
         >
-          {isSubmitting ? "Procesando..." : mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-        </button>
+          {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
+        </LoadingButton>
       </form>
     </div>
   );

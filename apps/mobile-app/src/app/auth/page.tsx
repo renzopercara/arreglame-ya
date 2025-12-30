@@ -6,8 +6,10 @@ import { useForm } from "react-hook-form";
 import { gql } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
 import { ArrowLeft, Mail, Lock, User, UserCog } from "lucide-react";
+import { toast } from "sonner";
 import { StorageAdapter } from "@/lib/adapters/storage";
 import { LOGIN_MUTATION, REGISTER_MUTATION } from "@/graphql/queries";
+import LoadingButton from "@/components/LoadingButton";
 
 type Mode = "login" | "register";
 
@@ -52,38 +54,56 @@ function AuthContent() {
   const [registerUser] = useMutation<RegisterResult>(REGISTER_MUTATION);
 
   const onSubmit = async (values: FormValues) => {
-    if (mode === "login") {
-      const { data } = await login({
-        variables: { email: values.email, password: values.password, role: values.role },
+    const mutationPromise = async () => {
+      if (mode === "login") {
+        const { data } = await login({
+          variables: { email: values.email, password: values.password, role: values.role },
+        });
+        const token = data?.login?.accessToken;
+        if (token) {
+          await StorageAdapter.set("auth.token", token);
+          const mustComplete = data?.login?.user?.mustAcceptTerms;
+          router.replace(mustComplete ? "/profile" : "/");
+        }
+        return data;
+      }
+
+      // Register flow
+      const { data } = await registerUser({
+        variables: {
+          email: values.email,
+          password: values.password,
+          name: values.name,
+          role: values.role,
+          termsAccepted: true,
+          termsVersion: "v1",
+          termsDate: new Date().toISOString(),
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "web",
+        },
       });
-      const token = data?.login?.accessToken;
+      const token = data?.register?.accessToken;
       if (token) {
         await StorageAdapter.set("auth.token", token);
-        const mustComplete = data?.login?.user?.mustAcceptTerms;
+        const mustComplete = data?.register?.user?.mustAcceptTerms;
         router.replace(mustComplete ? "/profile" : "/");
       }
-      return;
-    }
+      return data;
+    };
 
-    // Register flow
-    const { data } = await registerUser({
-      variables: {
-        email: values.email,
-        password: values.password,
-        name: values.name,
-        role: values.role,
-        termsAccepted: true,
-        termsVersion: "v1",
-        termsDate: new Date().toISOString(),
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "web",
+    toast.promise(mutationPromise(), {
+      loading: mode === "login" ? "Iniciando sesión..." : "Creando tu cuenta...",
+      success: mode === "login" ? "¡Sesión iniciada con éxito!" : "¡Cuenta creada exitosamente!",
+      error: (err) => {
+        // Professional error handling
+        if (err.networkError) {
+          return "Error de conexión. Verifica tu internet.";
+        }
+        if (err.graphQLErrors && err.graphQLErrors.length > 0) {
+          return err.graphQLErrors[0].message || "Error en la operación";
+        }
+        return err.message || "Ha ocurrido un error. Intenta nuevamente.";
       },
     });
-    const token = data?.register?.accessToken;
-    if (token) {
-      await StorageAdapter.set("auth.token", token);
-      const mustComplete = data?.register?.user?.mustAcceptTerms;
-      router.replace(mustComplete ? "/profile" : "/");
-    }
   };
 
   const toggleMode = (next: Mode) => {
@@ -189,13 +209,14 @@ function AuthContent() {
             </button>
           </div>
 
-          <button
+          <LoadingButton
             type="submit"
-            disabled={isSubmitting}
-            className="mt-2 flex items-center justify-center rounded-3xl bg-blue-600 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 disabled:opacity-60"
+            loading={isSubmitting}
+            loadingText="Procesando..."
+            className="mt-2 rounded-3xl bg-blue-600 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-blue-700"
           >
             {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-          </button>
+          </LoadingButton>
         </form>
       </div>
 
