@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@apollo/client/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Home, Search, User, ClipboardList, Briefcase, MessageSquare, LayoutDashboard } from "lucide-react";
-import { ME_QUERY } from "@/graphql/queries";
 
 interface NavItem {
   href: string;
@@ -14,18 +13,7 @@ interface NavItem {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { data, loading } = useQuery<{
-    me: {
-      id: string;
-      email: string;
-      role: string;
-      activeRole?: 'CLIENT' | 'PROVIDER';
-    }
-  }>(ME_QUERY, {
-    errorPolicy: 'ignore', // Ignore errors if not authenticated
-  });
-
-  const user = data?.me;
+  const { isAuthenticated, user, isBootstrapping } = useAuth();
 
   // Helper function to determine if a nav item is active
   const isNavItemActive = (itemHref: string, currentPath: string): boolean => {
@@ -37,14 +25,14 @@ export default function BottomNav() {
     return currentPath === itemHref || currentPath.startsWith(itemHref + "/");
   };
 
-  // Define navigation items based on auth state and activeRole
+  // Define navigation items based on auth state and activeRole (BLOCK 4)
   const getNavItems = (): NavItem[] => {
-    if (!user) {
+    if (!isAuthenticated || !user) {
       // Not logged in
       return [
         { href: "/", label: "Inicio", icon: Home },
         { href: "/search", label: "Buscar", icon: Search },
-        { href: "/login", label: "Acceso", icon: User },
+        { href: "/profile", label: "Acceso", icon: User },
       ];
     }
 
@@ -69,7 +57,8 @@ export default function BottomNav() {
 
   const navItems = getNavItems();
 
-  if (loading) {
+  // Show skeleton during bootstrap (BLOCK 1)
+  if (isBootstrapping) {
     return (
       <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-screen-sm -translate-x-1/2 px-4">
         <nav className="rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur">

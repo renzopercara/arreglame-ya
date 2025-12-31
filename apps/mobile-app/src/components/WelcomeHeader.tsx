@@ -1,48 +1,72 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
-import { ME_QUERY } from "@/graphql/queries";
-import LocationSelector from "./LocationSelector";
-import { Sparkles } from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import UserAvatar from "@/components/UserAvatar";
+import AuthModal from "@/components/AuthModal";
+import { Sparkles, User as UserIcon } from "lucide-react";
 
 export default function WelcomeHeader() {
-  const { data, loading } = useQuery<{
-    me: {
-      id: string;
-      name: string;
-      activeRole?: 'CLIENT' | 'PROVIDER';
-    }
-  }>(ME_QUERY, {
-    errorPolicy: 'ignore', // No fallar si no está autenticado
-  });
+  const { isAuthenticated, user, isBootstrapping } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const user = data?.me;
   const firstName = user?.name?.split(' ')[0] || 'Invitado';
   const isProvider = user?.activeRole === 'PROVIDER';
 
+  // Show skeleton during bootstrap (BLOCK 1)
+  if (isBootstrapping) {
+    return (
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="h-5 w-32 bg-gray-200 animate-pulse rounded-lg" />
+          <div className="h-8 w-48 bg-gray-200 animate-pulse rounded-lg mt-2" />
+        </div>
+        <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-start justify-between">
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-blue-600 flex items-center gap-1">
-          <Sparkles className="w-4 h-4" />
-          {isProvider ? 'Panel de Servicios' : 'Descubre'}
-        </p>
-        {loading ? (
-          <div className="h-8 w-48 bg-gray-200 animate-pulse rounded-lg mt-1" />
-        ) : (
+    <>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-blue-600 flex items-center gap-1">
+            <Sparkles className="w-4 h-4" />
+            {isProvider ? 'Panel de Servicios' : 'Descubre'}
+          </p>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-            {user ? `Hola, ${firstName}` : 'Arreglame Ya'}
+            {isAuthenticated && user ? `Hola, ${firstName}` : 'Arreglame Ya'}
           </h1>
+        </div>
+        
+        {/* BLOCK 4: Dynamic UI based on auth state */}
+        {isAuthenticated && user ? (
+          // Authenticated: Show UserAvatar (BLOCK 5)
+          <UserAvatar 
+            name={user.name} 
+            avatar={user.avatar}
+            size="md"
+          />
+        ) : (
+          // Not authenticated: Show "Acceso" button
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition active:scale-95"
+          >
+            <UserIcon className="w-4 h-4" />
+            Acceso
+          </button>
         )}
       </div>
-      
-      {user && (
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold shadow-md">
-            {firstName[0]?.toUpperCase()}
-          </div>
-        </div>
-      )}
-    </div>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          // Modal will close automatically, session is now active
+        }}
+      />
+    </>
   );
 }
