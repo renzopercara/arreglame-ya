@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMutation } from "@apollo/client";
+import { useMutation } from "@apollo/client/react";
 import { gql } from "@apollo/client";
 import { 
   ArrowLeft, 
@@ -61,6 +61,31 @@ const UPLOAD_AVATAR = gql`
   }
 `;
 
+// Types for mutations
+type UpdateProfileData = {
+  updateProfile: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    bio?: string;
+  };
+};
+
+type UpdateMercadoPagoData = {
+  updateMercadoPagoEmail: {
+    id: string;
+    mercadopagoEmail: string;
+  };
+};
+
+type UploadAvatarData = {
+  uploadAvatar: {
+    id: string;
+    avatar: string;
+  };
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const { isAuthenticated, user, isBootstrapping, logout, updateUser } = useAuth();
@@ -78,9 +103,9 @@ export default function ProfilePage() {
   const [mpEmail, setMpEmail] = useState(user?.mercadopagoEmail || '');
 
   // Mutations
-  const [updateProfile, { loading: updatingProfile }] = useMutation(UPDATE_PROFILE);
-  const [updateMercadoPagoEmail, { loading: updatingMP }] = useMutation(UPDATE_MERCADOPAGO_EMAIL);
-  const [uploadAvatar, { loading: uploadingAvatar }] = useMutation(UPLOAD_AVATAR);
+  const [updateProfile, { loading: updatingProfile }] = useMutation<UpdateProfileData>(UPDATE_PROFILE);
+  const [updateMercadoPagoEmail, { loading: updatingMP }] = useMutation<UpdateMercadoPagoData>(UPDATE_MERCADOPAGO_EMAIL);
+  const [uploadAvatar, { loading: uploadingAvatar }] = useMutation<UploadAvatarData>(UPLOAD_AVATAR);
 
   /* ---------------------------- PERSONAL INFO ---------------------------- */
   

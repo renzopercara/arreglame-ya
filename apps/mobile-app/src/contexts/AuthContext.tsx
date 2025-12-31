@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLazyQuery } from '@apollo/client';
+import { useLazyQuery, useApolloClient } from '@apollo/client/react';
 import { StorageAdapter } from '@/lib/adapters/storage';
 import { ME_QUERY } from '@/graphql/queries';
 import { toast } from 'sonner';
@@ -59,6 +59,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const apolloClient = useApolloClient();
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -143,6 +144,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await StorageAdapter.remove('auth.token');
       await StorageAdapter.remove('auth.user');
 
+      // Clear Apollo cache (BLOCK 8)
+      await apolloClient.clearStore();
+
       // Redirect to home
       router.push('/');
       
@@ -151,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('[AuthContext] Logout failed:', err);
       toast.error('Error al cerrar sesión');
     }
-  }, [router]);
+  }, [router, apolloClient]);
 
   /* ---------------------------- UPDATE USER ---------------------------- */
   
