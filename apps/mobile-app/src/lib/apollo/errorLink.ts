@@ -10,6 +10,7 @@ import {
 } from '@apollo/client/errors';
 import type { GraphQLError } from 'graphql';
 import { toast } from 'sonner';
+import { StorageAdapter } from '@/lib/adapters/storage';
 
 /* -------------------------------------------------------------------------- */
 /*                                   CODES                                    */
@@ -56,14 +57,12 @@ function parseErrorMessage(message: string): string {
 /*                              SESSION CONTROL                               */
 /* -------------------------------------------------------------------------- */
 
-function clearSession() {
+async function clearSession() {
   if (typeof window === 'undefined') return;
 
   try {
-    ['ay_auth_token', 'ay_user_id', 'ay_user_role'].forEach(key => {
-      localStorage.removeItem(key);
-      sessionStorage.removeItem(key);
-    });
+    await StorageAdapter.remove('auth.token');
+    await StorageAdapter.remove('auth.user');
   } catch {
     /* silent */
   }
@@ -73,9 +72,12 @@ function clearSession() {
 /*                              REDIRECT SAFETY                               */
 /* -------------------------------------------------------------------------- */
 
-function redirectToLogin() {
+function redirectToHome() {
   if (typeof window === 'undefined') return;
-  window.location.assign('/login');
+  
+  // Redirect to home instead of login to avoid loops
+  // The AuthContext will handle showing the auth UI
+  window.location.assign('/');
 }
 
 /* -------------------------------------------------------------------------- */
@@ -102,7 +104,7 @@ export const errorLink = new ErrorLink(({ error, operation }) => {
             description: 'Iniciá sesión nuevamente',
           });
           clearSession();
-          setTimeout(redirectToLogin, 800);
+          setTimeout(redirectToHome, 800);
           break;
 
         case ErrorCode.FORBIDDEN:

@@ -7,7 +7,7 @@ import { gql } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
 import { ArrowLeft, Mail, Lock, User, UserCog, X } from "lucide-react";
 import { toast } from "sonner";
-import { StorageAdapter } from "@/lib/adapters/storage";
+import { useAuth } from "@/contexts/AuthContext";
 import { LOGIN_MUTATION, REGISTER_MUTATION } from "@/graphql/queries";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingButton from "@/components/LoadingButton";
@@ -30,6 +30,7 @@ interface AuthModalProps {
 
 function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMode?: Mode; onClose: () => void; onSuccess?: () => void }) {
   const router = useRouter();
+  const { login: authLogin } = useAuth();
   const [mode, setMode] = useState<Mode>(defaultMode);
 
   const {
@@ -50,27 +51,30 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
 
   const role = watch("role");
 
-  type LoginResult = { login: { accessToken: string; user: { mustAcceptTerms: boolean } } };
-  type RegisterResult = { register: { accessToken: string; user: { mustAcceptTerms: boolean } } };
-  const [login] = useMutation<LoginResult>(LOGIN_MUTATION);
+  type LoginResult = { login: { accessToken: string; user: any } };
+  type RegisterResult = { register: { accessToken: string; user: any } };
+  const [loginMutation] = useMutation<LoginResult>(LOGIN_MUTATION);
   const [registerUser] = useMutation<RegisterResult>(REGISTER_MUTATION);
 
   const onSubmit = async (values: FormValues) => {
     const mutationPromise = async () => {
       if (mode === "login") {
-        const { data } = await login({
+        const { data } = await loginMutation({
           variables: { email: values.email, password: values.password, role: values.role },
         });
         const token = data?.login?.accessToken;
-        if (token) {
-          await StorageAdapter.set("auth.token", token);
+        const user = data?.login?.user;
+        
+        if (token && user) {
+          // Use AuthContext login to persist session
+          await authLogin(token, user);
           onSuccess?.();
           onClose();
         }
         return data;
       }
 
-      // Register flow
+      // Register flow - AUTO-LOGIN (BLOCK 3)
       const { data } = await registerUser({
         variables: {
           email: values.email,
@@ -83,11 +87,17 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "web",
         },
       });
+      
       const token = data?.register?.accessToken;
-      if (token) {
-        await StorageAdapter.set("auth.token", token);
+      const user = data?.register?.user;
+      
+      if (token && user) {
+        // AUTO-LOGIN: Use AuthContext to persist session immediately
+        await authLogin(token, user);
         onSuccess?.();
         onClose();
+        // Redirect to home/dashboard - user is now authenticated
+        router.push('/');
       }
       return data;
     };
