@@ -11,6 +11,7 @@ export default function PaymentReadinessBanner() {
   const router = useRouter();
 
   // BLOCK 4: Banner should NOT appear when logged in
+  // This ensures a clean UX where authenticated users don't see login prompts
   if (!isAuthenticated || !user) {
     return (
       <div className="flex items-center justify-between rounded-2xl border border-blue-200 bg-blue-50 p-4">

@@ -190,7 +190,7 @@ type Query {
   healthCheckReputation: String!
   latestTerms(role: String!): LegalDocument!
   me: UserInfo
-  nearbyJobs(lat: Float!, lng: Float!, radius: Float): [Job!]!
+  nearbyJobs(lat: Float!, limit: Int, lng: Float!, radius: Float): [Job!]!
 }
 
 input RegisterInput {

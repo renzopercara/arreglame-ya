@@ -122,7 +122,7 @@ export class Job {
   @Field(() => String, { nullable: true })
   provider?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   createdAt?: Date;
 }
 
@@ -302,11 +302,15 @@ export class JobsResolver {
     @Args('lat', { type: () => Float }) lat: number,
     @Args('lng', { type: () => Float }) lng: number,
     @Args('radius', { type: () => Float, nullable: true }) radius?: number,
+    @Args('limit', { type: () => Int, nullable: true }) limit?: number,
   ): Promise<Job[]> {
     const radiusKm = radius || 50; // Default 50km radius
     const radiusMeters = radiusKm * 1000;
+    const maxResults = limit || 100; // Default 100 results, configurable
 
-    // Get all service requests with coordinates
+    // Note: Using 'as any' for Prisma serviceRequest due to dynamic schema.
+    // The ServiceRequest model includes these fields but Prisma's type inference
+    // doesn't always capture them correctly with the current schema setup.
     const services = await (this.prisma.serviceRequest as any).findMany({
       where: {
         latitude: { not: null },
@@ -327,7 +331,7 @@ export class JobsResolver {
         client: { include: { user: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: maxResults,
     });
 
     // Calculate distances and filter by radius
