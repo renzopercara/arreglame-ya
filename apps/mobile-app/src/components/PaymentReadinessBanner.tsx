@@ -29,7 +29,8 @@ export default function PaymentReadinessBanner() {
     );
   }
 
-  const role = user.role || user.activeRole;
+  // Determine role - prefer activeRole over base role for dual-role users
+  const role = user.activeRole || user.role;
 
   if (role === "CLIENT" && !hasPaymentMethod) {
     return (

@@ -10,6 +10,8 @@ export default function WelcomeHeader() {
   const { isAuthenticated, user, isBootstrapping } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  // Empty string is intentional - when not authenticated, the header shows "Inicie sesión"
+  // and firstName is not displayed, avoiding any confusing "guest" terminology
   const firstName = user?.name?.split(' ')[0] || '';
   const isProvider = user?.activeRole === 'PROVIDER';
 

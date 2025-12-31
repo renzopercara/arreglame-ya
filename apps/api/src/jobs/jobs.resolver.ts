@@ -24,6 +24,31 @@ import { AuthGuard } from '../auth/auth.guard';
 import { UserInfoResponse } from '../auth/auth.resolver';
 
 // ============================================
+// TYPES AND INTERFACES
+// ============================================
+
+// Interface for service with calculated distance
+interface ServiceWithDistance {
+  id: string;
+  status: string;
+  description?: string;
+  address?: string;
+  city?: string;
+  latitude: number;
+  longitude: number;
+  estimatedHours?: number;
+  price?: any;
+  gardenImageBefore?: string;
+  gardenImageAfter?: string;
+  evidenceImages?: string[];
+  category?: string;
+  createdAt?: Date;
+  worker?: any;
+  client?: any;
+  distance: number; // Distance in meters
+}
+
+// ============================================
 // OBJECT TYPES (GraphQL Code First)
 // ============================================
 
@@ -335,20 +360,20 @@ export class JobsResolver {
     });
 
     // Calculate distances and filter by radius
-    const servicesWithDistance = services
-      .map((s: any) => {
+    const servicesWithDistance: ServiceWithDistance[] = services
+      .map((s: any): ServiceWithDistance => {
         const distance = this.calculateHaversineDistance(
           lat,
           lng,
           s.latitude,
           s.longitude
         );
-        return { ...s, distance };
+        return { ...s, distance } as ServiceWithDistance;
       })
-      .filter((s: any) => s.distance <= radiusMeters)
-      .sort((a: any, b: any) => a.distance - b.distance);
+      .filter((s: ServiceWithDistance) => s.distance <= radiusMeters)
+      .sort((a: ServiceWithDistance, b: ServiceWithDistance) => a.distance - b.distance);
 
-    return servicesWithDistance.map((s: any) => mapServiceRequestToJob(s));
+    return servicesWithDistance.map((s: ServiceWithDistance) => mapServiceRequestToJob(s));
   }
 
   /**
