@@ -281,6 +281,56 @@ export class JobsResolver {
     return services.map((s: any) => mapServiceRequestToJob(s));
   }
 
+  @Query(() => [Job])
+  async nearbyJobs(
+    @Args('lat', { type: () => Float }) lat: number,
+    @Args('lng', { type: () => Float }) lng: number,
+    @Args('radius', { type: () => Float, nullable: true }) radius?: number,
+  ): Promise<Job[]> {
+    const radiusKm = radius || 50; // Default 50km radius
+    const radiusMeters = radiusKm * 1000;
+
+    // Get all service requests with coordinates
+    const services = await (this.prisma.serviceRequest as any).findMany({
+      where: {
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      include: {
+        worker: {
+          include: {
+            user: {
+              include: {
+                wallet: true,
+                workerProfile: true,
+                clientProfile: true,
+              },
+            },
+          },
+        },
+        client: { include: { user: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    // Calculate distances and filter by radius
+    const servicesWithDistance = services
+      .map((s: any) => {
+        const distance = this.calculateHaversineDistance(
+          lat,
+          lng,
+          s.latitude,
+          s.longitude
+        );
+        return { ...s, distance };
+      })
+      .filter((s: any) => s.distance <= radiusMeters)
+      .sort((a: any, b: any) => a.distance - b.distance);
+
+    return servicesWithDistance.map((s: any) => mapServiceRequestToJob(s));
+  }
+
   /**
    * Calculate distance between two points using Haversine formula
    * Returns distance in meters
