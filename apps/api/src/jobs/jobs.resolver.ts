@@ -92,6 +92,15 @@ export class Job {
   @Field({ nullable: true })
   city?: string;
 
+  @Field(() => Float, { nullable: true })
+  latitude?: number;
+
+  @Field(() => Float, { nullable: true })
+  longitude?: number;
+
+  @Field(() => Float, { nullable: true })
+  estimatedHours?: number;
+
   @Field(() => GraphQLJSON, { nullable: true })
   price?: any;
 
@@ -112,6 +121,9 @@ export class Job {
 
   @Field(() => String, { nullable: true })
   provider?: string | null;
+
+  @Field({ nullable: true })
+  createdAt?: Date;
 }
 
 @ObjectType()
@@ -161,6 +173,9 @@ const mapServiceRequestToJob = (s: any): Job => ({
   title: s.description || 'Servicio',
   address: s.address,
   city: s.city,
+  latitude: s.latitude,
+  longitude: s.longitude,
+  estimatedHours: s.estimatedHours,
   price: s.price,
   gardenImageBefore: s.gardenImageBefore,
   gardenImageAfter: s.gardenImageAfter,
@@ -168,6 +183,7 @@ const mapServiceRequestToJob = (s: any): Job => ({
   category: s.category ?? null,
   imageUrl: s.gardenImageBefore || s.gardenImageAfter || (s.evidenceImages?.[0] ?? null),
   provider: s.worker?.user?.name || s.worker?.user?.email || 'Anónimo',
+  createdAt: s.createdAt,
 });
 
 // ============================================
