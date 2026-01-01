@@ -67,12 +67,16 @@ type Job {
   address: String
   category: String
   city: String
+  createdAt: DateTime
   description: String
+  estimatedHours: Float
   evidenceImages: [String!]
   gardenImageAfter: String
   gardenImageBefore: String
   id: ID!
   imageUrl: String
+  latitude: Float
+  longitude: Float
   price: JSON
   provider: String
   status: String!
@@ -186,6 +190,7 @@ type Query {
   healthCheckReputation: String!
   latestTerms(role: String!): LegalDocument!
   me: UserInfo
+  nearbyJobs(lat: Float!, limit: Int, lng: Float!, radius: Float): [Job!]!
 }
 
 input RegisterInput {

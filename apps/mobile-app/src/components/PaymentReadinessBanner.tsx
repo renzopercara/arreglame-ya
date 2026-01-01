@@ -1,14 +1,18 @@
 "use client";
 
 import usePaymentReadiness from "@/hooks/usePaymentReadiness";
+import { useAuth } from "@/contexts/AuthContext";
 import { ShieldCheck, CreditCard, Link as LinkIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function PaymentReadinessBanner() {
-  const { isLogged, role, hasPaymentMethod, isMpConnected } = usePaymentReadiness();
+  const { isAuthenticated, user } = useAuth();
+  const { hasPaymentMethod, isMpConnected } = usePaymentReadiness();
   const router = useRouter();
 
-  if (!isLogged) {
+  // BLOCK 4: Banner should NOT appear when logged in
+  // This ensures a clean UX where authenticated users don't see login prompts
+  if (!isAuthenticated || !user) {
     return (
       <div className="flex items-center justify-between rounded-2xl border border-blue-200 bg-blue-50 p-4">
         <div className="flex items-center gap-2">
@@ -24,6 +28,9 @@ export default function PaymentReadinessBanner() {
       </div>
     );
   }
+
+  // Determine role - prefer activeRole over base role for dual-role users
+  const role = user.activeRole || user.role;
 
   if (role === "CLIENT" && !hasPaymentMethod) {
     return (

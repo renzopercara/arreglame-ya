@@ -10,7 +10,9 @@ export default function WelcomeHeader() {
   const { isAuthenticated, user, isBootstrapping } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const firstName = user?.name?.split(' ')[0] || 'Invitado';
+  // Empty string is intentional - when not authenticated, the header shows "Inicie sesión"
+  // and firstName is not displayed, avoiding any confusing "guest" terminology
+  const firstName = user?.name?.split(' ')[0] || '';
   const isProvider = user?.activeRole === 'PROVIDER';
 
   // Show skeleton during bootstrap (BLOCK 1)
@@ -35,7 +37,7 @@ export default function WelcomeHeader() {
             {isProvider ? 'Panel de Servicios' : 'Descubre'}
           </p>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-            {isAuthenticated && user ? `Hola, ${firstName}` : 'Arreglame Ya'}
+            {isAuthenticated && user ? `Hola, ${firstName}` : 'Inicie sesión'}
           </h1>
         </div>
         

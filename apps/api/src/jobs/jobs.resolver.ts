@@ -24,6 +24,31 @@ import { AuthGuard } from '../auth/auth.guard';
 import { UserInfoResponse } from '../auth/auth.resolver';
 
 // ============================================
+// TYPES AND INTERFACES
+// ============================================
+
+// Interface for service with calculated distance
+interface ServiceWithDistance {
+  id: string;
+  status: string;
+  description?: string;
+  address?: string;
+  city?: string;
+  latitude: number;
+  longitude: number;
+  estimatedHours?: number;
+  price?: any;
+  gardenImageBefore?: string;
+  gardenImageAfter?: string;
+  evidenceImages?: string[];
+  category?: string;
+  createdAt?: Date;
+  worker?: any;
+  client?: any;
+  distance: number; // Distance in meters
+}
+
+// ============================================
 // OBJECT TYPES (GraphQL Code First)
 // ============================================
 
@@ -92,6 +117,15 @@ export class Job {
   @Field({ nullable: true })
   city?: string;
 
+  @Field(() => Float, { nullable: true })
+  latitude?: number;
+
+  @Field(() => Float, { nullable: true })
+  longitude?: number;
+
+  @Field(() => Float, { nullable: true })
+  estimatedHours?: number;
+
   @Field(() => GraphQLJSON, { nullable: true })
   price?: any;
 
@@ -112,6 +146,9 @@ export class Job {
 
   @Field(() => String, { nullable: true })
   provider?: string | null;
+
+  @Field(() => Date, { nullable: true })
+  createdAt?: Date;
 }
 
 @ObjectType()
@@ -161,6 +198,9 @@ const mapServiceRequestToJob = (s: any): Job => ({
   title: s.description || 'Servicio',
   address: s.address,
   city: s.city,
+  latitude: s.latitude,
+  longitude: s.longitude,
+  estimatedHours: s.estimatedHours,
   price: s.price,
   gardenImageBefore: s.gardenImageBefore,
   gardenImageAfter: s.gardenImageAfter,
@@ -168,6 +208,7 @@ const mapServiceRequestToJob = (s: any): Job => ({
   category: s.category ?? null,
   imageUrl: s.gardenImageBefore || s.gardenImageAfter || (s.evidenceImages?.[0] ?? null),
   provider: s.worker?.user?.name || s.worker?.user?.email || 'Anónimo',
+  createdAt: s.createdAt,
 });
 
 // ============================================
@@ -279,6 +320,60 @@ export class JobsResolver {
     }
 
     return services.map((s: any) => mapServiceRequestToJob(s));
+  }
+
+  @Query(() => [Job])
+  async nearbyJobs(
+    @Args('lat', { type: () => Float }) lat: number,
+    @Args('lng', { type: () => Float }) lng: number,
+    @Args('radius', { type: () => Float, nullable: true }) radius?: number,
+    @Args('limit', { type: () => Int, nullable: true }) limit?: number,
+  ): Promise<Job[]> {
+    const radiusKm = radius || 50; // Default 50km radius
+    const radiusMeters = radiusKm * 1000;
+    const maxResults = limit || 100; // Default 100 results, configurable
+
+    // Note: Using 'as any' for Prisma serviceRequest due to dynamic schema.
+    // The ServiceRequest model includes these fields but Prisma's type inference
+    // doesn't always capture them correctly with the current schema setup.
+    const services = await (this.prisma.serviceRequest as any).findMany({
+      where: {
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      include: {
+        worker: {
+          include: {
+            user: {
+              include: {
+                wallet: true,
+                workerProfile: true,
+                clientProfile: true,
+              },
+            },
+          },
+        },
+        client: { include: { user: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: maxResults,
+    });
+
+    // Calculate distances and filter by radius
+    const servicesWithDistance: ServiceWithDistance[] = services
+      .map((s: any): ServiceWithDistance => {
+        const distance = this.calculateHaversineDistance(
+          lat,
+          lng,
+          s.latitude,
+          s.longitude
+        );
+        return { ...s, distance } as ServiceWithDistance;
+      })
+      .filter((s: ServiceWithDistance) => s.distance <= radiusMeters)
+      .sort((a: ServiceWithDistance, b: ServiceWithDistance) => a.distance - b.distance);
+
+    return servicesWithDistance.map((s: ServiceWithDistance) => mapServiceRequestToJob(s));
   }
 
   /**
