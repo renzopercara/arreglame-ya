@@ -32,6 +32,10 @@ export interface IGeoService {
 
 // --- ADAPTER WEB (navigator.geolocation) ---
 
+// Simple cache for reverse geocoding results
+const geocodeCache = new Map<string, { address: GeoAddress; timestamp: number }>();
+const GEOCODE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 class WebGeoAdapter implements IGeoService {
   async getCurrentPosition(): Promise<GeoPosition> {
     return new Promise((resolve, reject) => {
@@ -115,6 +119,14 @@ class WebGeoAdapter implements IGeoService {
   }
 
   async reverseGeocode(lat: number, lng: number): Promise<GeoAddress> {
+    // Check cache first
+    const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`; // Round to ~10m precision
+    const cached = geocodeCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < GEOCODE_CACHE_TTL) {
+      return cached.address;
+    }
+
     // Using Nominatim OpenStreetMap API (free, no API key required)
     try {
       const response = await fetch(
@@ -133,7 +145,7 @@ class WebGeoAdapter implements IGeoService {
       const data = await response.json();
       const address = data.address || {};
 
-      return {
+      const result: GeoAddress = {
         street: address.road || address.street,
         city: address.city || address.town || address.village,
         state: address.state,
@@ -141,6 +153,17 @@ class WebGeoAdapter implements IGeoService {
         postalCode: address.postcode,
         formattedAddress: data.display_name,
       };
+
+      // Cache the result
+      geocodeCache.set(cacheKey, { address: result, timestamp: Date.now() });
+      
+      // Clean old cache entries (simple LRU)
+      if (geocodeCache.size > 50) {
+        const oldestKey = geocodeCache.keys().next().value;
+        geocodeCache.delete(oldestKey);
+      }
+
+      return result;
     } catch (error: any) {
       console.error('[GeoService] Reverse geocoding failed:', error);
       return {
@@ -196,6 +219,7 @@ class NativeGeoAdapter implements IGeoService {
 
   watchPosition(callback: (position: GeoPosition) => void, errorCallback?: (error: Error) => void): number {
     // Capacitor doesn't have a direct watchPosition, but we can simulate it with setInterval
+    // Using 10 seconds for better battery efficiency
     let watchId = 0;
     const intervalId = setInterval(async () => {
       try {
@@ -204,7 +228,7 @@ class NativeGeoAdapter implements IGeoService {
       } catch (error: any) {
         errorCallback?.(error);
       }
-    }, 5000); // Update every 5 seconds
+    }, 10000); // Update every 10 seconds for battery efficiency
 
     // Return a pseudo-watchId (using the interval ID)
     return intervalId as unknown as number;
@@ -215,6 +239,14 @@ class NativeGeoAdapter implements IGeoService {
   }
 
   async reverseGeocode(lat: number, lng: number): Promise<GeoAddress> {
+    // Check cache first
+    const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`; // Round to ~10m precision
+    const cached = geocodeCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < GEOCODE_CACHE_TTL) {
+      return cached.address;
+    }
+
     // Using Nominatim OpenStreetMap API (free, no API key required)
     try {
       const response = await fetch(
@@ -233,7 +265,7 @@ class NativeGeoAdapter implements IGeoService {
       const data = await response.json();
       const address = data.address || {};
 
-      return {
+      const result: GeoAddress = {
         street: address.road || address.street,
         city: address.city || address.town || address.village,
         state: address.state,
@@ -241,6 +273,17 @@ class NativeGeoAdapter implements IGeoService {
         postalCode: address.postcode,
         formattedAddress: data.display_name,
       };
+
+      // Cache the result
+      geocodeCache.set(cacheKey, { address: result, timestamp: Date.now() });
+      
+      // Clean old cache entries (simple LRU)
+      if (geocodeCache.size > 50) {
+        const oldestKey = geocodeCache.keys().next().value;
+        geocodeCache.delete(oldestKey);
+      }
+
+      return result;
     } catch (error: any) {
       console.error('[GeoService] Reverse geocoding failed:', error);
       return {
