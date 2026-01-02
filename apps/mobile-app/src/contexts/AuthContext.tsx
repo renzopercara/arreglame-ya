@@ -22,6 +22,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
   refreshUser: () => Promise<void>;
+  refetchUser: () => Promise<void>;
+  switchRole: (activeRole: 'CLIENT' | 'PROVIDER') => Promise<void>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -93,6 +95,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // This is kept for backward compatibility
   }, []);
 
+  /* ---------------------------- REFETCH USER ---------------------------- */
+  
+  const refetchUser = useCallback(async () => {
+    // Import needed at top of file
+    const { ME_QUERY } = await import('@/graphql/queries');
+    try {
+      const result = await apolloClient.query({
+        query: ME_QUERY,
+        fetchPolicy: 'network-only',
+      });
+      
+      if (result.data?.me) {
+        updateUser(result.data.me);
+      }
+    } catch (err) {
+      console.error('[AuthContext] Refetch user failed:', err);
+    }
+  }, [apolloClient, updateUser]);
+
+  /* ---------------------------- SWITCH ROLE ---------------------------- */
+  
+  const switchRole = useCallback(async (activeRole: 'CLIENT' | 'PROVIDER') => {
+    const { SWITCH_ACTIVE_ROLE } = await import('@/graphql/queries');
+    try {
+      const result = await apolloClient.mutate({
+        mutation: SWITCH_ACTIVE_ROLE,
+        variables: { activeRole },
+      });
+      
+      if (result.data?.switchActiveRole) {
+        updateUser(result.data.switchActiveRole);
+        toast.success(
+          activeRole === 'PROVIDER' 
+            ? 'Cambiado a modo Profesional' 
+            : 'Cambiado a modo Cliente'
+        );
+      }
+    } catch (err) {
+      console.error('[AuthContext] Switch role failed:', err);
+      toast.error('Error al cambiar de rol');
+      throw err;
+    }
+  }, [apolloClient, updateUser]);
+
   /* ------------------------------- VALUE ------------------------------- */
   
   const value: AuthContextValue = {
@@ -104,6 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     updateUser,
     refreshUser,
+    refetchUser,
+    switchRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

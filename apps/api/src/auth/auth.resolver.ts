@@ -3,7 +3,7 @@ import { Resolver, Mutation, Args, Context, Query, ObjectType, Field, Int, Float
 import { UseGuards, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LegalService } from '../legal/legal.service';
-import { LoginInput, RegisterInput } from './dto/auth.input';
+import { LoginInput, RegisterInput, BecomeWorkerInput } from './dto/auth.input';
 import { AuthGuard } from './auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -208,6 +208,45 @@ export class AuthResolver {
     const updatedUser = await this.authService.switchActiveRole(userId, activeRole);
     const fullUser = await this.loadUser(updatedUser.id);
     const hasAccepted = await this.legalService.hasAcceptedLatest(updatedUser.id, updatedUser.role as 'CLIENT' | 'WORKER');
+
+    return this.toUserInfo(fullUser, !hasAccepted);
+  }
+
+  @Mutation(() => UserInfoResponse)
+  @UseGuards(AuthGuard)
+  async becomeWorker(
+    @Context() context: any,
+    @Args('input', { type: () => BecomeWorkerInput }) input: BecomeWorkerInput,
+  ): Promise<UserInfoResponse> {
+    const userId = context.req?.user?.sub;
+    if (!userId) throw new UnauthorizedException('Usuario no autenticado');
+
+    if (!input.termsAccepted) {
+      throw new UnauthorizedException('Debes aceptar los términos y condiciones');
+    }
+
+    // Accept terms if provided
+    if (input.termsVersion) {
+      const workerDoc = await this.legalService.getActiveDocument('WORKER');
+      if (workerDoc && workerDoc.version === input.termsVersion) {
+        const ip = context?.req?.ip || '0.0.0.0';
+        const ua = context?.req?.headers?.['user-agent'] || 'BecomeWorker-Flow';
+        await this.legalService.acceptTerms(userId, workerDoc.id, { ip, ua });
+      }
+    }
+
+    // Create or update worker profile
+    await this.authService.becomeWorker(userId, {
+      name: input.name,
+      bio: input.bio,
+      trade: input.trade,
+      category: input.category,
+      selfieImage: input.selfieImage,
+    });
+
+    // Load updated user
+    const fullUser = await this.loadUser(userId);
+    const hasAccepted = await this.legalService.hasAcceptedLatest(userId, 'WORKER');
 
     return this.toUserInfo(fullUser, !hasAccepted);
   }

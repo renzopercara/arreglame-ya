@@ -15,6 +15,10 @@ export default function BottomNav() {
   const pathname = usePathname();
   const { isAuthenticated, user, isBootstrapping } = useAuth();
 
+  // Determine theme color based on active role
+  const isWorkerMode = user?.activeRole === 'PROVIDER' || user?.role === 'WORKER';
+  const themeColor = isWorkerMode ? 'green' : 'blue';
+
   // Helper function to determine if a nav item is active
   const isNavItemActive = (itemHref: string, currentPath: string): boolean => {
     // Special case: Root path requires exact match to avoid matching all paths
@@ -89,14 +93,16 @@ export default function BottomNav() {
                   href={item.href}
                   className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${
                     isActive
-                      ? "text-blue-600"
+                      ? themeColor === 'green' ? "text-green-600" : "text-blue-600"
                       : "text-slate-500 hover:text-blue-600"
                   }`}
                 >
                   <div
                     className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
                       isActive
-                        ? "border-blue-100 bg-blue-50 text-blue-600"
+                        ? themeColor === 'green' 
+                          ? "border-green-100 bg-green-50 text-green-600"
+                          : "border-blue-100 bg-blue-50 text-blue-600"
                         : "border-transparent bg-gray-50 text-slate-500"
                     }`}
                   >

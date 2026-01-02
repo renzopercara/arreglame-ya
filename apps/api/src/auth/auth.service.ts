@@ -123,6 +123,7 @@ export class AuthService {
       sub: user.id, 
       email: user.email, 
       role: user.role,
+      activeRole: user.activeRole,
       isEmailVerified: user.isEmailVerified 
     };
     const accessToken = await this.jwtService.signAsync(payload);
@@ -193,6 +194,7 @@ export class AuthService {
       sub: user.id, 
       email: user.email, 
       role: user.role,
+      activeRole: user.activeRole,
       isEmailVerified: user.isEmailVerified 
     };
     const accessToken = await this.jwtService.signAsync(payload);
@@ -283,5 +285,76 @@ export class AuthService {
       where: { id: userId },
       data: { activeRole },
     });
+  }
+
+  async becomeWorker(
+    userId: string,
+    input: {
+      name: string;
+      bio?: string;
+      trade?: string;
+      category?: string;
+      selfieImage?: string;
+    }
+  ) {
+    // Check if user exists
+    const user = await (this.prisma as any).user.findUnique({
+      where: { id: userId },
+      include: { workerProfile: true, clientProfile: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    // If worker profile already exists, update it
+    if (user.workerProfile) {
+      const updatedProfile = await this.prisma.workerProfile.update({
+        where: { userId },
+        data: {
+          name: input.name,
+          bio: input.bio,
+          trade: input.trade,
+          selfie: input.selfieImage,
+          kycStatus: 'PENDING_SUBMISSION',
+        },
+      });
+
+      // Update user role to WORKER and set activeRole to PROVIDER
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          role: 'WORKER',
+          activeRole: 'PROVIDER',
+        },
+      });
+
+      return updatedProfile;
+    }
+
+    // Create new worker profile
+    const workerProfile = await this.prisma.workerProfile.create({
+      data: {
+        userId,
+        name: input.name,
+        bio: input.bio,
+        trade: input.trade,
+        selfie: input.selfieImage,
+        kycStatus: 'PENDING_SUBMISSION',
+        isKycVerified: false,
+        status: 'OFFLINE',
+      },
+    });
+
+    // Update user role to WORKER
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: 'WORKER',
+        activeRole: 'PROVIDER',
+      },
+    });
+
+    return workerProfile;
   }
 }

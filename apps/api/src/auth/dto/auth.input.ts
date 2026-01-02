@@ -60,3 +60,40 @@ export class RegisterInput {
   @IsString()
   userAgent?: string;
 }
+
+@InputType()
+export class BecomeWorkerInput {
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  bio?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  trade?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  selfieImage?: string;
+
+  @Field()
+  @IsBoolean()
+  termsAccepted: boolean;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  termsVersion?: string;
+}

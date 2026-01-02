@@ -21,6 +21,8 @@ import { ContentSecurityService } from '../security/content-security.service';
 import { CreateJobInput } from './dto/create-job.input';
 import { EstimateJobInput } from './dto/estimate-job.input';
 import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { RequireActiveRole } from '../auth/roles.decorator';
 import { UserInfoResponse } from '../auth/auth.resolver';
 
 // ============================================
@@ -77,6 +79,15 @@ class JobPrice {
 class JobEstimateResponse {
   @Field(() => Float)
   difficultyMultiplier!: number;
+
+  @Field(() => Float, { nullable: true })
+  estimatedHours?: number;
+
+  @Field(() => [String], { nullable: true })
+  obstacles?: string[];
+
+  @Field({ nullable: true })
+  reasoning?: string;
 
   @Field(() => JobPrice)
   price!: JobPrice;
@@ -462,7 +473,8 @@ export class JobsResolver {
   }
 
   @Mutation(() => Job)
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireActiveRole('PROVIDER')
   async startJob(
     @Args('jobId') jobId: string,
     @Args('pin') pin: string,
@@ -495,7 +507,8 @@ export class JobsResolver {
   }
 
   @Mutation(() => AuditResponse)
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireActiveRole('PROVIDER')
   async completeJob(
     @Args('jobId') jobId: string,
     @Args('imageAfter') imageAfter: string,
