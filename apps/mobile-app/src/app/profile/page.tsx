@@ -3,178 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMutation } from "@apollo/client/react";
-import { gql } from "@apollo/client";
 import { 
   ArrowLeft, 
-  Bell, 
   Clock3, 
   LogOut, 
-  MapPin, 
   ShieldCheck, 
   Star, 
-  User as UserIcon,
-  Mail,
-  Phone,
-  Camera,
   CreditCard,
   DollarSign,
   CheckCircle,
-  XCircle,
   AlertCircle
 } from "lucide-react";
 import UserAvatar from "@/components/UserAvatar";
 import AuthModal from "@/components/AuthModal";
-import LoadingButton from "@/components/LoadingButton";
-import PaymentReadinessBanner from "@/components/PaymentReadinessBanner";
-import ProfileProgressBanner from "@/components/ProfileProgressBanner";
 import { toast } from "sonner";
-
-// GraphQL Mutations
-const UPDATE_PROFILE = gql`
-  mutation UpdateProfile($name: String, $email: String, $phone: String, $bio: String) {
-    updateProfile(input: { name: $name, email: $email, phone: $phone, bio: $bio }) {
-      id
-      name
-      email
-      phone
-      bio
-    }
-  }
-`;
-
-const UPDATE_MERCADOPAGO_EMAIL = gql`
-  mutation UpdateMercadoPagoEmail($email: String!) {
-    updateMercadoPagoEmail(email: $email) {
-      id
-      mercadopagoEmail
-    }
-  }
-`;
-
-const UPLOAD_AVATAR = gql`
-  mutation UploadAvatar($avatar: String!) {
-    uploadAvatar(avatar: $avatar) {
-      id
-      avatar
-    }
-  }
-`;
-
-// Types for mutations
-type UpdateProfileData = {
-  updateProfile: {
-    id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-    bio?: string;
-  };
-};
-
-type UpdateMercadoPagoData = {
-  updateMercadoPagoEmail: {
-    id: string;
-    mercadopagoEmail: string;
-  };
-};
-
-type UploadAvatarData = {
-  uploadAvatar: {
-    id: string;
-    avatar: string;
-  };
-};
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, user, isBootstrapping, logout, updateUser } = useAuth();
+  const { isAuthenticated, user, isBootstrapping, logout } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isEditingPersonal, setIsEditingPersonal] = useState(false);
-  const [isEditingMercadoPago, setIsEditingMercadoPago] = useState(false);
-
-  // Personal info form state
-  const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState(user?.phone || '');
-
-  // MercadoPago form state
-  const [mpEmail, setMpEmail] = useState(user?.mercadopagoEmail || '');
-
-  // Mutations
-  const [updateProfile, { loading: updatingProfile }] = useMutation<UpdateProfileData>(UPDATE_PROFILE);
-  const [updateMercadoPagoEmail, { loading: updatingMP }] = useMutation<UpdateMercadoPagoData>(UPDATE_MERCADOPAGO_EMAIL);
-  const [uploadAvatar, { loading: uploadingAvatar }] = useMutation<UploadAvatarData>(UPLOAD_AVATAR);
-
-  /* ---------------------------- PERSONAL INFO ---------------------------- */
-  
-  const handleSavePersonalInfo = async () => {
-    try {
-      const { data } = await updateProfile({
-        variables: { name, email, phone },
-      });
-
-      if (data?.updateProfile) {
-        updateUser(data.updateProfile);
-        toast.success('Perfil actualizado correctamente');
-        setIsEditingPersonal(false);
-      }
-    } catch (err: any) {
-      toast.error('Error al actualizar perfil', {
-        description: err.message,
-      });
-    }
-  };
-
-  /* --------------------------- MERCADO PAGO --------------------------- */
-  
-  const handleSaveMercadoPago = async () => {
-    try {
-      const { data } = await updateMercadoPagoEmail({
-        variables: { email: mpEmail },
-      });
-
-      if (data?.updateMercadoPagoEmail) {
-        updateUser({ mercadopagoEmail: data.updateMercadoPagoEmail.mercadopagoEmail });
-        toast.success('Email de Mercado Pago actualizado');
-        setIsEditingMercadoPago(false);
-      }
-    } catch (err: any) {
-      toast.error('Error al actualizar Mercado Pago', {
-        description: err.message,
-      });
-    }
-  };
-
-  /* --------------------------- AVATAR UPLOAD --------------------------- */
-  
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      
-      try {
-        const { data } = await uploadAvatar({
-          variables: { avatar: base64 },
-        });
-
-        if (data?.uploadAvatar?.avatar) {
-          updateUser({ avatar: data.uploadAvatar.avatar });
-          toast.success('Foto de perfil actualizada');
-        }
-      } catch (err: any) {
-        toast.error('Error al subir imagen', {
-          description: err.message,
-        });
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   /* ------------------------------- LOGOUT ------------------------------- */
   
@@ -241,16 +89,10 @@ export default function ProfilePage() {
   }
 
   const firstName = user.name?.split(' ')[0] || 'Usuario';
-  const mpConnected = !!user.mercadopagoEmail || !!user.mercadopagoCustomerId;
+  const mpConnected = !!user.mercadopagoCustomerId;
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Payment readiness banner */}
-      <PaymentReadinessBanner />
-      
-      {/* Profile progress banner */}
-      <ProfileProgressBanner />
-
       <header className="flex items-center gap-3">
         <button
           onClick={() => router.push('/')}
@@ -265,31 +107,15 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      {/* BLOCK 6: User Profile Section */}
+      {/* User Profile Section */}
       <section className="flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
         <div className="flex items-center gap-4">
-          {/* Avatar with upload (BLOCK 5) */}
-          <div className="relative">
-            <UserAvatar 
-              name={user.name} 
-              avatar={user.avatar}
-              size="xl"
-            />
-            <label 
-              htmlFor="avatar-upload"
-              className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white cursor-pointer hover:bg-blue-700 transition shadow-lg"
-            >
-              <Camera className="h-4 w-4" />
-              <input
-                id="avatar-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                className="hidden"
-                disabled={uploadingAvatar}
-              />
-            </label>
-          </div>
+          {/* Avatar */}
+          <UserAvatar 
+            name={user.name} 
+            avatar={user.avatar}
+            size="xl"
+          />
 
           <div className="flex-1">
             <p className="text-lg font-bold text-slate-900">{user.name}</p>
@@ -313,67 +139,9 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-
-        {/* Personal Info Editor */}
-        {isEditingPersonal ? (
-          <div className="flex flex-col gap-3 p-3 bg-gray-50 rounded-xl border border-slate-200">
-            <label className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-sm">
-              <UserIcon className="h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nombre completo"
-                className="flex-1 border-none bg-transparent text-sm font-medium text-slate-900 focus:outline-none"
-              />
-            </label>
-            <label className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-sm">
-              <Mail className="h-4 w-4 text-slate-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                className="flex-1 border-none bg-transparent text-sm font-medium text-slate-900 focus:outline-none"
-              />
-            </label>
-            <label className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-sm">
-              <Phone className="h-4 w-4 text-slate-400" />
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Teléfono"
-                className="flex-1 border-none bg-transparent text-sm font-medium text-slate-900 focus:outline-none"
-              />
-            </label>
-            <div className="flex gap-2">
-              <LoadingButton
-                onClick={handleSavePersonalInfo}
-                loading={updatingProfile}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
-              >
-                Guardar
-              </LoadingButton>
-              <button
-                onClick={() => setIsEditingPersonal(false)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setIsEditingPersonal(true)}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition"
-          >
-            Editar información personal
-          </button>
-        )}
       </section>
 
-      {/* BLOCK 7: MercadoPago Section */}
+      {/* MercadoPago Section */}
       <section className="flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -394,56 +162,18 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {isEditingMercadoPago ? (
-          <div className="flex flex-col gap-3 p-3 bg-gray-50 rounded-xl border border-slate-200">
-            <label className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-sm">
-              <Mail className="h-4 w-4 text-slate-400" />
-              <input
-                type="email"
-                value={mpEmail}
-                onChange={(e) => setMpEmail(e.target.value)}
-                placeholder="Email de Mercado Pago"
-                className="flex-1 border-none bg-transparent text-sm font-medium text-slate-900 focus:outline-none"
-              />
-            </label>
-            <div className="flex gap-2">
-              <LoadingButton
-                onClick={handleSaveMercadoPago}
-                loading={updatingMP}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
-              >
-                Guardar
-              </LoadingButton>
-              <button
-                onClick={() => setIsEditingMercadoPago(false)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition"
-              >
-                Cancelar
-              </button>
-            </div>
+        {mpConnected ? (
+          <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+            <p className="text-xs font-medium text-emerald-800">
+              Cuenta configurada
+            </p>
           </div>
         ) : (
-          <>
-            {mpConnected ? (
-              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                <p className="text-xs font-medium text-emerald-800">
-                  Email: {user.mercadopagoEmail || 'Configurado'}
-                </p>
-              </div>
-            ) : (
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <p className="text-xs text-slate-600">
-                  Vincula tu cuenta de Mercado Pago para recibir y realizar pagos de forma segura.
-                </p>
-              </div>
-            )}
-            <button
-              onClick={() => setIsEditingMercadoPago(true)}
-              className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition"
-            >
-              {mpConnected ? 'Editar email' : 'Vincular cuenta'}
-            </button>
-          </>
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-600">
+              Vincula tu cuenta de Mercado Pago para recibir y realizar pagos de forma segura.
+            </p>
+          </div>
         )}
       </section>
 
