@@ -2,6 +2,8 @@
 import { Resolver, Mutation, Args, Context, Query, ObjectType, Field } from '@nestjs/graphql';
 import { UseGuards, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { RequireRoles, RequireActiveRole } from '../auth/roles.decorator';
 import { WorkerService } from './worker.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubmitKYCInput } from './dto/submit-kyc.input';
@@ -62,7 +64,9 @@ export class WorkerResolver {
   ) {}
 
   @Mutation(() => UpdateLocationResponse)
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  @RequireActiveRole('PROVIDER')
   async updateWorkerLocation(
     @Args('lat') lat: number,
     @Args('lng') lng: number,
@@ -74,7 +78,9 @@ export class WorkerResolver {
   }
 
   @Mutation(() => WorkerProfileResponse)
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  @RequireActiveRole('PROVIDER')
   async setWorkerStatus(
     @Args('status') status: string,
     @Context() context: any
