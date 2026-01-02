@@ -19,6 +19,7 @@ type FormValues = {
   email: string;
   password: string;
   role: "CLIENT" | "WORKER";
+  termsAccepted?: boolean;
 };
 
 interface AuthModalProps {
@@ -45,11 +46,13 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
       email: "",
       password: "",
       role: "CLIENT",
+      termsAccepted: false,
     },
     mode: "onChange",
   });
 
   const role = watch("role");
+  const termsAccepted = watch("termsAccepted");
 
   type LoginResult = { login: { accessToken: string; user: any } };
   type RegisterResult = { register: { accessToken: string; user: any } };
@@ -81,8 +84,8 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
           password: values.password,
           name: values.name,
           role: values.role,
-          termsAccepted: true,
-          termsVersion: "v1",
+          termsAccepted: values.termsAccepted,
+          termsVersion: "v1.0",
           termsDate: new Date().toISOString(),
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "web",
         },
@@ -213,11 +216,33 @@ function AuthContent({ defaultMode = "login", onClose, onSuccess }: { defaultMod
           </button>
         </div>
 
+        {/* Legal Consent - Only for Registration */}
+        {mode === "register" && (
+          <div className="flex flex-col gap-2 px-2">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                {...register("termsAccepted", { required: "Debes aceptar los términos para continuar" })}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span className="text-xs text-slate-600 leading-relaxed">
+                He leído y acepto los <a href="/legal/terms" target="_blank" className="text-blue-600 underline font-semibold">Términos de Servicio</a> y la <a href="/legal/privacy" target="_blank" className="text-blue-600 underline font-semibold">Política de Privacidad</a>, incluyendo el descargo de responsabilidad sobre servicios prestados por terceros.
+              </span>
+            </label>
+            {errors.termsAccepted && <p className="text-xs text-red-600">{errors.termsAccepted.message}</p>}
+          </div>
+        )}
+
         <LoadingButton
           type="submit"
           loading={isSubmitting}
           loadingText="Procesando..."
-          className="mt-2 rounded-3xl bg-blue-600 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-blue-700"
+          disabled={mode === "register" && !termsAccepted}
+          className={`mt-2 rounded-3xl px-4 py-3 text-base font-bold text-white shadow-sm transition ${
+            mode === "register" && !termsAccepted 
+              ? "bg-slate-400 cursor-not-allowed" 
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
         >
           {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
         </LoadingButton>

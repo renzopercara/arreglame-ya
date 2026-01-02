@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { GeoService } from "@/lib/adapters/geo";
+import { GeoService, GeoAddress } from "@/lib/adapters/geo";
 import { ENTRE_RIOS_CITIES, DEFAULT_CITY, findCityByName, City } from "@/constants/cities";
 
 export type LocationStatus = "loading" | "gps" | "manual" | "error";
@@ -12,6 +12,7 @@ interface LocationContextValue {
   longitude?: number;
   cityName?: string;
   city?: City;
+  address?: GeoAddress;
   error?: string;
   setManualCity: (cityName: string) => void;
   refreshLocation: () => void;
@@ -29,6 +30,7 @@ export function LocationProvider({ children }: LocationProviderProps) {
   const [longitude, setLongitude] = useState<number | undefined>();
   const [cityName, setCityName] = useState<string | undefined>();
   const [city, setCity] = useState<City | undefined>();
+  const [address, setAddress] = useState<GeoAddress | undefined>();
   const [error, setError] = useState<string | undefined>();
 
   const tryGPSLocation = useCallback(async () => {
@@ -55,10 +57,30 @@ export function LocationProvider({ children }: LocationProviderProps) {
       setLongitude(position.lng);
       setStatus("gps");
       
-      // Find nearest city (simple approach: just use default for now)
-      // In a production app, you'd calculate distances to all cities
-      setCityName(DEFAULT_CITY.name);
-      setCity(DEFAULT_CITY);
+      // Reverse geocode to get address
+      try {
+        const geoAddress = await GeoService.reverseGeocode(position.lat, position.lng);
+        setAddress(geoAddress);
+        
+        // Try to find matching city from our list
+        if (geoAddress.city) {
+          const matchedCity = findCityByName(geoAddress.city);
+          if (matchedCity) {
+            setCityName(matchedCity.name);
+            setCity(matchedCity);
+          } else {
+            setCityName(geoAddress.city);
+          }
+        } else {
+          setCityName(DEFAULT_CITY.name);
+          setCity(DEFAULT_CITY);
+        }
+      } catch (geocodeError) {
+        console.error("[LocationProvider] Reverse geocoding failed:", geocodeError);
+        // Still set default city even if geocoding fails
+        setCityName(DEFAULT_CITY.name);
+        setCity(DEFAULT_CITY);
+      }
 
     } catch (err: any) {
       console.error("[LocationProvider] GPS failed:", err);
@@ -100,6 +122,7 @@ export function LocationProvider({ children }: LocationProviderProps) {
     longitude,
     cityName,
     city,
+    address,
     error,
     setManualCity,
     refreshLocation,

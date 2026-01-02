@@ -10,21 +10,37 @@ export interface GeoPosition {
   timestamp: number;
 }
 
+export interface GeoAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  formattedAddress?: string;
+}
+
 export type GeoPermissionStatus = 'granted' | 'denied' | 'prompt';
 
 export interface IGeoService {
   getCurrentPosition(): Promise<GeoPosition>;
   checkPermissions(): Promise<GeoPermissionStatus>;
   requestPermissions(): Promise<boolean>;
+  watchPosition(callback: (position: GeoPosition) => void, errorCallback?: (error: Error) => void): number;
+  clearWatch(watchId: number): void;
+  reverseGeocode(lat: number, lng: number): Promise<GeoAddress>;
 }
 
 // --- ADAPTER WEB (navigator.geolocation) ---
+
+// Simple cache for reverse geocoding results
+const geocodeCache = new Map<string, { address: GeoAddress; timestamp: number }>();
+const GEOCODE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 class WebGeoAdapter implements IGeoService {
   async getCurrentPosition(): Promise<GeoPosition> {
     return new Promise((resolve, reject) => {
       if (!('geolocation' in navigator)) {
-        reject(new Error('GeolocalizaciÃƒÂ³n no soportada en este navegador.'));
+        reject(new Error('Geolocalización no soportada en este navegador.'));
         return;
       }
 
@@ -60,7 +76,7 @@ class WebGeoAdapter implements IGeoService {
   }
 
   async requestPermissions(): Promise<boolean> {
-    // En web, el permiso se pide automÃƒÂ¡ticamente al llamar a getCurrentPosition.
+    // En web, el permiso se pide automáticamente al llamar a getCurrentPosition.
     // Simulamos el request llamando y cancelando, o simplemente devolviendo true para que el flujo siga.
     try {
       await this.getCurrentPosition();
@@ -70,16 +86,102 @@ class WebGeoAdapter implements IGeoService {
     }
   }
 
+  watchPosition(callback: (position: GeoPosition) => void, errorCallback?: (error: Error) => void): number {
+    if (!('geolocation' in navigator)) {
+      errorCallback?.(new Error('Geolocalización no soportada en este navegador.'));
+      return -1;
+    }
+
+    return navigator.geolocation.watchPosition(
+      (pos) => {
+        callback({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          timestamp: pos.timestamp,
+        });
+      },
+      (err) => {
+        errorCallback?.(this.normalizeError(err));
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  }
+
+  clearWatch(watchId: number): void {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+  }
+
+  async reverseGeocode(lat: number, lng: number): Promise<GeoAddress> {
+    // Check cache first
+    const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`; // Round to ~10m precision
+    const cached = geocodeCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < GEOCODE_CACHE_TTL) {
+      return cached.address;
+    }
+
+    // Using Nominatim OpenStreetMap API (free, no API key required)
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'ArreglameYa/1.0', // Required by Nominatim
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Error en la respuesta de geocodificación');
+      }
+
+      const data = await response.json();
+      const address = data.address || {};
+
+      const result: GeoAddress = {
+        street: address.road || address.street,
+        city: address.city || address.town || address.village,
+        state: address.state,
+        country: address.country,
+        postalCode: address.postcode,
+        formattedAddress: data.display_name,
+      };
+
+      // Cache the result
+      geocodeCache.set(cacheKey, { address: result, timestamp: Date.now() });
+      
+      // Clean old cache entries (simple LRU)
+      if (geocodeCache.size > 50) {
+        const oldestKey = geocodeCache.keys().next().value;
+        geocodeCache.delete(oldestKey);
+      }
+
+      return result;
+    } catch (error: any) {
+      console.error('[GeoService] Reverse geocoding failed:', error);
+      return {
+        formattedAddress: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      };
+    }
+  }
+
   private normalizeError(err: GeolocationPositionError): Error {
     switch (err.code) {
       case err.PERMISSION_DENIED:
-        return new Error('Permiso de ubicaciÃƒÂ³n denegado.');
+        return new Error('Permiso de ubicación denegado.');
       case err.POSITION_UNAVAILABLE:
-        return new Error('InformaciÃƒÂ³n de ubicaciÃƒÂ³n no disponible.');
+        return new Error('Información de ubicación no disponible.');
       case err.TIMEOUT:
-        return new Error('Se agotÃƒÂ³ el tiempo para obtener la ubicaciÃƒÂ³n.');
+        return new Error('Se agotó el tiempo para obtener la ubicación.');
       default:
-        return new Error(err.message || 'Error desconocido de ubicaciÃƒÂ³n.');
+        return new Error(err.message || 'Error desconocido de ubicación.');
     }
   }
 }
@@ -101,7 +203,7 @@ class NativeGeoAdapter implements IGeoService {
         timestamp: pos.timestamp,
       };
     } catch (err: any) {
-      throw new Error(err.message || 'Error nativo de ubicaciÃƒÂ³n');
+      throw new Error(err.message || 'Error nativo de ubicación');
     }
   }
 
@@ -113,6 +215,81 @@ class NativeGeoAdapter implements IGeoService {
   async requestPermissions(): Promise<boolean> {
     const status = await Geolocation.requestPermissions();
     return status.location === 'granted';
+  }
+
+  watchPosition(callback: (position: GeoPosition) => void, errorCallback?: (error: Error) => void): number {
+    // Capacitor doesn't have a direct watchPosition, but we can simulate it with setInterval
+    // Using 10 seconds for better battery efficiency
+    let watchId = 0;
+    const intervalId = setInterval(async () => {
+      try {
+        const pos = await this.getCurrentPosition();
+        callback(pos);
+      } catch (error: any) {
+        errorCallback?.(error);
+      }
+    }, 10000); // Update every 10 seconds for battery efficiency
+
+    // Return a pseudo-watchId (using the interval ID)
+    return intervalId as unknown as number;
+  }
+
+  clearWatch(watchId: number): void {
+    clearInterval(watchId);
+  }
+
+  async reverseGeocode(lat: number, lng: number): Promise<GeoAddress> {
+    // Check cache first
+    const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`; // Round to ~10m precision
+    const cached = geocodeCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < GEOCODE_CACHE_TTL) {
+      return cached.address;
+    }
+
+    // Using Nominatim OpenStreetMap API (free, no API key required)
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'ArreglameYa/1.0', // Required by Nominatim
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Error en la respuesta de geocodificación');
+      }
+
+      const data = await response.json();
+      const address = data.address || {};
+
+      const result: GeoAddress = {
+        street: address.road || address.street,
+        city: address.city || address.town || address.village,
+        state: address.state,
+        country: address.country,
+        postalCode: address.postcode,
+        formattedAddress: data.display_name,
+      };
+
+      // Cache the result
+      geocodeCache.set(cacheKey, { address: result, timestamp: Date.now() });
+      
+      // Clean old cache entries (simple LRU)
+      if (geocodeCache.size > 50) {
+        const oldestKey = geocodeCache.keys().next().value;
+        geocodeCache.delete(oldestKey);
+      }
+
+      return result;
+    } catch (error: any) {
+      console.error('[GeoService] Reverse geocoding failed:', error);
+      return {
+        formattedAddress: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      };
+    }
   }
 }
 

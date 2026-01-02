@@ -48,7 +48,6 @@ export const ME_QUERY = gql`
       activeRole
       status
       avatar
-      phone
       rating
       loyaltyPoints
       balance
@@ -59,8 +58,9 @@ export const ME_QUERY = gql`
       currentPlan
       mercadopagoCustomerId
       mercadopagoAccessToken
-      mercadopagoEmail
       mustAcceptTerms
+      isEmailVerified
+      isKycVerified
     }
   }
 `;
@@ -167,7 +167,6 @@ export const LOGIN_MUTATION = gql`
         activeRole
         status
         avatar
-        phone
         rating
         loyaltyPoints
         balance
@@ -178,8 +177,9 @@ export const LOGIN_MUTATION = gql`
         currentPlan
         mercadopagoCustomerId
         mercadopagoAccessToken
-        mercadopagoEmail
         mustAcceptTerms
+        isEmailVerified
+        isKycVerified
       }
     }
   }
@@ -215,7 +215,6 @@ export const REGISTER_MUTATION = gql`
         activeRole
         status
         avatar
-        phone
         rating
         loyaltyPoints
         balance
@@ -226,8 +225,9 @@ export const REGISTER_MUTATION = gql`
         currentPlan
         mercadopagoCustomerId
         mercadopagoAccessToken
-        mercadopagoEmail
         mustAcceptTerms
+        isEmailVerified
+        isKycVerified
       }
     }
   }

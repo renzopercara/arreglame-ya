@@ -24,18 +24,19 @@ export interface User {
   activeRole?: 'CLIENT' | 'PROVIDER';
   status?: string;
   avatar?: string;
-  phone?: string;
   rating?: number;
   loyaltyPoints?: number;
   balance?: number;
   totalJobs?: number;
   workerStatus?: string;
   kycStatus?: string;
+  isKycVerified?: boolean;
   bio?: string;
   currentPlan?: string;
   mercadopagoCustomerId?: string;
   mercadopagoAccessToken?: string;
-  mercadopagoEmail?: string;
+  mustAcceptTerms?: boolean;
+  isEmailVerified?: boolean;
 }
 
 interface AuthState {
