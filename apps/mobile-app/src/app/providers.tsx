@@ -8,16 +8,16 @@ import { LocationProvider } from '@/contexts/LocationContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from 'sonner';
 import { errorLink } from '@/lib/apollo/errorLink';
-import { StorageAdapter } from '@/lib/adapters/storage';
+import { useAuthStore } from '@/stores/authStore';
 
 // Endpoint GraphQL unificado (NestJS corre en 3001 por defecto)
 // Usa NEXT_PUBLIC_GRAPHQL_URL para apuntar exactamente a /graphql
 const API_URL = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql';
 
-// Auth link - Adds Authorization header to all requests
+// Auth link - Adds Authorization header to all requests (BLOCK 3)
 const authLink = setContext(async (_, { headers }) => {
-  // Get token from storage
-  const token = await StorageAdapter.get('auth.token');
+  // Get token from Zustand store (BLOCK 2)
+  const token = useAuthStore.getState().token;
 
   return {
     headers: {

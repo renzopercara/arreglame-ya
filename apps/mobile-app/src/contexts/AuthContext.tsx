@@ -1,37 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLazyQuery, useApolloClient } from '@apollo/client/react';
-import { StorageAdapter } from '@/lib/adapters/storage';
-import { ME_QUERY } from '@/graphql/queries';
+import { useApolloClient } from '@apollo/client/react';
 import { toast } from 'sonner';
+import { useAuthStore, User } from '@/stores/authStore';
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
 /* -------------------------------------------------------------------------- */
-
-interface User {
-  id: string;
-  name: string;
-  email?: string;
-  role: string;
-  activeRole?: 'CLIENT' | 'PROVIDER';
-  status?: string;
-  avatar?: string;
-  phone?: string;
-  rating?: number;
-  loyaltyPoints?: number;
-  balance?: number;
-  totalJobs?: number;
-  workerStatus?: string;
-  kycStatus?: string;
-  bio?: string;
-  currentPlan?: string;
-  mercadopagoCustomerId?: string;
-  mercadopagoAccessToken?: string;
-  mercadopagoEmail?: string;
-}
 
 interface AuthContextValue {
   // State
@@ -60,91 +37,37 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const apolloClient = useApolloClient();
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-
-  const [fetchMe] = useLazyQuery<{ me: User }>(ME_QUERY, {
-    fetchPolicy: 'network-only',
-    errorPolicy: 'all',
-  });
-
-  /* --------------------------- SESSION RESTORATION --------------------------- */
   
-  const restoreSession = useCallback(async () => {
-    try {
-      // Get token from storage
-      const storedToken = await StorageAdapter.get('auth.token');
-      
-      if (!storedToken) {
-        setIsBootstrapping(false);
-        return;
-      }
-
-      // Validate token by fetching user
-      const { data, error } = await fetchMe();
-
-      if (error || !data?.me) {
-        // Invalid token - clear it
-        await StorageAdapter.remove('auth.token');
-        await StorageAdapter.remove('auth.user');
-        setIsBootstrapping(false);
-        return;
-      }
-
-      // Token is valid - restore session
-      setAccessToken(storedToken);
-      setUser(data.me);
-      
-      // Also persist user data
-      await StorageAdapter.set('auth.user', JSON.stringify(data.me));
-    } catch (err) {
-      console.error('[AuthContext] Session restoration failed:', err);
-      // Clear potentially corrupted data
-      await StorageAdapter.remove('auth.token');
-      await StorageAdapter.remove('auth.user');
-    } finally {
-      setIsBootstrapping(false);
-    }
-  }, [fetchMe]);
-
-  /* ----------------------------- INITIALIZATION ----------------------------- */
-  
-  useEffect(() => {
-    restoreSession();
-  }, [restoreSession]);
+  // Use Zustand store (BLOCK 2)
+  const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const zustandLogin = useAuthStore((state) => state.login);
+  const zustandLogout = useAuthStore((state) => state.logout);
+  const zustandUpdateUser = useAuthStore((state) => state.updateUser);
 
   /* ------------------------------- LOGIN ------------------------------- */
   
   const login = useCallback(async (token: string, userData: User) => {
     try {
-      // Store in state
-      setAccessToken(token);
-      setUser(userData);
-
-      // Persist to storage
-      await StorageAdapter.set('auth.token', token);
-      await StorageAdapter.set('auth.user', JSON.stringify(userData));
+      // Store in Zustand (BLOCK 2)
+      zustandLogin(token, userData);
     } catch (err) {
       console.error('[AuthContext] Login failed:', err);
       toast.error('Error al guardar la sesión');
       throw err;
     }
-  }, []);
+  }, [zustandLogin]);
 
   /* ------------------------------- LOGOUT ------------------------------- */
   
   const logout = useCallback(async () => {
     try {
-      // Clear state
-      setAccessToken(null);
-      setUser(null);
+      // Clear Zustand store (BLOCK 2)
+      zustandLogout();
 
-      // Clear storage
-      await StorageAdapter.remove('auth.token');
-      await StorageAdapter.remove('auth.user');
-
-      // Clear Apollo cache (BLOCK 8)
+      // Clear Apollo cache (BLOCK 3)
       await apolloClient.clearStore();
 
       // Redirect to home
@@ -155,52 +78,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('[AuthContext] Logout failed:', err);
       toast.error('Error al cerrar sesión');
     }
-  }, [router, apolloClient]);
+  }, [router, apolloClient, zustandLogout]);
 
   /* ---------------------------- UPDATE USER ---------------------------- */
   
   const updateUser = useCallback((updates: Partial<User>) => {
-    setUser(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, ...updates };
-      
-      // Persist to storage
-      StorageAdapter.set('auth.user', JSON.stringify(updated)).catch(err => {
-        console.error('[AuthContext] Failed to persist user update:', err);
-      });
-      
-      return updated;
-    });
-  }, []);
+    zustandUpdateUser(updates);
+  }, [zustandUpdateUser]);
 
   /* ---------------------------- REFRESH USER ---------------------------- */
   
   const refreshUser = useCallback(async () => {
-    if (!accessToken) return;
-
-    try {
-      const { data, error } = await fetchMe();
-      
-      if (error || !data?.me) {
-        // Session expired or invalid
-        await logout();
-        return;
-      }
-
-      setUser(data.me);
-      await StorageAdapter.set('auth.user', JSON.stringify(data.me));
-    } catch (err) {
-      console.error('[AuthContext] Refresh user failed:', err);
-    }
-  }, [accessToken, fetchMe, logout]);
+    // Not needed anymore since we don't fetch /me on every load
+    // This is kept for backward compatibility
+  }, []);
 
   /* ------------------------------- VALUE ------------------------------- */
   
   const value: AuthContextValue = {
-    isAuthenticated: !!accessToken && !!user,
-    accessToken,
+    isAuthenticated,
+    accessToken: token,
     user,
-    isBootstrapping,
+    isBootstrapping: !isHydrated, // Bootstrapping until hydrated
     login,
     logout,
     updateUser,

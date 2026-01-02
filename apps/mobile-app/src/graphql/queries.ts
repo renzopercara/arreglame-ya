@@ -43,12 +43,14 @@ export const ME_QUERY = gql`
     me {
       id
       name
+      email
       role
       activeRole
       status
-      mustAcceptTerms
-      loyaltyPoints
+      avatar
+      phone
       rating
+      loyaltyPoints
       balance
       totalJobs
       workerStatus
@@ -57,6 +59,8 @@ export const ME_QUERY = gql`
       currentPlan
       mercadopagoCustomerId
       mercadopagoAccessToken
+      mercadopagoEmail
+      mustAcceptTerms
     }
   }
 `;
@@ -158,8 +162,23 @@ export const LOGIN_MUTATION = gql`
       user {
         id
         name
+        email
         role
+        activeRole
         status
+        avatar
+        phone
+        rating
+        loyaltyPoints
+        balance
+        totalJobs
+        workerStatus
+        kycStatus
+        bio
+        currentPlan
+        mercadopagoCustomerId
+        mercadopagoAccessToken
+        mercadopagoEmail
         mustAcceptTerms
       }
     }
@@ -191,7 +210,23 @@ export const REGISTER_MUTATION = gql`
       user {
         id
         name
+        email
         role
+        activeRole
+        status
+        avatar
+        phone
+        rating
+        loyaltyPoints
+        balance
+        totalJobs
+        workerStatus
+        kycStatus
+        bio
+        currentPlan
+        mercadopagoCustomerId
+        mercadopagoAccessToken
+        mercadopagoEmail
         mustAcceptTerms
       }
     }

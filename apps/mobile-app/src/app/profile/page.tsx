@@ -198,7 +198,7 @@ export default function ProfilePage() {
     );
   }
 
-  // Not authenticated - show login prompt
+  // Not authenticated - show login prompt (BLOCK 1)
   if (!isAuthenticated || !user) {
     return (
       <div className="flex flex-col gap-6">
@@ -220,8 +220,8 @@ export default function ProfilePage() {
           <div className="flex flex-col items-center gap-4 text-center">
             <UserAvatar size="xl" />
             <div>
-              <p className="text-lg font-bold text-slate-900">Usuario invitado</p>
-              <p className="text-sm text-slate-500">Inicia sesión para acceder a tu perfil</p>
+              <p className="text-lg font-bold text-slate-900">Accede a tu perfil</p>
+              <p className="text-sm text-slate-500">Inicia sesión para ver tu información personal</p>
             </div>
             <button
               onClick={() => setShowAuthModal(true)}

@@ -10,7 +10,7 @@ import {
 } from '@apollo/client/errors';
 import type { GraphQLError } from 'graphql';
 import { toast } from 'sonner';
-import { StorageAdapter } from '@/lib/adapters/storage';
+import { useAuthStore } from '@/stores/authStore';
 
 /* -------------------------------------------------------------------------- */
 /*                                   CODES                                    */
@@ -61,8 +61,8 @@ async function clearSession() {
   if (typeof window === 'undefined') return;
 
   try {
-    await StorageAdapter.remove('auth.token');
-    await StorageAdapter.remove('auth.user');
+    // Use Zustand store to clear session (BLOCK 3)
+    useAuthStore.getState().logout();
   } catch {
     /* silent */
   }
