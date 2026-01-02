@@ -123,6 +123,7 @@ export class AuthService {
       sub: user.id, 
       email: user.email, 
       role: user.role,
+      activeRole: user.activeRole,
       isEmailVerified: user.isEmailVerified 
     };
     const accessToken = await this.jwtService.signAsync(payload);
@@ -193,6 +194,7 @@ export class AuthService {
       sub: user.id, 
       email: user.email, 
       role: user.role,
+      activeRole: user.activeRole,
       isEmailVerified: user.isEmailVerified 
     };
     const accessToken = await this.jwtService.signAsync(payload);
