@@ -38,15 +38,26 @@ export class RolesGuard implements CanActivate {
 
     // Check if user has required role
     if (requiredRoles && !requiredRoles.includes(user.role)) {
+      const roleNameMap: Record<string, string> = {
+        'WORKER': 'Profesional',
+        'CLIENT': 'Cliente',
+        'ADMIN': 'Administrador',
+      };
+      const friendlyRoles = requiredRoles.map(r => roleNameMap[r] || r).join(', ');
       throw new ForbiddenException(
-        `Se requiere uno de los siguientes roles: ${requiredRoles.join(', ')}`
+        `Se requiere uno de los siguientes roles: ${friendlyRoles}`
       );
     }
 
     // Check if user has required active role
     if (requiredActiveRole && user.activeRole !== requiredActiveRole) {
+      const modeNameMap: Record<string, string> = {
+        'PROVIDER': 'Profesional',
+        'CLIENT': 'Cliente',
+      };
+      const friendlyMode = modeNameMap[requiredActiveRole] || requiredActiveRole;
       throw new ForbiddenException(
-        `Esta acción requiere estar en modo ${requiredActiveRole === 'PROVIDER' ? 'Profesional' : 'Cliente'}`
+        `Esta acción requiere estar en modo ${friendlyMode}`
       );
     }
 

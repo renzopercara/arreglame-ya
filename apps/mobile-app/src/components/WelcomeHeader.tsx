@@ -15,11 +15,15 @@ export default function WelcomeHeader() {
   // and firstName is not displayed, avoiding any confusing "guest" terminology
   const firstName = user?.name?.split(' ')[0] || '';
   const isProvider = user?.activeRole === 'PROVIDER';
-  const hasWorkerProfile = user?.role === 'WORKER' || user?.workerStatus;
-  const hasClientProfile = user?.role === 'CLIENT' || !hasWorkerProfile;
+  
+  // Check if user has both profiles by checking role - users with WORKER role have worker profile
+  // Users who have upgraded to WORKER still maintain their client capabilities
+  const hasWorkerProfile = user?.role === 'WORKER';
+  // All users can act as clients, but explicit CLIENT role means they haven't upgraded yet
+  const hasClientProfile = true; // All users can use client features
 
-  // Show both roles if user has both profiles
-  const canSwitchRole = isAuthenticated && hasWorkerProfile && hasClientProfile;
+  // Show role switch only if user has worker profile (has been upgraded to WORKER role)
+  const canSwitchRole = isAuthenticated && hasWorkerProfile;
 
   const handleSwitchRole = async () => {
     if (!canSwitchRole) return;

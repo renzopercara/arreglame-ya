@@ -309,7 +309,7 @@ export class AuthService {
 
     // If worker profile already exists, update it
     if (user.workerProfile) {
-      const updatedProfile = await (this.prisma as any).workerProfile.update({
+      const updatedProfile = await this.prisma.workerProfile.update({
         where: { userId },
         data: {
           name: input.name,
@@ -320,22 +320,20 @@ export class AuthService {
         },
       });
 
-      // Update user role to WORKER if not already
-      if (user.role !== 'WORKER') {
-        await (this.prisma as any).user.update({
-          where: { id: userId },
-          data: {
-            role: 'WORKER',
-            activeRole: 'PROVIDER',
-          },
-        });
-      }
+      // Update user role to WORKER and set activeRole to PROVIDER
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          role: 'WORKER',
+          activeRole: 'PROVIDER',
+        },
+      });
 
       return updatedProfile;
     }
 
     // Create new worker profile
-    const workerProfile = await (this.prisma as any).workerProfile.create({
+    const workerProfile = await this.prisma.workerProfile.create({
       data: {
         userId,
         name: input.name,
@@ -349,7 +347,7 @@ export class AuthService {
     });
 
     // Update user role to WORKER
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: {
         role: 'WORKER',

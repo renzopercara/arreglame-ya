@@ -99,7 +99,13 @@ export default function RoleUpgradeModal({ isOpen, onClose, onSuccess }: RoleUpg
       });
 
       if (result.data?.becomeWorker) {
-        await refetchUser();
+        try {
+          await refetchUser();
+        } catch (refetchError) {
+          console.error('Failed to refetch user:', refetchError);
+          // Continue anyway - user data will refresh on next page load
+        }
+        
         toast.success("¡Bienvenido como profesional!");
         onSuccess?.();
         onClose();
