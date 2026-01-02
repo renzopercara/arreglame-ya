@@ -37,7 +37,7 @@ export default function WelcomeHeader() {
             {isProvider ? 'Panel de Servicios' : 'Descubre'}
           </p>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-            {isAuthenticated && user ? `Hola, ${firstName}` : 'Inicie sesión'}
+            {isAuthenticated && user ? `Hola, ${firstName}` : 'Bienvenido'}
           </h1>
         </div>
         

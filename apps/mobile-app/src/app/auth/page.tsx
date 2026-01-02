@@ -7,7 +7,7 @@ import { gql } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
 import { ArrowLeft, Mail, Lock, User, UserCog } from "lucide-react";
 import { toast } from "sonner";
-import { StorageAdapter } from "@/lib/adapters/storage";
+import { useAuth } from "@/contexts/AuthContext";
 import { LOGIN_MUTATION, REGISTER_MUTATION } from "@/graphql/queries";
 import LoadingButton from "@/components/LoadingButton";
 
@@ -24,6 +24,7 @@ function AuthContent() {
   const router = useRouter();
   const params = useSearchParams();
   const [mode, setMode] = useState<Mode>("login");
+  const { login } = useAuth();
 
   useEffect(() => {
     const m = (params.get("mode") as Mode) || "login";
@@ -48,27 +49,29 @@ function AuthContent() {
 
   const role = watch("role");
 
-  type LoginResult = { login: { accessToken: string; user: { mustAcceptTerms: boolean } } };
-  type RegisterResult = { register: { accessToken: string; user: { mustAcceptTerms: boolean } } };
-  const [login] = useMutation<LoginResult>(LOGIN_MUTATION);
+  type LoginResult = { login: { accessToken: string; user: any } };
+  type RegisterResult = { register: { accessToken: string; user: any } };
+  const [loginMutation] = useMutation<LoginResult>(LOGIN_MUTATION);
   const [registerUser] = useMutation<RegisterResult>(REGISTER_MUTATION);
 
   const onSubmit = async (values: FormValues) => {
     const mutationPromise = async () => {
       if (mode === "login") {
-        const { data } = await login({
+        const { data } = await loginMutation({
           variables: { email: values.email, password: values.password, role: values.role },
         });
         const token = data?.login?.accessToken;
-        if (token) {
-          await StorageAdapter.set("auth.token", token);
-          const mustComplete = data?.login?.user?.mustAcceptTerms;
+        const user = data?.login?.user;
+        if (token && user) {
+          // BLOCK 5: Auto-login with full user data
+          await login(token, user);
+          const mustComplete = user.mustAcceptTerms;
           router.replace(mustComplete ? "/profile" : "/");
         }
         return data;
       }
 
-      // Register flow
+      // Register flow (BLOCK 5: Auto-login after registration)
       const { data } = await registerUser({
         variables: {
           email: values.email,
@@ -82,9 +85,11 @@ function AuthContent() {
         },
       });
       const token = data?.register?.accessToken;
-      if (token) {
-        await StorageAdapter.set("auth.token", token);
-        const mustComplete = data?.register?.user?.mustAcceptTerms;
+      const user = data?.register?.user;
+      if (token && user) {
+        // BLOCK 5: Auto-login with full user data
+        await login(token, user);
+        const mustComplete = user.mustAcceptTerms;
         router.replace(mustComplete ? "/profile" : "/");
       }
       return data;
@@ -94,7 +99,7 @@ function AuthContent() {
       loading: mode === "login" ? "Iniciando sesión..." : "Creando tu cuenta...",
       success: mode === "login" ? "¡Sesión iniciada con éxito!" : "¡Cuenta creada exitosamente!",
       error: (err) => {
-        // Professional error handling
+        // Professional error handling (BLOCK 5)
         if (err.networkError) {
           return "Error de conexión. Verifica tu internet.";
         }
