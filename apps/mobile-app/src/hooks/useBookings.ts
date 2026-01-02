@@ -15,7 +15,7 @@ const NEARBY_JOBS = gql`
       address
       gardenImageBefore
       createdAt
-      price { total }
+      price
     }
   }
 `;

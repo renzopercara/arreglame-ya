@@ -14,13 +14,7 @@ export const GET_SERVICE = gql`
       address
       gardenImageBefore
       gardenImageAfter
-      price {
-        total
-        workerNet
-        platformFee
-        taxes
-        currency
-      }
+      price
       client {
         id
         name
@@ -97,11 +91,7 @@ export const GET_JOB_HISTORY = gql`
       status
       completedAt
       warrantyExpiresAt
-      price {
-        total
-        workerNet
-        platformFee
-      }
+      price
       gardenImageBefore
       gardenImageAfter
       evidenceImages
@@ -126,9 +116,7 @@ export const GET_MY_JOBS = gql`
       id
       status
       completedAt
-      price {
-        total
-      }
+      price
       description
       location {
           address
@@ -295,8 +283,10 @@ export const ESTIMATE_SERVICE = gql`
           workerNet
           platformFee
           taxes
+          currency
           calculationSnapshot
       }
+      aiAnalysis
     }
   }
 `;
@@ -327,9 +317,7 @@ export const CREATE_REQUEST = gql`
       id
       status
       pin
-      price {
-          total
-      }
+      price
     }
   }
 `;
@@ -448,9 +436,7 @@ export const JOB_UPDATES_SUBSCRIPTION = gql`
       extraTimeStatus
       extraTimeMinutes
       extraTimeReason
-      price {
-        total
-      }
+      price
     }
   }
 `;

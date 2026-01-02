@@ -78,6 +78,15 @@ class JobEstimateResponse {
   @Field(() => Float)
   difficultyMultiplier!: number;
 
+  @Field(() => Float, { nullable: true })
+  estimatedHours?: number;
+
+  @Field(() => [String], { nullable: true })
+  obstacles?: string[];
+
+  @Field({ nullable: true })
+  reasoning?: string;
+
   @Field(() => JobPrice)
   price!: JobPrice;
 
