@@ -284,4 +284,77 @@ export class AuthService {
       data: { activeRole },
     });
   }
+
+  async becomeWorker(
+    userId: string,
+    input: {
+      name: string;
+      bio?: string;
+      trade?: string;
+      category?: string;
+      selfieImage?: string;
+    }
+  ) {
+    // Check if user exists
+    const user = await (this.prisma as any).user.findUnique({
+      where: { id: userId },
+      include: { workerProfile: true, clientProfile: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    // If worker profile already exists, update it
+    if (user.workerProfile) {
+      const updatedProfile = await (this.prisma as any).workerProfile.update({
+        where: { userId },
+        data: {
+          name: input.name,
+          bio: input.bio,
+          trade: input.trade,
+          selfie: input.selfieImage,
+          kycStatus: 'PENDING_SUBMISSION',
+        },
+      });
+
+      // Update user role to WORKER if not already
+      if (user.role !== 'WORKER') {
+        await (this.prisma as any).user.update({
+          where: { id: userId },
+          data: {
+            role: 'WORKER',
+            activeRole: 'PROVIDER',
+          },
+        });
+      }
+
+      return updatedProfile;
+    }
+
+    // Create new worker profile
+    const workerProfile = await (this.prisma as any).workerProfile.create({
+      data: {
+        userId,
+        name: input.name,
+        bio: input.bio,
+        trade: input.trade,
+        selfie: input.selfieImage,
+        kycStatus: 'PENDING_SUBMISSION',
+        isKycVerified: false,
+        status: 'OFFLINE',
+      },
+    });
+
+    // Update user role to WORKER
+    await (this.prisma as any).user.update({
+      where: { id: userId },
+      data: {
+        role: 'WORKER',
+        activeRole: 'PROVIDER',
+      },
+    });
+
+    return workerProfile;
+  }
 }

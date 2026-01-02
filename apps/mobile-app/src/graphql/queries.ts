@@ -238,6 +238,33 @@ export const ACCEPT_LATEST_TERMS = gql`
   }
 `;
 
+export const BECOME_WORKER = gql`
+  mutation BecomeWorker($input: BecomeWorkerInput!) {
+    becomeWorker(input: $input) {
+      id
+      name
+      email
+      role
+      activeRole
+      status
+      avatar
+      rating
+      loyaltyPoints
+      balance
+      totalJobs
+      workerStatus
+      kycStatus
+      bio
+      currentPlan
+      mercadopagoCustomerId
+      mercadopagoAccessToken
+      mustAcceptTerms
+      isEmailVerified
+      isKycVerified
+    }
+  }
+`;
+
 export const CREATE_PAYMENT_PREFERENCE = gql`
   mutation CreatePaymentPreference($serviceRequestId: String!) {
     createPaymentPreference(serviceRequestId: $serviceRequestId) {
