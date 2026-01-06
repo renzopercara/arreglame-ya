@@ -83,7 +83,8 @@ enum ActiveRole {
   PROVIDER
 }
 
-enum ServiceCategory {
+// DEPRECATED: Use ServiceCategory model instead
+enum ServiceCategoryEnum {
   MAINTENANCE
   PAINTING
   HVAC
@@ -97,24 +98,24 @@ enum ServiceSubcategory {
   GARDEN_CLEANUP
   TREE_TRIMMING
   PRESSURE_WASHING
-  
+
   // PAINTING
   INTERIOR_PAINTING
   EXTERIOR_PAINTING
   WALL_REPAIR
-  
+
   // HVAC
   AC_INSTALLATION
   AC_REPAIR
   AC_MAINTENANCE
   HEATING_INSTALLATION
-  
+
   // ELECTRICAL
   OUTLET_INSTALLATION
   LIGHTING_INSTALLATION
   CIRCUIT_BREAKER
   WIRING_REPAIR
-  
+
   // PLUMBING
   LEAK_REPAIR
   PIPE_INSTALLATION
@@ -134,38 +135,38 @@ enum DifficultyLevel {
 // ============================================
 
 model User {
-  id           String      @id @default(uuid())
-  email        String      @unique
+  id           String     @id @default(uuid())
+  email        String     @unique
   passwordHash String
-  role         UserRole    @default(CLIENT)
-  status       UserStatus  @default(LOGGED_IN)
-  activeRole   ActiveRole  @default(CLIENT) // Rol activo para UI dinámica
-  
+  role         UserRole   @default(CLIENT)
+  status       UserStatus @default(LOGGED_IN)
+  activeRole   ActiveRole @default(CLIENT) // Rol activo para UI dinámica
+
   // Email Verification (Security)
-  isEmailVerified      Boolean  @default(false)
+  isEmailVerified        Boolean   @default(false)
   emailVerificationToken String?
-  emailVerifiedAt      DateTime?
-  
+  emailVerifiedAt        DateTime?
+
   // Mercado Pago integration fields
-  mercadopagoCustomerId   String? // For clients (payers)
-  mercadopagoAccessToken  String? // For workers (receivers)
-  
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  mercadopagoCustomerId  String? // For clients (payers)
+  mercadopagoAccessToken String? // For workers (receivers)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  workerProfile    WorkerProfile?
-  clientProfile    ClientProfile?
-  customerProfile  CustomerProfile? // Perfil para clientes/compradores
-  
+  workerProfile   WorkerProfile?
+  clientProfile   ClientProfile?
+  customerProfile CustomerProfile? // Perfil para clientes/compradores
+
   // Mensajes relacionados al User directamente
-  sentMessages     ChatMessage[]  @relation("SenderRelation")
-  receivedMessages ChatMessage[]  @relation("ReceiverRelation")
-  
-  wallet           Wallet?
-  payoutRequests   PayoutRequest[]
-  userConsents     UserConsent[]
-  notifications    Notification[]
+  sentMessages     ChatMessage[] @relation("SenderRelation")
+  receivedMessages ChatMessage[] @relation("ReceiverRelation")
+
+  wallet         Wallet?
+  payoutRequests PayoutRequest[]
+  userConsents   UserConsent[]
+  notifications  Notification[]
 
   @@index([email])
   @@index([status])
@@ -173,52 +174,52 @@ model User {
 }
 
 model WorkerProfile {
-  id                 String         @id @default(uuid())
-  userId             String         @unique
+  id                 String       @id @default(uuid())
+  userId             String       @unique
   name               String
   bio                String?
   trade              String? // Oficio (Plomero, Electricista, etc.)
   hourlyRate         Float? // Precio por hora
   availability       Json? // Estructura flexible para horarios
-  rating             Float          @default(5.0)
-  totalJobs          Int            @default(0)
-  status             WorkerStatus   @default(OFFLINE)
+  rating             Float        @default(5.0)
+  totalJobs          Int          @default(0)
+  status             WorkerStatus @default(OFFLINE)
   // location           Unsupported("geography(Point, 4326)")? // Commented: Use latitude/longitude instead
   latitude           Float?
   longitude          Float?
   lastLocationUpdate DateTime?
-  reputationPoints   Int            @default(0)
-  currentPlan        String         @default("STARTER")
-  acceptanceRate     Float          @default(1.0)
-  cancellationRate   Float          @default(0.0)
+  reputationPoints   Int          @default(0)
+  currentPlan        String       @default("STARTER")
+  acceptanceRate     Float        @default(1.0)
+  cancellationRate   Float        @default(0.0)
   penaltyUntil       DateTime?
-  
+
   // KYC Fields (Know Your Customer - Regulatory Compliance)
-  kycStatus          KYCStatus      @default(PENDING_SUBMISSION)
-  isKycVerified      Boolean        @default(false) // Calculated field for quick checks
-  legalName          String?        // Full legal name from ID
-  taxId              String?        // DNI / Tax ID number
-  dateOfBirth        DateTime?      // For age verification
-  dniFront           String?        // ID front image URL
-  dniBack            String?        // ID back image URL
-  insuranceDoc       String?        // Insurance document URL
-  selfie             String?        // Selfie for identity verification
-  kycSubmittedAt     DateTime?      // When KYC was submitted
-  kycApprovedAt      DateTime?      // When KYC was approved
-  
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  kycStatus      KYCStatus @default(PENDING_SUBMISSION)
+  isKycVerified  Boolean   @default(false) // Calculated field for quick checks
+  legalName      String? // Full legal name from ID
+  taxId          String? // DNI / Tax ID number
+  dateOfBirth    DateTime? // For age verification
+  dniFront       String? // ID front image URL
+  dniBack        String? // ID back image URL
+  insuranceDoc   String? // Insurance document URL
+  selfie         String? // Selfie for identity verification
+  kycSubmittedAt DateTime? // When KYC was submitted
+  kycApprovedAt  DateTime? // When KYC was approved
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  serviceRequests   ServiceRequest[] @relation("WorkerServiceRequests")
-  reviewsGiven      Review[]         @relation("ReviewAuthor")
-  reviewsReceived   Review[]         @relation("ReviewTarget")
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  serviceRequests ServiceRequest[] @relation("WorkerServiceRequests")
+  reviewsGiven    Review[]         @relation("ReviewAuthor")
+  reviewsReceived Review[]         @relation("ReviewTarget")
+  // @@index([location]) // Removed: location field is now commented out
 
   @@index([userId])
   @@index([status])
   @@index([currentPlan])
-  // @@index([location]) // Removed: location field is now commented out
 }
 
 model ClientProfile {
@@ -241,17 +242,17 @@ model ClientProfile {
 }
 
 model CustomerProfile {
-  id               String   @id @default(uuid())
-  userId           String   @unique
-  name             String
-  bio              String?
-  phone            String?
-  avatar           String?
-  rating           Float    @default(5.0)
-  totalOrders      Int      @default(0)
-  loyaltyPoints    Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  name          String
+  bio           String?
+  phone         String?
+  avatar        String?
+  rating        Float    @default(5.0)
+  totalOrders   Int      @default(0)
+  loyaltyPoints Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -263,66 +264,92 @@ model CustomerProfile {
 // SERVICE REQUEST & BILLING
 // ============================================
 
-model ServiceRequest {
-  id                    String              @id @default(uuid())
-  status                JobStatus           @default(CREATED)
-  paymentStatus         String              @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
-  
-  // Service Classification (NEW)
-  category              ServiceCategory?
-  subcategory           ServiceSubcategory?
-  metadata              Json?               // Flexible storage for subcategory-specific data
-  difficultyLevel       DifficultyLevel     @default(MEDIUM)
-  
-  clientId              String
-  workerId              String?
-  // location              Unsupported("geography(Point, 4326)") // Commented: Use latitude/longitude instead
-  latitude              Float
-  longitude             Float
-  address               String?
-  city                  String?         // City name for precise filtering
-  coverageRadius        Float           @default(15.0) // Search radius in km
-  description           String?
-  squareMeters          Float
-  gardenImageBefore     String
-  gardenImageAfter      String?
-  evidenceImages        String[]
-  difficulty            Float           @default(1.0)
-  estimatedHours        Float
-  aiReasoning           String?
-  price                 Json            // { total, workerNet, platformFee, taxes, currency }
-  priceWorkerNet        Float?
-  pricePlatformFee      Float?
-  pin                   String          @default("0000")
-  extraTimeStatus       ExtraTimeStatus @default(NONE)
-  extraTimeMinutes      Int?
-  extraTimeReason       String?
-  paidAt                DateTime?       // When payment was completed
-  
-  // Nota: disputeId removido de aquí para que Dispute sea el único dueño de la relación 1:1
-  
-  createdAt             DateTime        @default(now())
-  startedAt             DateTime?
-  completedAt           DateTime?
-  warrantyExpiresAt     DateTime?
+// Service Category (Dynamic DB-driven model)
+model ServiceCategory {
+  id             String   @id @default(uuid())
+  slug           String   @unique
+  name           String
+  iconName       String
+  description    String?
+  basePrice      Float
+  hourlyRate     Float
+  estimatedHours Float
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
-  client          ClientProfile   @relation("ClientServiceRequests", fields: [clientId], references: [id], onDelete: Restrict)
-  worker          WorkerProfile?  @relation("WorkerServiceRequests", fields: [workerId], references: [id], onDelete: SetNull)
-  
+  services ServiceRequest[] @relation("ServiceCategoryRelation")
+
+  @@index([slug])
+  @@index([active])
+}
+
+model ServiceRequest {
+  id            String    @id @default(uuid())
+  status        JobStatus @default(CREATED)
+  paymentStatus String    @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+
+  // Service Classification (NEW)
+  category        ServiceCategoryEnum? // DEPRECATED: Use serviceCategoryId instead
+  subcategory     ServiceSubcategory?
+  metadata        Json? // Flexible storage for subcategory-specific data
+  difficultyLevel DifficultyLevel      @default(MEDIUM)
+
+  // Dynamic Category System
+  serviceCategoryId String? // FK to ServiceCategory table
+
+  clientId          String
+  workerId          String?
+  // location              Unsupported("geography(Point, 4326)") // Commented: Use latitude/longitude instead
+  latitude          Float
+  longitude         Float
+  address           String?
+  city              String? // City name for precise filtering
+  coverageRadius    Float           @default(15.0) // Search radius in km
+  description       String?
+  squareMeters      Float
+  gardenImageBefore String
+  gardenImageAfter  String?
+  evidenceImages    String[]
+  difficulty        Float           @default(1.0)
+  estimatedHours    Float
+  aiReasoning       String?
+  price             Json // { total, workerNet, platformFee, taxes, currency }
+  priceWorkerNet    Float?
+  pricePlatformFee  Float?
+  pin               String          @default("0000")
+  extraTimeStatus   ExtraTimeStatus @default(NONE)
+  extraTimeMinutes  Int?
+  extraTimeReason   String?
+  paidAt            DateTime? // When payment was completed
+
+  // Nota: disputeId removido de aquí para que Dispute sea el único dueño de la relación 1:1
+
+  createdAt         DateTime  @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  warrantyExpiresAt DateTime?
+
+  // Relations
+  client          ClientProfile    @relation("ClientServiceRequests", fields: [clientId], references: [id], onDelete: Restrict)
+  worker          WorkerProfile?   @relation("WorkerServiceRequests", fields: [workerId], references: [id], onDelete: SetNull)
+  serviceCategory ServiceCategory? @relation("ServiceCategoryRelation", fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+
   // Relación 1:1 - El campo 'fields' está en el modelo Dispute
-  dispute         Dispute?        
-  
-  reviews         Review[]
-  supportTickets  SupportTicket[]
-  transactions    Transaction[]
-  chatMessages    ChatMessage[]
+  dispute Dispute?
+
+  reviews        Review[]
+  supportTickets SupportTicket[]
+  transactions   Transaction[]
+  chatMessages   ChatMessage[]
 
   // Billing performance indices
   @@index([status])
   @@index([paymentStatus]) // Quick lookup of payment status
   @@index([clientId])
   @@index([workerId])
+  @@index([serviceCategoryId]) // Query by category
   @@index([createdAt])
   @@index([paidAt]) // Revenue analytics queries
   // Composite indices for common billing queries
@@ -341,7 +368,7 @@ model Dispute {
   resolvedAt        DateTime?
 
   // Relations - Dispute es el dueño de la relación 1:1
-  serviceRequest    ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
 }
@@ -351,17 +378,17 @@ model Dispute {
 // ============================================
 
 model Wallet {
-  id               String        @id @default(uuid())
-  userId           String        @unique
-  balancePending   Decimal       @default(0) @db.Decimal(14, 2)
-  balanceAvailable Decimal       @default(0) @db.Decimal(14, 2)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  balancePending   Decimal  @default(0) @db.Decimal(14, 2)
+  balanceAvailable Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
-  user             User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  transactions     Transaction[]
-  payoutRequests   PayoutRequest[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions   Transaction[]
+  payoutRequests PayoutRequest[]
 
   // Billing performance indices
   @@index([userId])
@@ -382,14 +409,14 @@ model Transaction {
   updatedAt      DateTime          @updatedAt
 
   // Relations
-  wallet         Wallet            @relation(fields: [walletId], references: [id], onDelete: Restrict)
-  serviceRequest ServiceRequest?   @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  wallet         Wallet          @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  serviceRequest ServiceRequest? @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
   // Billing performance indices
   @@index([walletId]) // Quick lookup of wallet transactions
-  @@index([jobId])    // Fast service request transaction lookups
-  @@index([type])     // Filter by transaction type (PAYMENT_RECEIVED, REFUND, etc.)
-  @@index([status])   // Query pending/completed transactions
+  @@index([jobId]) // Fast service request transaction lookups
+  @@index([type]) // Filter by transaction type (PAYMENT_RECEIVED, REFUND, etc.)
+  @@index([status]) // Query pending/completed transactions
   @@index([referenceId]) // Idempotency: find transaction by payment gateway ID
   @@index([createdAt]) // Historical/audit queries
   // Composite index for common billing queries
@@ -399,16 +426,16 @@ model Transaction {
 model PayoutRequest {
   id          String    @id @default(uuid())
   walletId    String
-  userId      String    // Añadido para consistencia con el modelo User
+  userId      String // Añadido para consistencia con el modelo User
   amount      Decimal   @db.Decimal(14, 2)
-  cbuAlias    String    // CBU or alias for payout
+  cbuAlias    String // CBU or alias for payout
   status      String    @default("REQUESTED") // REQUESTED, PROCESSING, COMPLETED, FAILED
   createdAt   DateTime  @default(now())
   processedAt DateTime?
 
   // Relations
-  wallet      Wallet    @relation(fields: [walletId], references: [id], onDelete: Restrict)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([walletId])
   @@index([userId])
@@ -423,17 +450,17 @@ model ChatMessage {
   id         String   @id @default(uuid())
   jobId      String
   senderId   String
-  receiverId String?  // Opcional si quieres tracking directo del receptor
+  receiverId String? // Opcional si quieres tracking directo del receptor
   senderRole String?
   content    String
   timestamp  DateTime @default(now())
 
   // Relations
-  job      ServiceRequest @relation(fields: [jobId], references: [id], onDelete: Restrict)
-  
+  job ServiceRequest @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
   // Relaciones con User (unificadas para evitar conflictos entre perfiles)
-  sender   User           @relation("SenderRelation", fields: [senderId], references: [id], onDelete: Restrict)
-  receiver User?          @relation("ReceiverRelation", fields: [receiverId], references: [id], onDelete: SetNull)
+  sender   User  @relation("SenderRelation", fields: [senderId], references: [id], onDelete: Restrict)
+  receiver User? @relation("ReceiverRelation", fields: [receiverId], references: [id], onDelete: SetNull)
 
   @@index([jobId])
   @@index([senderId])
@@ -477,7 +504,7 @@ model SupportTicket {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  job         ServiceRequest @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  job ServiceRequest @relation(fields: [jobId], references: [id], onDelete: Restrict)
 
   @@index([jobId])
   @@index([reporterId])
@@ -500,7 +527,7 @@ model LegalDocument {
   updatedAt      DateTime       @updatedAt
 
   // Relations
-  userConsents   UserConsent[]
+  userConsents UserConsent[]
 
   @@index([targetAudience])
   @@index([version])
@@ -530,17 +557,17 @@ model UserConsent {
 // ============================================
 
 model PlanConfig {
-  id              String         @id @default(uuid())
-  code            String         @unique
-  targetAudience  TargetAudience
-  name            String
-  minPoints       Int            @default(0)
-  commissionFee   Float          @default(0.0)
-  priorityBonus   Int            @default(0)
-  benefits        Json
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id             String         @id @default(uuid())
+  code           String         @unique
+  targetAudience TargetAudience
+  name           String
+  minPoints      Int            @default(0)
+  commissionFee  Float          @default(0.0)
+  priorityBonus  Int            @default(0)
+  benefits       Json
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   @@index([code])
   @@index([targetAudience])
