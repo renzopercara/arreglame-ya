@@ -8,6 +8,8 @@ import {
   Int, 
   InputType 
 } from '@nestjs/graphql';
+import { IsEnum, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import GraphQLJSON from 'graphql-type-json';
 import { ServiceSubcategory, DifficultyLevel } from '@prisma/client';
 
@@ -15,15 +17,21 @@ import { ServiceSubcategory, DifficultyLevel } from '@prisma/client';
 @InputType()
 export class PriceEstimateInput {
   @Field(() => ServiceSubcategory)
+  @IsEnum(ServiceSubcategory, { message: 'Invalid service subcategory' })
   subcategory: ServiceSubcategory;
 
   @Field(() => GraphQLJSON)
+  @IsObject({ message: 'Metadata must be a valid object' })
   metadata: Record<string, any>;
 
   @Field(() => DifficultyLevel, { defaultValue: DifficultyLevel.MEDIUM })
+  @IsEnum(DifficultyLevel, { message: 'Invalid difficulty level' })
+  @IsOptional()
   difficultyLevel?: DifficultyLevel;
 
   @Field({ nullable: true })
+  @IsUUID('4', { message: 'Worker ID must be a valid UUID' })
+  @IsOptional()
   workerId?: string;
 }
 
