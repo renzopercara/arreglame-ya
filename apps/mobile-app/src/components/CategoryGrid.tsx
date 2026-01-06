@@ -1,62 +1,24 @@
+"use client";
+
 import React from "react";
-import {
-  Wrench,
-  Paintbrush,
-  Snowflake,
-  Droplets,
-  Zap,
-  LayoutGrid,
-  ChevronRight,
-} from "lucide-react";
+import { useQuery } from "@apollo/client/react";
+import * as LucideIcons from "lucide-react";
+import { GET_SERVICE_CATEGORIES } from "../graphql/queries";
 
 /**
  * Category - Estructura alineada con ServiceCategory del Backend
  */
 interface Category {
-  id: string | null;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  description: string;
+  id: string;
+  slug: string;
+  name: string;
+  iconName: string;
+  description: string | null;
+  basePrice: number;
+  hourlyRate: number;
+  estimatedHours: number;
+  active: boolean;
 }
-
-const CATEGORIES: Category[] = [
-  {
-    id: null,
-    label: "Todos",
-    icon: LayoutGrid,
-    description: "Ver todos los servicios disponibles",
-  },
-  {
-    id: "MAINTENANCE",
-    label: "Mantenimiento",
-    icon: Wrench,
-    description: "Jardín, limpieza y reparaciones generales",
-  },
-  {
-    id: "PAINTING",
-    label: "Pintura",
-    icon: Paintbrush,
-    description: "Paredes, techos y aberturas",
-  },
-  {
-    id: "HVAC",
-    label: "Clima",
-    icon: Snowflake,
-    description: "Aire acondicionado y calefacción",
-  },
-  {
-    id: "ELECTRICAL",
-    label: "Electricidad",
-    icon: Zap,
-    description: "Instalaciones y arreglos eléctricos",
-  },
-  {
-    id: "PLUMBING",
-    label: "Plomería",
-    icon: Droplets,
-    description: "Grifería, tanques y cañerías",
-  },
-];
 
 interface CategoryGridProps {
   onSelect?: (id: string | null) => void;
@@ -64,11 +26,85 @@ interface CategoryGridProps {
   variant?: "compact" | "full";
 }
 
+/**
+ * Get Lucide icon component by name
+ * @param iconName Name of the icon from lucide-react
+ * @returns Icon component or fallback
+ */
+function getLucideIcon(iconName: string): React.ComponentType<{ className?: string }> {
+  // Get icon from lucide-react dynamically
+  const Icon = (LucideIcons as any)[iconName];
+  
+  // Fallback to a generic icon if not found
+  if (!Icon) {
+    console.warn(`Icon "${iconName}" not found in lucide-react, using fallback`);
+    return LucideIcons.Package;
+  }
+  
+  return Icon;
+}
+
 export default function CategoryGrid({
   onSelect,
   activeId,
   variant = "compact",
 }: CategoryGridProps) {
+  // Fetch categories from API
+  const { data, loading, error } = useQuery(GET_SERVICE_CATEGORIES);
+
+  /**
+   * ======================
+   * LOADING STATE
+   * ======================
+   */
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <p className="text-sm text-slate-500">Cargando categorías...</p>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * ======================
+   * ERROR STATE
+   * ======================
+   */
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="rounded-2xl bg-red-50 p-4 text-center">
+          <p className="text-sm font-semibold text-red-600">
+            Error al cargar categorías
+          </p>
+          <p className="mt-1 text-xs text-red-500">
+            {error.message}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const categories: Category[] = data?.serviceCategories || [];
+
+  /**
+   * ======================
+   * EMPTY STATE
+   * ======================
+   */
+  if (categories.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <p className="text-sm text-slate-500">
+          No hay categorías disponibles
+        </p>
+      </div>
+    );
+  }
+
   /**
    * ======================
    * COMPACT VARIANT (CHIPS)
@@ -77,13 +113,13 @@ export default function CategoryGrid({
   if (variant === "compact") {
     return (
       <div className="flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-hide">
-        {CATEGORIES.map((category) => {
-          const Icon = category.icon;
+        {categories.map((category) => {
+          const Icon = getLucideIcon(category.iconName);
           const isActive = activeId === category.id;
 
           return (
             <button
-              key={category.id ?? "all"}
+              key={category.id}
               type="button"
               onClick={() => onSelect?.(category.id)}
               className={`
@@ -101,7 +137,7 @@ export default function CategoryGrid({
               `}
             >
               <Icon className="h-3.5 w-3.5" />
-              {category.label}
+              {category.name}
             </button>
           );
         })}
@@ -116,13 +152,13 @@ export default function CategoryGrid({
    */
   return (
     <div className="grid grid-cols-1 gap-3 p-1">
-      {CATEGORIES.map((category) => {
-        const Icon = category.icon;
+      {categories.map((category) => {
+        const Icon = getLucideIcon(category.iconName);
         const isActive = activeId === category.id;
 
         return (
           <button
-            key={category.id ?? "all"}
+            key={category.id}
             type="button"
             onClick={() => onSelect?.(category.id)}
             className={`
@@ -152,19 +188,19 @@ export default function CategoryGrid({
             {/* Content */}
             <div className="flex-1 text-left">
               <span className="block text-base font-bold">
-                {category.label}
+                {category.name}
               </span>
               <p
                 className={`mt-0.5 text-xs line-clamp-1 ${
                   isActive ? "text-blue-100" : "text-slate-500"
                 }`}
               >
-                {category.description}
+                {category.description || "Sin descripción"}
               </p>
             </div>
 
             {/* Arrow */}
-            <ChevronRight
+            <LucideIcons.ChevronRight
               className={`h-5 w-5 ${
                 isActive ? "text-white" : "text-slate-300"
               }`}
@@ -175,5 +211,3 @@ export default function CategoryGrid({
     </div>
   );
 }
-
-export { CATEGORIES };

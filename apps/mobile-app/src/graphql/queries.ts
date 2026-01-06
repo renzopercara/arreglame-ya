@@ -1,6 +1,23 @@
 
 import { gql } from '@apollo/client';
 
+// SERVICE CATEGORIES
+export const GET_SERVICE_CATEGORIES = gql`
+  query GetServiceCategories {
+    serviceCategories {
+      id
+      slug
+      name
+      iconName
+      description
+      basePrice
+      hourlyRate
+      estimatedHours
+      active
+    }
+  }
+`;
+
 // Query para detalle de servicio (usada por Codegen)
 export const GET_SERVICE = gql`
   query GetService($id: String!) {

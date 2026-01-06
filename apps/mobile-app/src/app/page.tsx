@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useQuery } from "@apollo/client/react";
+import * as LucideIcons from "lucide-react";
+import { GET_SERVICE_CATEGORIES } from "../graphql/queries";
 import { 
   Map as MapIcon, 
   List, 
@@ -9,10 +12,6 @@ import {
   MapPin, 
   Navigation,
   ChevronRight,
-  Hammer,
-  TreePine,
-  Droplets,
-  Zap
 } from "lucide-react";
 
 /**
@@ -40,10 +39,25 @@ const useServices = (config: any) => ({
   refetch: () => console.log("Refetching...")
 });
 
+/**
+ * Get Lucide icon component by name
+ */
+function getLucideIcon(iconName: string): React.ComponentType<{ size?: number }> {
+  const Icon = (LucideIcons as any)[iconName];
+  if (!Icon) {
+    return LucideIcons.Package; // Fallback icon
+  }
+  return Icon;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const { status: locStatus, latitude, longitude, cityName } = useLocationContext();
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  
+  // Fetch dynamic categories
+  const { data: categoriesData, loading: categoriesLoading } = useQuery(GET_SERVICE_CATEGORIES);
+  const categories = categoriesData?.serviceCategories || [];
   
   const { services, loading } = useServices({
     location: cityName,
@@ -89,21 +103,39 @@ export default function HomePage() {
       {/* Categorías */}
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-bold text-slate-800">Categorías</h2>
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: "Jardín", icon: <TreePine />, color: "bg-green-100 text-green-600" },
-            { label: "Piletas", icon: <Droplets />, color: "bg-blue-100 text-blue-600" },
-            { label: "Reparo", icon: <Hammer />, color: "bg-orange-100 text-orange-600" },
-            { label: "Luz", icon: <Zap />, color: "bg-yellow-100 text-yellow-600" }
-          ].map((cat, i) => (
-            <button key={i} className="flex flex-col items-center gap-2">
-              <div className={`w-full aspect-square rounded-2xl flex items-center justify-center ${cat.color} shadow-sm active:scale-90 transition-transform`}>
-                {React.cloneElement(cat.icon as React.ReactElement, { size: 24 })}
-              </div>
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">{cat.label}</span>
-            </button>
-          ))}
-        </div>
+        {categoriesLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-3">
+            {categories.slice(0, 4).map((cat: any) => {
+              const Icon = getLucideIcon(cat.iconName);
+              // Color mapping for visual variety
+              const colors = [
+                "bg-green-100 text-green-600",
+                "bg-blue-100 text-blue-600",
+                "bg-orange-100 text-orange-600",
+                "bg-yellow-100 text-yellow-600",
+                "bg-purple-100 text-purple-600",
+                "bg-pink-100 text-pink-600",
+              ];
+              const colorIndex = categories.indexOf(cat) % colors.length;
+              const color = colors[colorIndex];
+              
+              return (
+                <button key={cat.id} className="flex flex-col items-center gap-2">
+                  <div className={`w-full aspect-square rounded-2xl flex items-center justify-center ${color} shadow-sm active:scale-90 transition-transform`}>
+                    <Icon size={24} />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter line-clamp-1">
+                    {cat.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* Switch de Vista */}
