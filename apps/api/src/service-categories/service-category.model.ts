@@ -1,11 +1,13 @@
 import { ObjectType, Field, ID, Float } from '@nestjs/graphql';
 
 /**
- * ServiceCategory GraphQL ObjectType
- * Represents a service category with pricing information
+ * ServiceCategoryGraphQL - GraphQL representation of ServiceCategory
+ * 
+ * Renamed to avoid collision with Prisma's ServiceCategory model.
+ * This is a pure GraphQL type that mirrors the Prisma model structure.
  */
-@ObjectType()
-export class ServiceCategory {
+@ObjectType('ServiceCategory')
+export class ServiceCategoryGraphQL {
   @Field(() => ID)
   id!: string;
 

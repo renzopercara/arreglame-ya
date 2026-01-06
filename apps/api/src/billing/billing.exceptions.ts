@@ -147,13 +147,17 @@ export function throwBillingException(
   );
 }
 
+import { Logger } from '@nestjs/common';
+
 /**
  * Safe error handler wrapper
  * Catches unexpected errors and returns safe response
  */
 export class SafeErrorHandler {
+  private static readonly logger = new Logger('BillingError');
+
   static handle(error: any, context: string = 'Billing Operation'): never {
-    console.error(`[${context}] Error:`, error);
+    this.logger.error(`[${context}] Error:`, error);
 
     // If it's already a BillingException, re-throw it
     if (error instanceof BillingException) {
@@ -182,6 +186,8 @@ export class SafeErrorHandler {
  * Logging utility for audit trails
  */
 export class PaymentAuditLog {
+  private static readonly logger = new Logger('BillingAudit');
+
   static log(
     level: 'info' | 'warn' | 'error',
     action: string,
@@ -197,8 +203,19 @@ export class PaymentAuditLog {
       details: sensitiveData ? maskSensitiveData(details) : details,
     };
 
-    // TODO: Send to external logging service (Sentry, DataDog, etc.)
-    console.log(`[BILLING_AUDIT] ${JSON.stringify(logEntry)}`);
+    // Log to NestJS logger for proper handling
+    const message = `${action} - ${JSON.stringify(logEntry.details)}`;
+    
+    switch (level) {
+      case 'error':
+        this.logger.error(message);
+        break;
+      case 'warn':
+        this.logger.warn(message);
+        break;
+      default:
+        this.logger.log(message);
+    }
   }
 }
 

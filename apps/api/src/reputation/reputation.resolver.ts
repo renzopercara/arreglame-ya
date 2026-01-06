@@ -1,5 +1,7 @@
 import { Resolver, Query, Args, ObjectType, Field, Int } from '@nestjs/graphql';
 import { ReputationService } from './reputation.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { NotFoundException } from '@nestjs/common';
 
 // ============================================
 // OBJECT TYPES (GraphQL Code First)
@@ -23,7 +25,10 @@ class ReputationInfo {
 
 @Resolver()
 export class ReputationResolver {
-  constructor(private readonly reputationService: ReputationService) {}
+  constructor(
+    private readonly reputationService: ReputationService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Health check para el sistema de reputación
@@ -41,11 +46,35 @@ export class ReputationResolver {
    */
   @Query(() => ReputationInfo)
   async getWorkerReputation(@Args('workerId') workerId: string): Promise<ReputationInfo> {
-    // TODO: Integrar con ReputationService para obtener datos reales
+    const worker = await this.prisma.workerProfile.findUnique({
+      where: { id: workerId },
+      select: {
+        reputationPoints: true,
+        currentPlan: true,
+      },
+    });
+
+    if (!worker) {
+      throw new NotFoundException(`Worker with ID ${workerId} not found`);
+    }
+
+    // Get next milestone from PlanConfig
+    const plans = await this.prisma.planConfig.findMany({
+      where: {
+        targetAudience: 'WORKER',
+        isActive: true,
+        minPoints: { gt: worker.reputationPoints },
+      },
+      orderBy: { minPoints: 'asc' },
+      take: 1,
+    });
+
+    const nextMilestone = plans.length > 0 ? plans[0].minPoints : worker.reputationPoints;
+
     return {
-      points: 100,
-      currentPlan: 'BRONZE',
-      nextMilestone: 500,
+      points: worker.reputationPoints,
+      currentPlan: worker.currentPlan,
+      nextMilestone,
     };
   }
 }

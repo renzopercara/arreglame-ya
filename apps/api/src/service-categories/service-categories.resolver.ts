@@ -1,12 +1,12 @@
 import { Resolver, Query, Args, Float } from '@nestjs/graphql';
 import { ServiceCategoriesService } from './service-categories.service';
-import { ServiceCategory } from './service-category.model';
+import { ServiceCategoryGraphQL } from './service-category.model';
 
 /**
  * ServiceCategoriesResolver
  * GraphQL resolver for service categories
  */
-@Resolver(() => ServiceCategory)
+@Resolver(() => ServiceCategoryGraphQL)
 export class ServiceCategoriesResolver {
   constructor(private readonly serviceCategoriesService: ServiceCategoriesService) {}
 
@@ -14,11 +14,11 @@ export class ServiceCategoriesResolver {
    * Query: serviceCategories
    * Returns all active service categories ordered by name
    */
-  @Query(() => [ServiceCategory], {
+  @Query(() => [ServiceCategoryGraphQL], {
     name: 'serviceCategories',
     description: 'Get all active service categories',
   })
-  async getServiceCategories(): Promise<ServiceCategory[]> {
+  async getServiceCategories(): Promise<ServiceCategoryGraphQL[]> {
     return this.serviceCategoriesService.getActiveCategories();
   }
 

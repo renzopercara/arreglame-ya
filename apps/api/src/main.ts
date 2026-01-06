@@ -3,6 +3,8 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { validateEnvironment } from './env.validation';
 import { AllExceptionsFilter } from './common/filters/exception.filter';
+// Import enum registry to register GraphQL enums once at boot
+import './common/graphql/graphql-enum.registry';
 
 /**
  * Bootstrap function - Deterministic startup with explicit logging
