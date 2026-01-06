@@ -279,9 +279,54 @@ model ServiceCategory {
   updatedAt      DateTime @updatedAt
 
   // Relations
-  services ServiceRequest[] @relation("ServiceCategoryRelation")
+  services        ServiceRequest[] @relation("ServiceCategoryRelation")
+  serviceFormulas ServiceFormula[]
 
   @@index([slug])
+  @@index([active])
+}
+
+// Service Formula (DB-driven pricing formulas)
+model ServiceFormula {
+  id               String             @id @default(uuid())
+  subcategory      ServiceSubcategory @unique
+  serviceCategoryId String?
+  baseTimeFormula  String // JSON string describing formula
+  defaultMetadata  Json? // Default metadata values
+  active           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  // Relations
+  serviceCategory ServiceCategory? @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+
+  @@index([subcategory])
+  @@index([active])
+  @@index([serviceCategoryId])
+}
+
+// Difficulty Multipliers (DB-driven configuration)
+model DifficultyMultiplier {
+  id        String          @id @default(uuid())
+  level     DifficultyLevel @unique
+  value     Float
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([level])
+}
+
+// Extras Multipliers (DB-driven configuration)
+model ExtrasMultiplier {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  value     Float
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([code])
   @@index([active])
 }
 
