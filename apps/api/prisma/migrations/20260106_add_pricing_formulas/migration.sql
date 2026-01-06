@@ -1,12 +1,10 @@
--- AlterTable
+-- AlterTable: Add pricing columns if they don't exist
 ALTER TABLE "ServiceCategory" ADD COLUMN IF NOT EXISTS "basePrice" DOUBLE PRECISION,
 ADD COLUMN IF NOT EXISTS "hourlyRate" DOUBLE PRECISION,
 ADD COLUMN IF NOT EXISTS "estimatedHours" DOUBLE PRECISION;
 
--- Update existing ServiceCategory records with default values if columns were added
-UPDATE "ServiceCategory" 
-SET "basePrice" = 5000, "hourlyRate" = 3500, "estimatedHours" = 1.5 
-WHERE "basePrice" IS NULL;
+-- Note: Existing records should be seeded via seed.ts, not hardcoded here
+-- The seed script provides the correct business values from a single source
 
 -- CreateTable: ServiceFormula
 CREATE TABLE IF NOT EXISTS "ServiceFormula" (
