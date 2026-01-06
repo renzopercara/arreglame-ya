@@ -4,44 +4,13 @@ import React from "react";
 import { useQuery } from "@apollo/client/react";
 import * as LucideIcons from "lucide-react";
 import { GET_SERVICE_CATEGORIES } from "../graphql/queries";
-
-/**
- * Category - Estructura alineada con ServiceCategory del Backend
- */
-interface Category {
-  id: string;
-  slug: string;
-  name: string;
-  iconName: string;
-  description: string | null;
-  basePrice: number;
-  hourlyRate: number;
-  estimatedHours: number;
-  active: boolean;
-}
+import { getLucideIcon } from "../lib/icons";
+import { ServiceCategory } from "../types/category";
 
 interface CategoryGridProps {
   onSelect?: (id: string | null) => void;
   activeId?: string | null;
   variant?: "compact" | "full";
-}
-
-/**
- * Get Lucide icon component by name
- * @param iconName Name of the icon from lucide-react
- * @returns Icon component or fallback
- */
-function getLucideIcon(iconName: string): React.ComponentType<{ className?: string }> {
-  // Get icon from lucide-react dynamically
-  const Icon = (LucideIcons as any)[iconName];
-  
-  // Fallback to a generic icon if not found
-  if (!Icon) {
-    console.warn(`Icon "${iconName}" not found in lucide-react, using fallback`);
-    return LucideIcons.Package;
-  }
-  
-  return Icon;
 }
 
 export default function CategoryGrid({
@@ -88,7 +57,7 @@ export default function CategoryGrid({
     );
   }
 
-  const categories: Category[] = data?.serviceCategories || [];
+  const categories: ServiceCategory[] = data?.serviceCategories || [];
 
   /**
    * ======================

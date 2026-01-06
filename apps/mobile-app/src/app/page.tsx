@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
-import * as LucideIcons from "lucide-react";
 import { GET_SERVICE_CATEGORIES } from "../graphql/queries";
+import { getLucideIcon } from "../lib/icons";
+import { ServiceCategory } from "../types/category";
 import { 
   Map as MapIcon, 
   List, 
@@ -39,17 +40,6 @@ const useServices = (config: any) => ({
   refetch: () => console.log("Refetching...")
 });
 
-/**
- * Get Lucide icon component by name
- */
-function getLucideIcon(iconName: string): React.ComponentType<{ size?: number }> {
-  const Icon = (LucideIcons as any)[iconName];
-  if (!Icon) {
-    return LucideIcons.Package; // Fallback icon
-  }
-  return Icon;
-}
-
 export default function HomePage() {
   const router = useRouter();
   const { status: locStatus, latitude, longitude, cityName } = useLocationContext();
@@ -57,7 +47,7 @@ export default function HomePage() {
   
   // Fetch dynamic categories
   const { data: categoriesData, loading: categoriesLoading } = useQuery(GET_SERVICE_CATEGORIES);
-  const categories = categoriesData?.serviceCategories || [];
+  const categories: ServiceCategory[] = categoriesData?.serviceCategories || [];
   
   const { services, loading } = useServices({
     location: cityName,
@@ -109,7 +99,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-3">
-            {categories.slice(0, 4).map((cat: any) => {
+            {categories.slice(0, 4).map((cat: ServiceCategory) => {
               const Icon = getLucideIcon(cat.iconName);
               // Color mapping for visual variety
               const colors = [

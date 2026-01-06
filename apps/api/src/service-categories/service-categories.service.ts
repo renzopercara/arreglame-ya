@@ -59,7 +59,7 @@ export class ServiceCategoriesService {
     // Validate complexity factor
     if (complexityFactor < 1) {
       throw new BadRequestException(
-        'Complexity factor must be greater than or equal to 1',
+        `Complexity factor must be >= 1, received: ${complexityFactor}`,
       );
     }
 
@@ -78,8 +78,8 @@ export class ServiceCategoriesService {
     }
 
     // Calculate price using the required formula
-    const baseCalculation = category.basePrice + 
-                           (category.hourlyRate * category.estimatedHours);
+    const baseCalculation =
+      category.basePrice + category.hourlyRate * category.estimatedHours;
     const estimatedPrice = baseCalculation * complexityFactor;
 
     return estimatedPrice;
