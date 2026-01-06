@@ -1,14 +1,13 @@
 import ServiceDetailClient from "./ServiceDetailClient";
 
+export const dynamic = 'force-static';
+export const dynamicParams = false;
+
 export async function generateStaticParams() {
-  return [
-    { id: "service-123" },
-    { id: "service-456" },
-  ];
+  // Cambiamos 'id' por algo neutro
+  return [{ id: 'dynamic' }];
 }
 
 export default function Page({ params }: { params: { id: string } }) {
-  // En Next.js 14/15, a veces params debe ser tratado como Promise 
-  // pero para exportaciones estáticas simples, esto funciona:
   return <ServiceDetailClient serviceId={params.id} />;
 }

@@ -1,149 +1,182 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import CategoryGrid from "@/components/CategoryGrid";
-import WelcomeHeader from "@/components/WelcomeHeader";
-import FakeSearchBar from "@/components/FakeSearchBar";
-import FeaturedServices from "@/components/FeaturedServices";
-import NearYou from "@/components/NearYou";
-import LocationSelector from "@/components/LocationSelector";
-import ServiceMap from "@/components/ServiceMap";
-import { ServiceMapMarker } from "@/components/ServiceMap";
-import useServices from "@/hooks/useServices";
-import { useLocationContext } from "@/contexts/LocationContext";
-import { Map, List } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { 
+  Map as MapIcon, 
+  List, 
+  Search, 
+  Star, 
+  MapPin, 
+  Navigation,
+  ChevronRight,
+  Hammer,
+  TreePine,
+  Droplets,
+  Zap
+} from "lucide-react";
+
+/**
+ * NOTA DE COMPATIBILIDAD: 
+ * Se han mockeado los hooks de navegación y servicios para permitir 
+ * la visualización en el entorno de previsualización sin errores de resolución.
+ */
+
+// Mock de hooks para previsualización
+const useRouter = () => ({ push: (url: string) => console.log(`Navegando a: ${url}`) });
+const useLocationContext = () => ({
+  status: "gps",
+  latitude: -32.058,
+  longitude: -60.150,
+  cityName: "Paraná, Entre Ríos"
+});
+
+const useServices = (config: any) => ({
+  services: [
+    { id: "1", title: "Corte de Césped Profesional", price: "$5.500", provider: "Juan Pérez", image: "https://images.unsplash.com/photo-1558905734-b83d8436dd77?w=400", rating: 4.8 },
+    { id: "2", title: "Limpieza de Piscinas", price: "$8.000", provider: "Agua Clara", image: "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?w=400", rating: 4.9 },
+    { id: "3", title: "Instalación de Riego", price: "$12.000", provider: "Riego Sur", image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400", rating: 4.7 }
+  ],
+  loading: false,
+  refetch: () => console.log("Refetching...")
+});
 
 export default function HomePage() {
   const router = useRouter();
   const { status: locStatus, latitude, longitude, cityName } = useLocationContext();
-  const [showMap, setShowMap] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
   
-  const { services, loading, refetch } = useServices({
+  const { services, loading } = useServices({
     location: cityName,
     latitude,
     longitude,
     radiusKm: 50,
   });
 
-  const handleCategoryClick = (categoryId: string | null) => {
-    if (categoryId === null) {
-      router.push("/search");
-    } else {
-      router.push(`/search?category=${categoryId}`);
-    }
-  };
-
-  const handleCityChange = (city: string) => {
-    // Refetch services when city changes
-    refetch();
-  };
-
-  const handleMarkerClick = (serviceId: string) => {
-    router.push(`/services/${serviceId}`);
-  };
-
-  // Convert services to map markers
-  // TODO: Add lat/lng to Service model and use actual coordinates
-  // For now, using center of Entre Ríos as placeholder
-  const mapMarkers: ServiceMapMarker[] = services
-    .filter(s => s.image) // Only show services with images
-    .map((s, index) => ({
-      id: s.id,
-      // Spread markers around the current location for demo
-      lat: (latitude || -32.0333) + (Math.random() - 0.5) * 0.1,
-      lng: (longitude || -60.3000) + (Math.random() - 0.5) * 0.1,
-      title: s.title,
-      price: parseFloat(s.price.replace(/[^0-9.-]+/g, "")) || 0,
-      provider: s.provider || "Proveedor",
-      imageUrl: s.image,
-    }));
-
   return (
-    <div className="flex flex-col gap-6 pb-8">
-      {/* Header con saludo personalizado */}
-      <WelcomeHeader />
+    <div className="flex flex-col gap-6 max-w-md mx-auto bg-gray-50 min-h-screen">
+      {/* Header */}
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-black text-slate-900">¡Hola! 👋</h1>
+        <p className="text-slate-500 text-sm font-medium">¿En qué podemos ayudarte hoy?</p>
+      </header>
 
-      {/* Location selector */}
-      <LocationSelector onCityChange={handleCityChange} />
+      {/* Selector de Ubicación */}
+      <div className="flex items-center gap-2 p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
+        <div className="p-2 bg-green-100 text-green-600 rounded-xl">
+          <MapPin size={20} />
+        </div>
+        <div className="flex-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tu ubicación</p>
+          <p className="text-sm font-bold text-slate-700">{cityName}</p>
+        </div>
+        <ChevronRight size={18} className="text-slate-300" />
+      </div>
 
-      {/* Fake search bar que redirige a /search */}
-      <FakeSearchBar />
+      {/* Buscador Falso */}
+      <div className="relative group">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
+          <Search size={20} />
+        </div>
+        <input 
+          type="text" 
+          placeholder="Buscar jardineros, plomeros..." 
+          className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-sm"
+          readOnly
+          onClick={() => router.push("/search")}
+        />
+      </div>
 
-      {/* Categorías con navegación a /search */}
+      {/* Categorías */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold text-slate-800">¿Qué necesitas?</h2>
-        <CategoryGrid onSelect={handleCategoryClick} />
+        <h2 className="text-lg font-bold text-slate-800">Categorías</h2>
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { label: "Jardín", icon: <TreePine />, color: "bg-green-100 text-green-600" },
+            { label: "Piletas", icon: <Droplets />, color: "bg-blue-100 text-blue-600" },
+            { label: "Reparo", icon: <Hammer />, color: "bg-orange-100 text-orange-600" },
+            { label: "Luz", icon: <Zap />, color: "bg-yellow-100 text-yellow-600" }
+          ].map((cat, i) => (
+            <button key={i} className="flex flex-col items-center gap-2">
+              <div className={`w-full aspect-square rounded-2xl flex items-center justify-center ${cat.color} shadow-sm active:scale-90 transition-transform`}>
+                {React.cloneElement(cat.icon as React.ReactElement, { size: 24 })}
+              </div>
+              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">{cat.label}</span>
+            </button>
+          ))}
+        </div>
       </section>
 
-      {/* Toggle between list and map view */}
-      {locStatus !== "loading" && services.length > 0 && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowMap(false)}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
-              !showMap
-                ? "bg-blue-600 text-white"
-                : "bg-white text-slate-700 border border-slate-200"
-            }`}
-          >
-            <List className="h-4 w-4" />
-            Lista
-          </button>
-          <button
-            onClick={() => setShowMap(true)}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
-              showMap
-                ? "bg-blue-600 text-white"
-                : "bg-white text-slate-700 border border-slate-200"
-            }`}
-          >
-            <Map className="h-4 w-4" />
-            Mapa
-          </button>
-        </div>
-      )}
-
-      {/* Map or List view */}
-      {showMap && latitude && longitude ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-bold text-slate-800">Servicios cercanos</h2>
-          <ServiceMap
-            center={{ lat: latitude, lng: longitude }}
-            markers={mapMarkers}
-            userLocation={locStatus === "gps" ? { lat: latitude, lng: longitude } : undefined}
-            showAccuracyCircle={locStatus === "gps"}
-            onMarkerClick={handleMarkerClick}
-            className="w-full h-[500px] rounded-xl"
-          />
-        </section>
-      ) : (
-        <>
-          {/* Servicios destacados (horizontal scroll) */}
-          {locStatus === "loading" ? (
-            <section className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm border border-slate-200">
-              <p className="text-sm text-slate-600">Buscando servicios cerca de ti...</p>
-            </section>
-          ) : (
-            <FeaturedServices services={services} loading={loading} />
-          )}
-
-          {/* Sección "Cerca de ti" (placeholder) */}
-          <NearYou />
-        </>
-      )}
-
-      {/* CTA adicional */}
-      <section className="flex flex-col gap-4 p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border border-purple-100">
-        <h3 className="text-lg font-bold text-slate-800">¿Eres profesional?</h3>
-        <p className="text-sm text-slate-600">
-          Únete a nuestra red de trabajadores verificados y empieza a recibir solicitudes de clientes en tu área.
-        </p>
+      {/* Switch de Vista */}
+      <div className="flex p-1 bg-slate-200/50 rounded-2xl">
         <button
-          onClick={() => router.push("/auth?mode=register")}
-          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+          onClick={() => setViewMode("list")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            viewMode === "list" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"
+          }`}
         >
-          Registrarme como profesional
+          <List size={16} /> Lista
+        </button>
+        <button
+          onClick={() => setViewMode("map")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            viewMode === "map" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"
+          }`}
+        >
+          <MapIcon size={16} /> Mapa
+        </button>
+      </div>
+
+      {/* Contenido Principal */}
+      <div className="flex flex-col gap-4">
+        {viewMode === "map" ? (
+          <div className="w-full h-64 bg-slate-200 rounded-3xl flex items-center justify-center relative overflow-hidden group">
+            <div className="absolute inset-0 bg-[url('https://api.mapbox.com/styles/v1/mapbox/light-v10/static/-60.150,-32.058,12,0/600x400?access_token=none')] bg-cover opacity-50" />
+            <div className="z-10 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-white">
+              <p className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                <Navigation size={14} className="text-blue-500 fill-blue-500" /> 
+                Vista de mapa activada
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <h2 className="text-lg font-bold text-slate-800">Servicios Destacados</h2>
+            <div className="flex flex-col gap-4">
+              {services.map((s) => (
+                <div key={s.id} className="bg-white p-3 rounded-3xl border border-slate-100 shadow-sm flex gap-4 active:scale-[0.98] transition-transform">
+                  <div className="relative h-20 w-20 shrink-0">
+                    <img src={s.image} className="h-full w-full object-cover rounded-2xl" alt={s.title} />
+                    <div className="absolute -top-2 -right-2 bg-white px-1.5 py-0.5 rounded-lg shadow-sm border border-slate-50 flex items-center gap-0.5">
+                      <Star size={10} className="text-yellow-400 fill-yellow-400" />
+                      <span className="text-[10px] font-black">{s.rating}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col justify-between py-1 flex-1">
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm leading-tight">{s.title}</h3>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase">{s.provider}</p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-blue-600 font-black text-sm">{s.price}</span>
+                      <button className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg uppercase">Ver más</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Banner Profesional */}
+      <section className="mt-4 p-6 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2.5rem] text-white shadow-xl shadow-blue-200">
+        <h3 className="text-xl font-black mb-1">¡Súmate al equipo!</h3>
+        <p className="text-blue-100 text-xs mb-4 leading-relaxed">Publica tus servicios y llega a cientos de clientes en tu zona de forma inmediata.</p>
+        <button 
+          onClick={() => router.push("/auth?mode=register")}
+          className="w-full py-3.5 bg-white text-blue-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg"
+        >
+          REGISTRARME AHORA
         </button>
       </section>
     </div>

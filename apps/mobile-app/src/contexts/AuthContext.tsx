@@ -1,170 +1,174 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useApolloClient } from '@apollo/client/react';
-import { toast } from 'sonner';
-import { useAuthStore, User } from '@/stores/authStore';
+import React, { useState } from "react";
+import { Sparkles, User as UserIcon, ArrowLeftRight } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/*                                   TYPES                                    */
+/* TYPES & MOCKS (Para evitar errores de importación en el preview)           */
 /* -------------------------------------------------------------------------- */
 
-interface AuthContextValue {
-  // State
-  isAuthenticated: boolean;
-  accessToken: string | null;
-  user: User | null;
-  isBootstrapping: boolean;
-  
-  // Methods
-  login: (token: string, user: User) => Promise<void>;
-  logout: () => Promise<void>;
-  updateUser: (updates: Partial<User>) => void;
-  refreshUser: () => Promise<void>;
-  refetchUser: () => Promise<void>;
-  switchRole: (activeRole: 'CLIENT' | 'PROVIDER') => Promise<void>;
+interface User {
+  id: string;
+  name: string;
+  avatar?: string;
+  activeRole: 'CLIENT' | 'PROVIDER';
+  roles: string[]; // El array que contiene los permisos
 }
 
+// Mocks de componentes internos
+const UserAvatar = ({ name, avatar, size }: any) => (
+  <div className="h-10 w-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+    {avatar ? <img src={avatar} alt={name} /> : <UserIcon size={20} className="text-slate-400" />}
+  </div>
+);
+const AuthModal = ({ isOpen, onClose }: any) => null;
+
+// Mock de AuthContext
+const useAuth = () => ({
+  isAuthenticated: true,
+  user: {
+    name: "Juan Pérez",
+    activeRole: "CLIENT",
+    roles: ["CLIENT", "PROVIDER"], // Tiene ambos roles
+  } as User,
+  isBootstrapping: false,
+  switchRole: async (role: string) => console.log("Switched to", role)
+});
+
 /* -------------------------------------------------------------------------- */
-/*                                  CONTEXT                                   */
+/* COMPONENT                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+export default function WelcomeHeader() {
+  const { isAuthenticated, user, isBootstrapping, switchRole } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
 
-/* -------------------------------------------------------------------------- */
-/*                                  PROVIDER                                  */
-/* -------------------------------------------------------------------------- */
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const apolloClient = useApolloClient();
+  const firstName = user?.name?.split(' ')[0] || '';
+  const isProvider = user?.activeRole === 'PROVIDER';
   
-  // Use Zustand store (BLOCK 2)
-  const token = useAuthStore((state) => state.token);
-  const user = useAuthStore((state) => state.user);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const isHydrated = useAuthStore((state) => state.isHydrated);
-  const zustandLogin = useAuthStore((state) => state.login);
-  const zustandLogout = useAuthStore((state) => state.logout);
-  const zustandUpdateUser = useAuthStore((state) => state.updateUser);
-
-  /* ------------------------------- LOGIN ------------------------------- */
+  // FIX: Verificamos si tiene el perfil de trabajador en el array 'roles'
+  // Usamos 'PROVIDER' que es el identificador correcto en la base de datos
+  const hasWorkerProfile = user?.roles?.includes('PROVIDER');
   
-  const login = useCallback(async (token: string, userData: User) => {
+  // El switch se muestra si está autenticado y posee el rol de proveedor en su cuenta
+  const canSwitchRole = isAuthenticated && hasWorkerProfile;
+
+  const handleSwitchRole = async () => {
+    if (!canSwitchRole) return;
+    
+    setIsSwitchingRole(true);
     try {
-      // Store in Zustand (BLOCK 2)
-      zustandLogin(token, userData);
+      const newRole = isProvider ? 'CLIENT' : 'PROVIDER';
+      await switchRole(newRole);
     } catch (err) {
-      console.error('[AuthContext] Login failed:', err);
-      toast.error('Error al guardar la sesión');
-      throw err;
+      console.error('Failed to switch role:', err);
+    } finally {
+      setIsSwitchingRole(false);
     }
-  }, [zustandLogin]);
-
-  /* ------------------------------- LOGOUT ------------------------------- */
-  
-  const logout = useCallback(async () => {
-    try {
-      // Clear Zustand store (BLOCK 2)
-      zustandLogout();
-
-      // Clear Apollo cache (BLOCK 3)
-      await apolloClient.clearStore();
-
-      // Redirect to home
-      router.push('/');
-      
-      toast.success('Sesión cerrada correctamente');
-    } catch (err) {
-      console.error('[AuthContext] Logout failed:', err);
-      toast.error('Error al cerrar sesión');
-    }
-  }, [router, apolloClient, zustandLogout]);
-
-  /* ---------------------------- UPDATE USER ---------------------------- */
-  
-  const updateUser = useCallback((updates: Partial<User>) => {
-    zustandUpdateUser(updates);
-  }, [zustandUpdateUser]);
-
-  /* ---------------------------- REFRESH USER ---------------------------- */
-  
-  const refreshUser = useCallback(async () => {
-    // Not needed anymore since we don't fetch /me on every load
-    // This is kept for backward compatibility
-  }, []);
-
-  /* ---------------------------- REFETCH USER ---------------------------- */
-  
-  const refetchUser = useCallback(async () => {
-    // Import needed at top of file
-    const { ME_QUERY } = await import('@/graphql/queries');
-    try {
-      const result = await apolloClient.query({
-        query: ME_QUERY,
-        fetchPolicy: 'network-only',
-      });
-      
-      if (result.data?.me) {
-        updateUser(result.data.me);
-      }
-    } catch (err) {
-      console.error('[AuthContext] Refetch user failed:', err);
-    }
-  }, [apolloClient, updateUser]);
-
-  /* ---------------------------- SWITCH ROLE ---------------------------- */
-  
-  const switchRole = useCallback(async (activeRole: 'CLIENT' | 'PROVIDER') => {
-    const { SWITCH_ACTIVE_ROLE } = await import('@/graphql/queries');
-    try {
-      const result = await apolloClient.mutate({
-        mutation: SWITCH_ACTIVE_ROLE,
-        variables: { activeRole },
-      });
-      
-      if (result.data?.switchActiveRole) {
-        updateUser(result.data.switchActiveRole);
-        toast.success(
-          activeRole === 'PROVIDER' 
-            ? 'Cambiado a modo Profesional' 
-            : 'Cambiado a modo Cliente'
-        );
-      }
-    } catch (err) {
-      console.error('[AuthContext] Switch role failed:', err);
-      toast.error('Error al cambiar de rol');
-      throw err;
-    }
-  }, [apolloClient, updateUser]);
-
-  /* ------------------------------- VALUE ------------------------------- */
-  
-  const value: AuthContextValue = {
-    isAuthenticated,
-    accessToken: token,
-    user,
-    isBootstrapping: !isHydrated, // Bootstrapping until hydrated
-    login,
-    logout,
-    updateUser,
-    refreshUser,
-    refetchUser,
-    switchRole,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // Esqueleto de carga
+  if (isBootstrapping) {
+    return (
+      <div className="flex items-start justify-between">
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-24 bg-slate-200 animate-pulse rounded-full" />
+          <div className="h-8 w-40 bg-slate-200 animate-pulse rounded-lg" />
+        </div>
+        <div className="w-10 h-10 rounded-full bg-slate-200 animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <p className={`text-xs font-bold flex items-center gap-1.5 tracking-wide uppercase ${
+              isProvider ? 'text-indigo-600' : 'text-blue-600'
+            }`}>
+              <Sparkles className="w-3.5 h-3.5" />
+              {isProvider ? 'Panel Profesional' : 'Explorar'}
+            </p>
+            
+            {/* Badge de Rol actual */}
+            {isAuthenticated && user && (
+              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter border ${
+                isProvider 
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                  : 'bg-blue-50 text-blue-700 border-blue-100'
+              }`}>
+                {isProvider ? 'Trabajador' : 'Cliente'}
+              </span>
+            )}
+          </div>
+          
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 mt-1">
+            {isAuthenticated && user ? `Hola, ${firstName}` : 'Bienvenido'}
+          </h1>
+
+          {/* Botón de cambio de rol: Solo si tiene perfil PROVIDER habilitado */}
+          {canSwitchRole && (
+            <button
+              onClick={handleSwitchRole}
+              disabled={isSwitchingRole}
+              className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm border ${
+                isProvider
+                  ? 'bg-white text-blue-600 border-blue-100 hover:bg-blue-50'
+                  : 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50'
+              } disabled:opacity-50 active:scale-95`}
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              {isSwitchingRole 
+                ? 'Cambiando...' 
+                : isProvider 
+                  ? 'Modo Cliente' 
+                  : 'Modo Profesional'
+              }
+            </button>
+          )}
+        </div>
+        
+        {/* Avatar o Botón de Acceso */}
+        <div className="ml-4">
+          {isAuthenticated && user ? (
+            <UserAvatar 
+              name={user.name} 
+              avatar={user.avatar}
+              size="md"
+            />
+          ) : (
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-bold shadow-xl shadow-slate-200 transition active:scale-95"
+            >
+              <UserIcon className="w-3.5 h-3.5" />
+              Acceso
+            </button>
+          )}
+        </div>
+      </div>
+
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
+    </>
+  );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                    HOOK                                    */
-/* -------------------------------------------------------------------------- */
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+// Exportación para visualización
+export function App() {
+  return (
+    <div className="min-h-screen bg-white p-6">
+      <div className="max-w-md mx-auto">
+        <WelcomeHeader />
+        <div className="mt-12 p-8 border-2 border-dashed border-slate-100 rounded-3xl text-center text-slate-300 font-medium">
+          Contenido de la página...
+        </div>
+      </div>
+    </div>
+  );
 }

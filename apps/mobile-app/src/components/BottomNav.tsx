@@ -1,9 +1,12 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { Home, Search, User, ClipboardList, Briefcase, MessageSquare, LayoutDashboard } from "lucide-react";
+import { Briefcase, ClipboardList, Home, LayoutDashboard, MessageSquare, Search, UserIcon } from "lucide-react";
+import { useAuth } from "@/app/providers";
+
+
 
 interface NavItem {
   href: string;
@@ -15,62 +18,50 @@ export default function BottomNav() {
   const pathname = usePathname();
   const { isAuthenticated, user, isBootstrapping } = useAuth();
 
-  // Determine theme color based on active role
-  const isWorkerMode = user?.activeRole === 'PROVIDER' || user?.role === 'WORKER';
+  const isWorkerMode = user?.activeRole === 'PROVIDER';
   const themeColor = isWorkerMode ? 'green' : 'blue';
 
-  // Helper function to determine if a nav item is active
   const isNavItemActive = (itemHref: string, currentPath: string): boolean => {
-    // Special case: Root path requires exact match to avoid matching all paths
-    if (itemHref === "/") {
-      return currentPath === "/";
-    }
-    // Other paths: exact match or sub-route match
+    if (itemHref === "/") return currentPath === "/";
     return currentPath === itemHref || currentPath.startsWith(itemHref + "/");
   };
 
-  // Define navigation items based on auth state and activeRole (BLOCK 4)
   const getNavItems = (): NavItem[] => {
     if (!isAuthenticated || !user) {
-      // Not logged in
       return [
         { href: "/", label: "Inicio", icon: Home },
         { href: "/search", label: "Buscar", icon: Search },
-        { href: "/profile", label: "Acceso", icon: User },
+        { href: "/profile", label: "Acceso", icon: UserIcon },
       ];
     }
 
-    if (user.activeRole === 'PROVIDER' || user.role === 'WORKER') {
-      // Provider/Worker mode
+    if (user.activeRole === 'PROVIDER') {
       return [
-        { href: "/worker/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/worker/dashboard", label: "Panel", icon: LayoutDashboard },
         { href: "/worker/jobs", label: "Trabajos", icon: Briefcase },
         { href: "/worker/chat", label: "Chat", icon: MessageSquare },
-        { href: "/profile", label: "Perfil", icon: User },
+        { href: "/profile", label: "Perfil", icon: UserIcon },
       ];
     }
 
-    // Client mode (default)
     return [
       { href: "/", label: "Inicio", icon: Home },
       { href: "/search", label: "Buscar", icon: Search },
       { href: "/bookings", label: "Pedidos", icon: ClipboardList },
-      { href: "/profile", label: "Perfil", icon: User },
+      { href: "/profile", label: "Perfil", icon: UserIcon },
     ];
   };
 
   const navItems = getNavItems();
 
-  // Show skeleton during bootstrap (BLOCK 1)
   if (isBootstrapping) {
     return (
-      <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-screen-sm -translate-x-1/2 px-4">
-        <nav className="rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur">
-          <div className="flex items-center justify-between gap-1 h-16 animate-pulse">
+      <div className="fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-6">
+        <nav className="rounded-3xl border border-slate-200 bg-white/80 p-2 shadow-xl backdrop-blur-md">
+          <div className="flex items-center justify-between h-14 animate-pulse px-2">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                <div className="h-10 w-10 rounded-xl bg-gray-200" />
-                <div className="h-3 w-12 rounded bg-gray-200" />
+                <div className="h-10 w-10 rounded-2xl bg-slate-100" />
               </div>
             ))}
           </div>
@@ -80,35 +71,39 @@ export default function BottomNav() {
   }
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-screen-sm -translate-x-1/2 px-4">
-      <nav className="rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur">
-        <ul className="flex items-center justify-between gap-1">
+    <div className="fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-6">
+      <nav className="rounded-3xl border border-white/40 bg-white/80 p-2 shadow-2xl shadow-slate-200/50 backdrop-blur-xl">
+        <ul className="flex items-center justify-around">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = isNavItemActive(item.href, pathname);
 
             return (
-              <li key={item.href} className="flex-1">
+              <li key={item.href} className="flex-1 max-w-[80px]">
                 <Link
                   href={item.href}
-                  className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${
+                  className={`flex flex-col items-center gap-1.5 py-1 transition-all duration-300 ${
                     isActive
-                      ? themeColor === 'green' ? "text-green-600" : "text-blue-600"
-                      : "text-slate-500 hover:text-blue-600"
+                      ? themeColor === 'green' ? "text-emerald-600 scale-105" : "text-blue-600 scale-105"
+                      : "text-slate-400 hover:text-slate-600"
                   }`}
                 >
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
+                    className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all duration-300 ${
                       isActive
                         ? themeColor === 'green' 
-                          ? "border-green-100 bg-green-50 text-green-600"
-                          : "border-blue-100 bg-blue-50 text-blue-600"
-                        : "border-transparent bg-gray-50 text-slate-500"
+                          ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
+                          : "bg-blue-600 text-white shadow-lg shadow-blue-200"
+                        : "bg-transparent text-slate-400"
                     }`}
                   >
-                    <Icon className="h-5 w-5" strokeWidth={2.5} />
+                    <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                   </div>
-                  <span className="truncate">{item.label}</span>
+                  <span className={`text-[10px] font-bold tracking-tight uppercase transition-all duration-300 ${
+                    isActive ? 'opacity-100 translate-y-0' : 'opacity-0 h-0 -translate-y-2'
+                  }`}>
+                    {item.label}
+                  </span>
                 </Link>
               </li>
             );

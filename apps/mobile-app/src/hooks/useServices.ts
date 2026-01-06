@@ -53,8 +53,10 @@ export default function useServices(options?: UseServicesOptions) {
     },
   });
 
-  const services = data?.getServices ?? [];
-  const friendlyError = error ? error.message : null;
-
-  return { services, loading, error: friendlyError, refetch };
+  return { 
+    services: data?.getServices ?? [], 
+    loading, 
+    error: error ? error.message : null, 
+    refetch 
+  };
 }

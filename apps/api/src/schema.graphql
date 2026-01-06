@@ -13,6 +13,16 @@ type AuthResponse {
   user: UserInfo!
 }
 
+input BecomeWorkerInput {
+  bio: String
+  category: String
+  name: String!
+  selfieImage: String
+  termsAccepted: Boolean!
+  termsVersion: String
+  trade: String
+}
+
 type CategoryInfo {
   id: ServiceCategory!
   label: String!
@@ -86,7 +96,10 @@ type Job {
 type JobEstimateResponse {
   aiAnalysis: JSON
   difficultyMultiplier: Float!
+  estimatedHours: Float
+  obstacles: [String!]
   price: JobPrice!
+  reasoning: String
 }
 
 type JobPrice {
@@ -117,6 +130,7 @@ input LoginInput {
 type Mutation {
   acceptLatestTerms(documentId: String!, userId: String!): Boolean!
   arriveAtJob(jobId: String!, lat: Float!, lng: Float!, workerId: String!): Boolean!
+  becomeWorker(input: BecomeWorkerInput!): UserInfo!
   completeJob(evidenceImages: [String!], imageAfter: String!, jobId: String!): AuditResponse!
   createJob(input: CreateJobInput!): Job!
   createPaymentPreference(amount: Float, serviceRequestId: String!): PaymentPreference!

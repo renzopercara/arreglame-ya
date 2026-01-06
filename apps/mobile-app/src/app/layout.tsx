@@ -5,11 +5,11 @@ import { Providers } from './providers';
 import "./globals.css";
 
 export const viewport: Viewport = {
-  themeColor: "#16a34a", // green-600 (Color de marca)
+  themeColor: "#16a34a",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // UX Nativa: Evita zoom accidental
+  userScalable: false,
 };
 
 export const metadata: Metadata = {
@@ -21,9 +21,6 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Arreglame Ya",
   },
-  formatDetection: {
-    telephone: false,
-  },
 };
 
 export default function RootLayout({
@@ -34,14 +31,15 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
-        {/* Fallback de iconos para iOS antiguos */}
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
-      <body className="bg-gray-50 text-slate-900 select-none font-sans antialiased">
-        {/* select-none: Evita selección de texto (sensación app nativa) */}
-        <div className="mx-auto flex min-h-screen max-w-screen-sm flex-col bg-gray-50 px-4 pb-24 pt-6">
+      <body className="bg-gray-50 text-slate-900 select-none font-sans antialiased overflow-x-hidden">
+        <div className="mx-auto flex min-h-screen max-w-screen-sm flex-col bg-gray-50">
           <Providers>
-            <main className="flex-1">{children}</main>
+            {/* Padding ajustado para no chocar con la BottomNav */}
+            <main className="flex-1 px-4 pt-6 pb-24">
+              {children}
+            </main>
             <BottomNav />
           </Providers>
         </div>

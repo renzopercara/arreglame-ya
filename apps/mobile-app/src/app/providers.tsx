@@ -1,73 +1,74 @@
-'use client';
+"use client";
 
-import React, { useMemo } from 'react';
-import { ApolloClient, InMemoryCache, HttpLink, from, ApolloLink } from '@apollo/client';
-import { setContext } from '@apollo/client/link/context';
-import { ApolloProvider } from '@apollo/client/react';
-import { LocationProvider } from '@/contexts/LocationContext';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { Toaster } from 'sonner';
-import { errorLink } from '@/lib/apollo/errorLink';
-import { useAuthStore } from '@/stores/authStore';
+import React, { createContext, useContext, useMemo, useState } from "react";
+// Importación correcta para Apollo en Next.js
+import { ApolloProvider } from "@apollo/client/react"; 
 
-// Endpoint GraphQL unificado (NestJS corre en 3001 por defecto)
-// Usa NEXT_PUBLIC_GRAPHQL_URL para apuntar exactamente a /graphql
-const API_URL = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql';
+import { LocationProvider } from "@/contexts/LocationContext";
+import { Toaster } from "sonner";
+import { client } from "../../../../graphql/client";
 
-// Auth link - Adds Authorization header to all requests (BLOCK 3)
-const authLink = setContext(async (_, { headers }) => {
-  // Get token from Zustand store (BLOCK 2)
-  const token = useAuthStore.getState().token;
+/* -------------------------------------------------------------------------- */
+/* AUTH CONTEXT                                                               */
+/* -------------------------------------------------------------------------- */
 
-  return {
-    headers: {
-      ...headers,
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    },
-  };
-});
+interface AuthContextType {
+  user: any | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  isBootstrapping: boolean;
+}
 
-const httpLink = new HttpLink({ 
-  uri: API_URL,
-  credentials: 'include', // Incluye cookies para autenticación
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const client = new ApolloClient({
-  link: from([authLink, errorLink, httpLink]),
-  cache: new InMemoryCache(),
-  defaultOptions: {
-    watchQuery: {
-      fetchPolicy: 'network-only',
-      errorPolicy: 'all',
-    },
-    query: {
-      fetchPolicy: 'network-only',
-      errorPolicy: 'all',
-    },
-    mutate: {
-      errorPolicy: 'all',
-    },
-  },
-});
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user] = useState(null);
+  const [loading] = useState(false);
+  const [isBootstrapping] = useState(false);
+
+  const value = useMemo(() => ({
+    user,
+    isAuthenticated: !!user,
+    loading,
+    isBootstrapping
+  }), [user, loading, isBootstrapping]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+/* -------------------------------------------------------------------------- */
+/* MAIN PROVIDERS COMPONENT                                                   */
+/* -------------------------------------------------------------------------- */
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  // Verificación crucial para evitar el error "got: undefined"
+  if (!client) {
+    return <div className="p-4 text-red-500">Error: Apollo Client no inicializado</div>;
+  }
+
   return (
     <ApolloProvider client={client}>
       <AuthProvider>
         <LocationProvider>
-          {/* Sonner Toaster - Mobile-first positioning */}
-          <Toaster 
-            position="top-center" 
-            toastOptions={{
-              style: {
-                marginTop: '60px', // Evita que cubra el header
-              },
-              className: 'sonner-toast',
-            }}
-            richColors
-            closeButton
-            duration={4000}
-          />
+          <Toaster position="top-center" richColors duration={4000} />
+          
+          <style dangerouslySetInnerHTML={{ __html: `
+            .sonner-toast {
+              border-radius: 1.5rem !important;
+              font-family: ui-sans-serif, system-ui, sans-serif !important;
+              padding: 1rem 1.5rem !important;
+              box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+            }
+          `}} />
+
           {children}
         </LocationProvider>
       </AuthProvider>
