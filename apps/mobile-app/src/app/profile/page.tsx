@@ -52,9 +52,10 @@ const AuthModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }
       await login(email, password, 'CLIENT');
       toast.success('¡Bienvenido!');
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Login error:', err);
-      setError(err.message || 'Credenciales inválidas');
+      const errorMessage = err instanceof Error ? err.message : 'Credenciales inválidas';
+      setError(errorMessage);
     }
   };
 

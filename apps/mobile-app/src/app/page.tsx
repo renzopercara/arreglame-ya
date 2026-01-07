@@ -21,6 +21,12 @@ import {
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
+/* CONSTANTS                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none"><rect width="80" height="80" rx="12" fill="%23E5E7EB"/></svg>';
+
+/* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -279,7 +285,7 @@ export default function HomePage() {
                           className="h-full w-full object-cover rounded-2xl" 
                           alt={service.title}
                           onError={(e) => {
-                            e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none"><rect width="80" height="80" rx="12" fill="%23E5E7EB"/></svg>';
+                            e.currentTarget.src = PLACEHOLDER_IMAGE;
                           }}
                         />
                       ) : (

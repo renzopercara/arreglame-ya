@@ -34,7 +34,7 @@ interface JobFromAPI {
   id: string;
   title: string | null;
   provider: string | null;
-  price: any;
+  price: number | { total?: number; currency?: string } | null;
   category: string | null;
   imageUrl: string | null;
 }
@@ -43,7 +43,7 @@ export interface Service {
   id: string;
   title: string;
   provider: string;
-  price: any;
+  price: number | { total?: number; currency?: string } | null;
   category: string;
   imageUrl: string;
   image: string;
