@@ -1,7 +1,6 @@
 "use client";
 
 import { gql } from "@apollo/client";
-import type { Service } from "@/components/ServiceCard";
 import { useQuery } from "@apollo/client/react";
 
 export const GET_SERVICES = gql`
@@ -31,6 +30,26 @@ export const GET_SERVICES = gql`
   }
 `;
 
+interface JobFromAPI {
+  id: string;
+  title: string | null;
+  provider: string | null;
+  price: any;
+  category: string | null;
+  imageUrl: string | null;
+}
+
+export interface Service {
+  id: string;
+  title: string;
+  provider: string;
+  price: any;
+  category: string;
+  imageUrl: string;
+  image: string;
+  rating?: number;
+}
+
 interface UseServicesOptions {
   category?: string | null;
   query?: string;
@@ -41,7 +60,7 @@ interface UseServicesOptions {
 }
 
 export default function useServices(options?: UseServicesOptions) {
-  const { data, loading, error, refetch } = useQuery<{ getServices: Service[] }>(GET_SERVICES, {
+  const { data, loading, error, refetch } = useQuery<{ getServices: JobFromAPI[] }>(GET_SERVICES, {
     fetchPolicy: "cache-and-network",
     variables: {
       category: options?.category || undefined,
@@ -53,8 +72,19 @@ export default function useServices(options?: UseServicesOptions) {
     },
   });
 
+  const services: Service[] = (data?.getServices ?? []).map((job) => ({
+    id: job.id,
+    title: job.title || 'Sin título',
+    provider: job.provider || 'Proveedor',
+    price: job.price,
+    category: job.category || 'General',
+    imageUrl: job.imageUrl || '',
+    image: job.imageUrl || '',
+    rating: undefined,
+  }));
+
   return { 
-    services: data?.getServices ?? [], 
+    services, 
     loading, 
     error: error ? error.message : null, 
     refetch 
