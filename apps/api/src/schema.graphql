@@ -23,11 +23,6 @@ input BecomeWorkerInput {
   trade: String
 }
 
-type CategoryInfo {
-  id: ServiceCategory!
-  label: String!
-}
-
 input CreateJobInput {
   address: String
   clientId: String!
@@ -47,6 +42,7 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+"""Difficulty levels for service estimation"""
 enum DifficultyLevel {
   EASY
   EXPERT
@@ -193,11 +189,13 @@ type PriceEstimateResult {
 }
 
 type Query {
+  """
+  Calculate estimated price for a service based on category and complexity
+  """
+  calculateServicePrice(categoryId: String!, complexityFactor: Float! = 1): Float!
   estimateJob(input: EstimateJobInput!): JobEstimateResponse!
   getNotifications(limit: Float): [Notification!]!
   getPublicWorkerProfile(workerId: String!): WorkerProfile
-  getServiceCategories: [CategoryInfo!]!
-  getServiceSubcategories(category: ServiceCategory!): [SubcategoryInfo!]!
   getServices(category: String, latitude: Float, location: String, longitude: Float, query: String, radiusKm: Int): [Job!]!
   getUnreadCount: UnreadCountResult!
   getWorkerReputation(workerId: String!): ReputationInfo!
@@ -205,6 +203,9 @@ type Query {
   latestTerms(role: String!): LegalDocument!
   me: UserInfo
   nearbyJobs(lat: Float!, limit: Int, lng: Float!, radius: Float): [Job!]!
+
+  """Get all active service categories"""
+  serviceCategories: [ServiceCategory!]!
 }
 
 input RegisterInput {
@@ -230,14 +231,19 @@ type Review {
   rating: Int!
 }
 
-enum ServiceCategory {
-  ELECTRICAL
-  HVAC
-  MAINTENANCE
-  PAINTING
-  PLUMBING
+type ServiceCategory {
+  active: Boolean!
+  basePrice: Float!
+  description: String
+  estimatedHours: Float!
+  hourlyRate: Float!
+  iconName: String!
+  id: ID!
+  name: String!
+  slug: String!
 }
 
+"""Service subcategories for different types of work"""
 enum ServiceSubcategory {
   AC_INSTALLATION
   AC_MAINTENANCE
@@ -258,11 +264,6 @@ enum ServiceSubcategory {
   TREE_TRIMMING
   WALL_REPAIR
   WIRING_REPAIR
-}
-
-type SubcategoryInfo {
-  id: ServiceSubcategory!
-  label: String!
 }
 
 input SubmitKYCInput {

@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { ServiceCategoryGraphQL } from './service-category.model';
 
 /**
  * ServiceCategoriesService
@@ -7,17 +9,29 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 @Injectable()
 export class ServiceCategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Get all active service categories
    * @returns Active categories ordered by name
    */
-  async getActiveCategories() {
-    return this.prisma.serviceCategory.findMany({
+  async getActiveCategories(): Promise<ServiceCategoryGraphQL[]> {
+    const categories = await this.prisma.serviceCategory.findMany({
       where: { active: true },
       orderBy: { name: 'asc' },
     });
+
+    return categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      iconName: category.iconName,
+      description: category.description,
+      active: category.active,
+      basePrice: category.basePrice.toNumber(),
+      hourlyRate: category.hourlyRate.toNumber(),
+      estimatedHours: category.estimatedHours,
+    }));
   }
 
   /**
@@ -78,10 +92,15 @@ export class ServiceCategoriesService {
     }
 
     // Calculate price using the required formula
-    const baseCalculation =
-      category.basePrice + category.hourlyRate * category.estimatedHours;
-    const estimatedPrice = baseCalculation * complexityFactor;
+    const basePrice = new Prisma.Decimal(category.basePrice);
+    const hourlyRate = new Prisma.Decimal(category.hourlyRate);
 
-    return estimatedPrice;
+    const baseCalculation = basePrice.plus(
+      hourlyRate.mul(category.estimatedHours),
+    );
+
+    const estimatedPrice = baseCalculation.mul(complexityFactor);
+
+    return estimatedPrice.toNumber();
   }
 }

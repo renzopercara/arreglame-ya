@@ -9,10 +9,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ConfigModule } from '../config/config.module';
 
 /**
- * Billing Module
- * Handles payment processing, commission calculations, and wallet management
- * Integrates with Mercado Pago for payment gateway
- * NEW: PricingService for price estimation
+ * Billing Module - Payment processing, commissions, pricing, and wallet management
+ * Imports ConfigModule to access AppConfigService (@Global) for plan/reputation/system settings
  * 
  * Exports: BillingService, MercadoPagoService, CommissionService, PricingService
  */

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { 
   ArrowLeft, 
   Clock3, 

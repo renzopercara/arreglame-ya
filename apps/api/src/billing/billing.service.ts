@@ -17,7 +17,7 @@
 
 import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConfigService } from '../config/config.service';
+import { AppConfigService } from '../config/app-config.service';
 import { CommissionService } from './commission.service';
 import { PaymentAuditLog, throwBillingException } from './billing.exceptions';
 import { WalletBalance, TransactionHistory } from './billing.entity';
@@ -31,7 +31,7 @@ export class BillingService {
 
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService,
+    private configService: AppConfigService,
     private commissionService: CommissionService,
   ) {}
 

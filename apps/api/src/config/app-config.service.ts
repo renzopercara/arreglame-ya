@@ -12,9 +12,13 @@ export interface PlanConfigData {
   benefits: any; // En Prisma es Json
 }
 
+/**
+ * Application Configuration Service - Loads config from database with caching
+ * Separate from @nestjs/config to manage app-specific business logic (plans, reputation)
+ */
 @Injectable()
-export class ConfigService implements OnModuleInit {
-  private readonly logger = new Logger(ConfigService.name);
+export class AppConfigService implements OnModuleInit {
+  private readonly logger = new Logger(AppConfigService.name);
   
   private settingsCache: Record<string, any> = {};
   private plansCache: PlanConfigData[] = [];

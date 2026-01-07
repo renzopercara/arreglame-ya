@@ -1,15 +1,13 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConfigService } from '../config/config.service';
-
-@Injectable()
+import { AppConfigService } from '../config/app-config.service';
 export class ReputationService {
   private readonly logger = new Logger(ReputationService.name);
 
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService
+    private configService: AppConfigService
   ) {}
 
   /**

@@ -1,7 +1,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { GeoService } from '../geo/geo.service';
-import { ConfigService } from '../config/config.service';
+import { AppConfigService } from '../config/app-config.service';
 
 interface MatchCandidate {
     id: string;
@@ -25,7 +25,7 @@ export class MatchingService {
 
   constructor(
       private geoService: GeoService,
-      private configService: ConfigService
+      private configService: AppConfigService
   ) {}
 
   /**

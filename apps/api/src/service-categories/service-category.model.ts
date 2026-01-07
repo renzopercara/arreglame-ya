@@ -34,10 +34,4 @@ export class ServiceCategoryGraphQL {
 
   @Field()
   active!: boolean;
-
-  @Field()
-  createdAt!: Date;
-
-  @Field()
-  updatedAt!: Date;
 }

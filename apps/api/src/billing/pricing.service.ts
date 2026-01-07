@@ -1,12 +1,12 @@
 import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
-import { 
-  ObjectType, 
-  Field, 
-  Float, 
-  Int, 
-  InputType 
+import { AppConfigService } from '../config/app-config.service';
+import {
+  ObjectType,
+  Field,
+  Float,
+  Int,
+  InputType
 } from '@nestjs/graphql';
 import { IsEnum, IsOptional, IsUUID, IsObject } from 'class-validator';
 import GraphQLJSON from 'graphql-type-json';
@@ -64,10 +64,9 @@ export class PricingService {
   private readonly logger = new Logger(PricingService.name);
 
   constructor(
-    private prisma: PrismaService,
-    private config: ConfigService,
-  ) {}
-
+    private readonly prisma: PrismaService,
+    private readonly configService: AppConfigService,
+  ) { }
   /**
    * Estimate service price from database-driven formulas
    * @throws NotFoundException if formula not found
@@ -144,26 +143,26 @@ export class PricingService {
     try {
       // Merge metadata with defaults
       const mergedMeta = { ...(defaultMetadata || {}), ...metadata };
-      
+
       // SECURITY: Validate formula contains only safe characters
       // Allow: numbers, letters, spaces, operators, parentheses, dots, question marks, colons, quotes
       const safePattern = /^[a-zA-Z0-9\s+\-*/()?:.'"<>=!|&,]+$/;
       if (!safePattern.test(formulaStr)) {
         throw new Error('Formula contains unsafe characters');
       }
-      
+
       // SECURITY: Create a safe evaluation context with limited scope
       // This uses Function constructor but with controlled input and no access to global scope
       // The formula can only access the 'm' parameter (metadata)
       // eslint-disable-next-line no-new-func
       const evaluator = new Function('m', `'use strict'; return (${formulaStr});`);
       const result = evaluator(mergedMeta);
-      
+
       // Validate result is a number
       if (typeof result !== 'number' || isNaN(result)) {
         throw new Error('Formula did not return a valid number');
       }
-      
+
       return Math.max(0.5, result);
     } catch (error) {
       this.logger.error(`Failed to evaluate formula: ${formulaStr}`, error);
@@ -234,7 +233,7 @@ export class PricingService {
     }
 
     // Get default from environment
-    const defaultRate = this.config.get<number>('DEFAULT_HOURLY_RATE');
+    const defaultRate = this.configService.get<number>('DEFAULT_HOURLY_RATE');
     if (defaultRate == null || defaultRate === undefined) {
       throw new InternalServerErrorException(
         'DEFAULT_HOURLY_RATE not configured in environment'

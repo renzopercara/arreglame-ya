@@ -265,44 +265,50 @@ model CustomerProfile {
 // ============================================
 
 // Service Category (Dynamic DB-driven model)
+
 model ServiceCategory {
-  id             String   @id @default(uuid())
-  slug           String   @unique
+  id             String           @id @default(uuid())
+  slug           String           @unique
   name           String
   iconName       String
   description    String?
-  basePrice      Float
-  hourlyRate     Float
+  // Usamos Decimal para precisión financiera en producción
+  basePrice      Decimal          @db.Decimal(10, 2)
+  hourlyRate     Decimal          @db.Decimal(10, 2)
   estimatedHours Float
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   // Relations
-  services        ServiceRequest[] @relation("ServiceCategoryRelation")
+  services       ServiceRequest[] @relation("ServiceCategoryRelation")
   serviceFormulas ServiceFormula[]
 
   @@index([slug])
   @@index([active])
+  @@map("service_categories")
 }
 
 // Service Formula (DB-driven pricing formulas)
 model ServiceFormula {
-  id               String             @id @default(uuid())
-  subcategory      ServiceSubcategory @unique
+  id                String             @id @default(uuid())
+  // Se recomienda usar String si el Enum da problemas en migraciones complejas, 
+  // o asegurar que el Enum existe antes de esta tabla.
+  subcategory       ServiceSubcategory @unique
   serviceCategoryId String?
-  baseTimeFormula  String // JSON string describing formula
-  defaultMetadata  Json? // Default metadata values
-  active           Boolean            @default(true)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  baseTimeFormula   String             // Recomendación: Almacenar como String descriptivo
+  defaultMetadata   Json?              
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   // Relations
-  serviceCategory ServiceCategory? @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+  serviceCategory   ServiceCategory?   @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
 
   @@index([subcategory])
   @@index([active])
   @@index([serviceCategoryId])
+  @@map("service_formulas")
 }
 
 // Difficulty Multipliers (DB-driven configuration)
@@ -331,75 +337,65 @@ model ExtrasMultiplier {
 }
 
 model ServiceRequest {
-  id            String    @id @default(uuid())
-  status        JobStatus @default(CREATED)
-  paymentStatus String    @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
-
-  // Service Classification (NEW)
-  category        ServiceCategoryEnum? // DEPRECATED: Use serviceCategoryId instead
-  subcategory     ServiceSubcategory?
-  metadata        Json? // Flexible storage for subcategory-specific data
-  difficultyLevel DifficultyLevel      @default(MEDIUM)
-
-  // Dynamic Category System
-  serviceCategoryId String? // FK to ServiceCategory table
+  id                String               @id @default(uuid())
+  status            JobStatus            @default(CREATED)
+  paymentStatus     String               @default("PENDING") 
+  
+  subcategory       ServiceSubcategory?
+  metadata          Json? 
+  difficultyLevel   DifficultyLevel      @default(MEDIUM)
+  serviceCategoryId String?
 
   clientId          String
   workerId          String?
-  // location              Unsupported("geography(Point, 4326)") // Commented: Use latitude/longitude instead
   latitude          Float
   longitude         Float
   address           String?
-  city              String? // City name for precise filtering
-  coverageRadius    Float           @default(15.0) // Search radius in km
+  city              String?
+  coverageRadius    Float                @default(15.0)
   description       String?
   squareMeters      Float
   gardenImageBefore String
   gardenImageAfter  String?
   evidenceImages    String[]
-  difficulty        Float           @default(1.0)
+  difficulty        Float                @default(1.0)
   estimatedHours    Float
   aiReasoning       String?
-  price             Json // { total, workerNet, platformFee, taxes, currency }
-  priceWorkerNet    Float?
-  pricePlatformFee  Float?
-  pin               String          @default("0000")
-  extraTimeStatus   ExtraTimeStatus @default(NONE)
+  
+  // Estructura de precio recomendada
+  price             Json                 // { total, workerNet, platformFee, taxes, currency }
+  priceWorkerNet    Decimal?             @db.Decimal(10, 2)
+  pricePlatformFee  Decimal?             @db.Decimal(10, 2)
+  
+  pin               String               @default("0000")
+  extraTimeStatus   ExtraTimeStatus      @default(NONE)
   extraTimeMinutes  Int?
   extraTimeReason   String?
-  paidAt            DateTime? // When payment was completed
+  paidAt            DateTime?
 
-  // Nota: disputeId removido de aquí para que Dispute sea el único dueño de la relación 1:1
-
-  createdAt         DateTime  @default(now())
+  createdAt         DateTime             @default(now())
   startedAt         DateTime?
   completedAt       DateTime?
   warrantyExpiresAt DateTime?
 
   // Relations
-  client          ClientProfile    @relation("ClientServiceRequests", fields: [clientId], references: [id], onDelete: Restrict)
-  worker          WorkerProfile?   @relation("WorkerServiceRequests", fields: [workerId], references: [id], onDelete: SetNull)
-  serviceCategory ServiceCategory? @relation("ServiceCategoryRelation", fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+  client            ClientProfile        @relation("ClientServiceRequests", fields: [clientId], references: [id], onDelete: Restrict)
+  worker            WorkerProfile?       @relation("WorkerServiceRequests", fields: [workerId], references: [id], onDelete: SetNull)
+  serviceCategory   ServiceCategory?     @relation("ServiceCategoryRelation", fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+  dispute           Dispute?
 
-  // Relación 1:1 - El campo 'fields' está en el modelo Dispute
-  dispute Dispute?
+  reviews           Review[]
+  supportTickets    SupportTicket[]
+  transactions      Transaction[]
+  chatMessages      ChatMessage[]
 
-  reviews        Review[]
-  supportTickets SupportTicket[]
-  transactions   Transaction[]
-  chatMessages   ChatMessage[]
-
-  // Billing performance indices
   @@index([status])
-  @@index([paymentStatus]) // Quick lookup of payment status
+  @@index([paymentStatus])
   @@index([clientId])
   @@index([workerId])
-  @@index([serviceCategoryId]) // Query by category
+  @@index([serviceCategoryId])
   @@index([createdAt])
-  @@index([paidAt]) // Revenue analytics queries
-  // Composite indices for common billing queries
-  @@index([clientId, paymentStatus])
-  @@index([workerId, paymentStatus])
+  @@map("service_requests")
 }
 
 model Dispute {

@@ -1,5 +1,5 @@
 import { Injectable, Logger, BadRequestException, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '../config/config.service';
+import { AppConfigService } from '../config/app-config.service';
 import { MercadoPagoConfig as MPConfig, Preference, Payment } from 'mercadopago';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from './billing.service';
@@ -13,7 +13,7 @@ export class MercadoPagoService implements OnModuleInit {
   private paymentClient: Payment | null = null;
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: AppConfigService,
     private readonly prisma: PrismaService,
     private readonly billingService: BillingService,
   ) {}
