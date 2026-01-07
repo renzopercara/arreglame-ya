@@ -5,8 +5,8 @@ import { createClient } from 'graphql-ws';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { StorageAdapter } from '../lib/adapters/storage';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
-const WS_URL = API_URL.replace(/^http/, 'ws');
+const API_URL = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql';
+const WS_URL = process.env.NEXT_PUBLIC_GRAPHQL_WS_URL || API_URL.replace(/^http/, 'ws');
 
 const authLink = setContext(async (_, { headers }) => {
   const token = await StorageAdapter.get('ay_auth_token');

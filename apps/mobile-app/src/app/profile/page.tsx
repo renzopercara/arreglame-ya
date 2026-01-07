@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { useState } from 'react';
+import { useAuth } from '../providers';
 import { 
   ArrowLeft, 
   Clock3, 
@@ -11,90 +12,163 @@ import {
   DollarSign,
   CheckCircle,
   AlertCircle,
-  Loader2,
   User as UserIcon,
-  X
+  X,
+  Loader2,
 } from "lucide-react";
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 /* -------------------------------------------------------------------------- */
-/* TYPES & MOCKS (Resolved from missing imports)                              */
+/* COMPONENTS                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  activeRole: 'CLIENT' | 'PROVIDER';
-  avatar?: string;
-  // Campos faltantes que causaban error de compilación:
-  mercadopagoCustomerId?: string;
-  rating?: number;
-  totalJobs?: number;
-  status?: 'VERIFIED' | 'PENDING' | 'UNVERIFIED';
-  balance?: number;
-}
-
-interface AuthContextValue {
-  isAuthenticated: boolean;
-  user: User | null;
-  isBootstrapping: boolean;
-  login: (token: string, user: User) => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
-};
-
-// Mock components to replace missing local imports
 const UserAvatar = ({ name, avatar, size = "md" }: { name?: string, avatar?: string, size?: "md" | "xl" }) => (
   <div className={`rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold ${size === 'xl' ? 'w-20 h-20 text-2xl' : 'w-12 h-12 text-lg'}`}>
-    {avatar ? <img src={avatar} alt={name} className="w-full h-full rounded-2xl object-cover" /> : (name?.charAt(0) || <UserIcon />)}
+    {avatar ? (
+      <img src={avatar} alt={name} className="w-full h-full rounded-2xl object-cover" />
+    ) : (
+      name?.charAt(0)?.toUpperCase() || <UserIcon />
+    )}
   </div>
 );
 
 const AuthModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  const { login, loading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!email || !password) {
+      setError('Por favor completa todos los campos');
+      return;
+    }
+
+    try {
+      await login(email, password, 'CLIENT');
+      toast.success('¡Bienvenido!');
+      onClose();
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Credenciales inválidas');
+    }
+  };
+
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-white rounded-3xl w-full max-w-sm p-8 relative">
-        <button onClick={onClose} className="absolute right-4 top-4 text-slate-400"><X size={20} /></button>
-        <h2 className="text-xl font-bold mb-2">Iniciar Sesión</h2>
+        <button 
+          onClick={onClose} 
+          className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 transition"
+          disabled={loading}
+        >
+          <X size={20} />
+        </button>
+
+        <h2 className="text-xl font-bold mb-2 text-slate-900">Iniciar Sesión</h2>
         <p className="text-slate-500 text-sm mb-6">Accede a tu cuenta para gestionar tus servicios.</p>
-        <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold">Continuar</button>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div>
+            <label htmlFor="email" className="block text-xs font-bold text-slate-700 mb-2">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
+              placeholder="tu@email.com"
+              disabled={loading}
+              autoComplete="email"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-xs font-bold text-slate-700 mb-2">
+              Contraseña
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
+              placeholder="••••••••"
+              disabled={loading}
+              autoComplete="current-password"
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl">
+              <p className="text-xs text-red-700 font-medium">{error}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Iniciando sesión...
+              </>
+            ) : (
+              'Continuar'
+            )}
+          </button>
+        </form>
       </div>
     </div>
   );
-};
-
-const toast = {
-  success: (msg: string) => console.log("Toast Success:", msg),
 };
 
 /* -------------------------------------------------------------------------- */
 /* MAIN COMPONENT                                                             */
 /* -------------------------------------------------------------------------- */
 
-function ProfilePage() {
+export default function ProfilePage() {
+  const router = useRouter();
   const { isAuthenticated, user, isBootstrapping, logout } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    setShowLogoutModal(false);
-    toast.success('Sesión cerrada correctamente');
+    try {
+      await logout();
+      setShowLogoutModal(false);
+      toast.success('Sesión cerrada correctamente');
+    } catch (err) {
+      console.error('Logout error:', err);
+      toast.error('Error al cerrar sesión');
+    }
   };
 
+  const handleBack = () => {
+    router.push('/');
+  };
+
+  // Loading state
   if (isBootstrapping) {
     return (
       <div className="max-w-md mx-auto p-6 flex flex-col gap-6 animate-pulse">
-        <div className="h-10 bg-gray-200 rounded-lg w-48" />
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 bg-gray-200 rounded-xl" />
+          <div className="flex-1">
+            <div className="h-4 bg-gray-200 rounded w-20 mb-2" />
+            <div className="h-6 bg-gray-200 rounded w-32" />
+          </div>
+        </div>
         <div className="h-32 bg-gray-200 rounded-2xl" />
         <div className="h-40 bg-gray-200 rounded-2xl" />
         <div className="h-40 bg-gray-200 rounded-2xl" />
@@ -102,11 +176,15 @@ function ProfilePage() {
     );
   }
 
+  // Not authenticated state
   if (!isAuthenticated || !user) {
     return (
       <div className="max-w-md mx-auto p-6 flex flex-col gap-6">
         <header className="flex items-center gap-3">
-          <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm border border-slate-100">
+          <button 
+            onClick={handleBack}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm border border-slate-100 hover:bg-slate-50 transition"
+          >
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
@@ -136,13 +214,17 @@ function ProfilePage() {
     );
   }
 
+  // Authenticated state
   const firstName = user.name?.split(' ')[0] || 'Usuario';
   const mpConnected = !!user.mercadopagoCustomerId;
 
   return (
     <div className="max-w-md mx-auto p-6 flex flex-col gap-6 font-sans bg-slate-50/50 min-h-screen">
       <header className="flex items-center gap-3">
-        <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm border border-slate-100">
+        <button 
+          onClick={handleBack}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm border border-slate-100 hover:bg-slate-50 transition"
+        >
           <ArrowLeft className="h-5 w-5 text-slate-600" />
         </button>
         <div>
@@ -159,12 +241,12 @@ function ProfilePage() {
             <p className="text-lg font-bold text-slate-900">{user.name}</p>
             <p className="text-sm text-slate-500">{user.email}</p>
             <div className="flex flex-wrap gap-2 mt-2">
-              {user.rating && (
+              {user.rating && user.rating > 0 && (
                 <span className="flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
                   <Star className="h-3 w-3 fill-amber-700" /> {user.rating.toFixed(1)}
                 </span>
               )}
-              {user.totalJobs !== undefined && (
+              {user.totalJobs !== undefined && user.totalJobs > 0 && (
                 <span className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
                   <Clock3 className="h-3 w-3" /> {user.totalJobs} trabajos
                 </span>
@@ -212,14 +294,18 @@ function ProfilePage() {
       </section>
 
       {/* Account Stats */}
-      {user.balance !== undefined && (
+      {user.balance !== undefined && user.balance > 0 && (
         <section className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 p-6 shadow-lg shadow-blue-100 text-white">
           <div className="flex items-center gap-2 text-sm font-medium opacity-90">
             <DollarSign className="h-4 w-4" />
             Saldo disponible
           </div>
           <p className="text-3xl font-bold">
-            ${user.balance.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+            {new Intl.NumberFormat('es-AR', {
+              style: 'currency',
+              currency: 'ARS',
+              minimumFractionDigits: 2,
+            }).format(user.balance)}
           </p>
         </section>
       )}
@@ -258,45 +344,5 @@ function ProfilePage() {
         </div>
       )}
     </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* EXPORT WRAPPER                                                             */
-/* -------------------------------------------------------------------------- */
-
-export default function App() {
-  const [user, setUser] = useState<User | null>({
-    id: 'u1',
-    name: 'Juan Pérez',
-    email: 'juan.perez@ejemplo.com',
-    roles: ['CLIENT', 'PROVIDER'],
-    activeRole: 'CLIENT',
-    mercadopagoCustomerId: 'mp_987654',
-    rating: 4.8,
-    totalJobs: 24,
-    status: 'VERIFIED',
-    balance: 15420.50
-  });
-
-  const logout = async () => {
-    await new Promise(r => setTimeout(r, 500));
-    setUser(null);
-  };
-
-  const login = async (token: string, userData: User) => {
-    setUser(userData);
-  };
-
-  return (
-    <AuthContext.Provider value={{ 
-      isAuthenticated: !!user, 
-      user, 
-      isBootstrapping: false, 
-      logout, 
-      login 
-    }}>
-      <ProfilePage />
-    </AuthContext.Provider>
   );
 }
