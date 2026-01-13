@@ -61,7 +61,14 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
   };
 
   const handleClose = () => {
+    // Reset all form fields and errors
     setError('');
+    setName('');
+    setEmail('');
+    setPassword('');
+    setRole('CLIENT');
+    setTermsAccepted(false);
+    setMode(initialMode);
     onClose();
   };
 
