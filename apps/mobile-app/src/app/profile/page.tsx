@@ -15,6 +15,10 @@ import {
   User as UserIcon,
   X,
   Loader2,
+  Mail,
+  Lock,
+  User,
+  UserCog,
 } from "lucide-react";
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -34,28 +38,67 @@ const UserAvatar = ({ name, avatar, size = "md" }: { name?: string, avatar?: str
 );
 
 const AuthModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
-  const { login, loading } = useAuth();
+  const { login, register, loading } = useAuth();
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<"CLIENT" | "PROVIDER">("CLIENT");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState('');
+
+  // Reset errors when mode changes or modal closes
+  const handleModeChange = (newMode: "login" | "register") => {
+    setMode(newMode);
+    setError('');
+  };
+
+  const handleClose = () => {
+    setError('');
+    onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!email || !password) {
-      setError('Por favor completa todos los campos');
-      return;
-    }
+    if (mode === "login") {
+      // Login flow
+      if (!email || !password) {
+        setError('Por favor completa todos los campos');
+        return;
+      }
 
-    try {
-      await login(email, password, 'CLIENT');
-      toast.success('¡Bienvenido!');
-      onClose();
-    } catch (err: unknown) {
-      console.error('Login error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Credenciales inválidas';
-      setError(errorMessage);
+      try {
+        await login(email, password, role);
+        toast.success('¡Bienvenido!');
+        handleClose();
+      } catch (err: unknown) {
+        console.error('Login error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Credenciales inválidas';
+        setError(errorMessage);
+      }
+    } else {
+      // Register flow
+      if (!name || !email || !password) {
+        setError('Por favor completa todos los campos');
+        return;
+      }
+
+      if (!termsAccepted) {
+        setError('Debes aceptar los términos y condiciones');
+        return;
+      }
+
+      try {
+        await register(email, password, name, role, termsAccepted);
+        toast.success('¡Cuenta creada exitosamente!');
+        handleClose();
+      } catch (err: unknown) {
+        console.error('Register error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Error al crear la cuenta';
+        setError(errorMessage);
+      }
     }
   };
 
@@ -65,67 +108,159 @@ const AuthModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-white rounded-3xl w-full max-w-sm p-8 relative">
         <button 
-          onClick={onClose} 
+          onClick={handleClose} 
           className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 transition"
           disabled={loading}
         >
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-bold mb-2 text-slate-900">Iniciar Sesión</h2>
-        <p className="text-slate-500 text-sm mb-6">Accede a tu cuenta para gestionar tus servicios.</p>
+        <h2 className="text-xl font-bold mb-2 text-slate-900">
+          {mode === "login" ? "Iniciar Sesión" : "Crear Cuenta"}
+        </h2>
+        <p className="text-slate-500 text-sm mb-6">
+          {mode === "login" 
+            ? "Accede a tu cuenta para gestionar tus servicios." 
+            : "Únete a Arréglame Ya y empieza hoy."}
+        </p>
+
+        {/* Mode Selector (Tabs) */}
+        <div className="flex bg-slate-200/50 p-1.5 rounded-[1.5rem] border border-slate-200 mb-6">
+          <button
+            type="button"
+            onClick={() => handleModeChange("login")}
+            className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all ${
+              mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+            }`}
+          >
+            Iniciar Sesión
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange("register")}
+            className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all ${
+              mode === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+            }`}
+          >
+            Registrarse
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/* Name Field (Register only) */}
+          {mode === "register" && (
+            <div>
+              <label htmlFor="name" className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-4 border border-slate-100 focus-within:border-indigo-200 focus-within:bg-white transition-all">
+                <User className="h-5 w-5 text-slate-400" />
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-transparent text-sm font-semibold text-slate-900 focus:outline-none placeholder:text-slate-400"
+                  placeholder="Nombre completo"
+                  disabled={loading}
+                  required
+                />
+              </label>
+            </div>
+          )}
+
+          {/* Email Field */}
           <div>
-            <label htmlFor="email" className="block text-xs font-bold text-slate-700 mb-2">
-              Email
+            <label htmlFor="email" className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-4 border border-slate-100 focus-within:border-indigo-200 focus-within:bg-white transition-all">
+              <Mail className="h-5 w-5 text-slate-400" />
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-transparent text-sm font-semibold text-slate-900 focus:outline-none placeholder:text-slate-400"
+                placeholder="correo@ejemplo.com"
+                disabled={loading}
+                autoComplete="email"
+                required
+              />
             </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
-              placeholder="tu@email.com"
-              disabled={loading}
-              autoComplete="email"
-            />
           </div>
 
+          {/* Password Field */}
           <div>
-            <label htmlFor="password" className="block text-xs font-bold text-slate-700 mb-2">
-              Contraseña
+            <label htmlFor="password" className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-4 border border-slate-100 focus-within:border-indigo-200 focus-within:bg-white transition-all">
+              <Lock className="h-5 w-5 text-slate-400" />
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-transparent text-sm font-semibold text-slate-900 focus:outline-none placeholder:text-slate-400"
+                placeholder="Contraseña"
+                disabled={loading}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                required
+              />
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
-              placeholder="••••••••"
-              disabled={loading}
-              autoComplete="current-password"
-            />
           </div>
 
+          {/* Role Selector */}
+          <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100">
+            <button
+              type="button"
+              onClick={() => setRole("CLIENT")}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-[10px] font-black uppercase tracking-tight transition-all ${
+                role === "CLIENT" ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
+              }`}
+            >
+              <User size={14} /> Cliente
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole("PROVIDER")}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-[10px] font-black uppercase tracking-tight transition-all ${
+                role === "PROVIDER" ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
+              }`}
+            >
+              <UserCog size={14} /> Profesional
+            </button>
+          </div>
+
+          {/* Terms Checkbox (Register only) */}
+          {mode === "register" && (
+            <label className="flex items-start gap-3 cursor-pointer group px-1">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                required
+              />
+              <span className="text-[10px] text-slate-500 leading-relaxed font-medium">
+                Acepto los <span className="text-indigo-600 font-bold underline">Términos</span> y la <span className="text-indigo-600 font-bold underline">Privacidad</span> de Arréglame Ya.
+              </span>
+            </label>
+          )}
+
+          {/* Error Message */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-100 rounded-xl">
               <p className="text-xs text-red-700 font-medium">{error}</p>
             </div>
           )}
 
+          {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            disabled={loading || (mode === "register" && !termsAccepted)}
+            className="w-full py-4 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            aria-disabled={loading || (mode === "register" && !termsAccepted)}
           >
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Iniciando sesión...
+                {mode === "login" ? "Iniciando sesión..." : "Creando cuenta..."}
               </>
             ) : (
-              'Continuar'
+              mode === "login" ? "Entrar al Sistema" : "Finalizar Registro"
             )}
           </button>
         </form>
@@ -199,14 +334,22 @@ export default function ProfilePage() {
             <UserAvatar size="xl" />
             <div>
               <p className="text-lg font-bold text-slate-900">Accede a tu perfil</p>
-              <p className="text-sm text-slate-500">Inicia sesión para ver tu información personal</p>
+              <p className="text-sm text-slate-500">Crea una cuenta o inicia sesión para continuar</p>
             </div>
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="w-full flex items-center justify-center rounded-2xl bg-blue-600 px-6 py-4 text-base font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 active:scale-95"
-            >
-              Iniciar sesión
-            </button>
+            <div className="w-full flex flex-col gap-3">
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="w-full flex items-center justify-center rounded-2xl bg-indigo-600 px-6 py-4 text-base font-bold text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700 active:scale-95"
+              >
+                Registrarse
+              </button>
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="w-full flex items-center justify-center rounded-2xl bg-white border-2 border-slate-200 px-6 py-4 text-base font-bold text-slate-700 transition hover:bg-slate-50 active:scale-95"
+              >
+                Iniciar sesión
+              </button>
+            </div>
           </div>
         </section>
 

@@ -5,7 +5,7 @@ import { ApolloProvider, useLazyQuery, useMutation } from "@apollo/client/react"
 import { LocationProvider } from "@/contexts/LocationContext";
 import { Toaster } from "sonner";
 import { client } from "../../../../graphql/client";
-import { ME_QUERY, LOGIN_MUTATION } from "@/graphql/queries";
+import { ME_QUERY, LOGIN_MUTATION, REGISTER_MUTATION } from "@/graphql/queries";
 import { StorageAdapter } from "@/lib/adapters/storage";
 
 /* -------------------------------------------------------------------------- */
@@ -41,6 +41,7 @@ interface AuthContextType {
   loading: boolean;
   isBootstrapping: boolean;
   login: (email: string, password: string, role: string) => Promise<void>;
+  register: (email: string, password: string, name: string, role: string, termsAccepted: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
 }
@@ -79,6 +80,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   });
 
   const [loginMutation, { loading: loginLoading }] = useMutation(LOGIN_MUTATION);
+  const [registerMutation, { loading: registerLoading }] = useMutation(REGISTER_MUTATION);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -104,6 +106,27 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     }
   }, [loginMutation]);
 
+  const register = useCallback(async (email: string, password: string, name: string, role: string, termsAccepted: boolean) => {
+    const { data } = await registerMutation({
+      variables: {
+        email,
+        password,
+        name,
+        role,
+        termsAccepted,
+        termsVersion: '1.0',
+        termsDate: new Date().toISOString(),
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      },
+    });
+
+    if (data?.register) {
+      await StorageAdapter.set('ay_auth_token', data.register.accessToken);
+      setUser(data.register.user);
+      await client.resetStore();
+    }
+  }, [registerMutation]);
+
   const logout = useCallback(async () => {
     await StorageAdapter.remove('ay_auth_token');
     setUser(null);
@@ -117,9 +140,10 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
-    loading: meLoading || loginLoading,
+    loading: meLoading || loginLoading || registerLoading,
     isBootstrapping,
     login,
+    register,
     logout,
     refetchUser,
   };
