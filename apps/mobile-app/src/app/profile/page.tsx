@@ -37,15 +37,22 @@ const UserAvatar = ({ name, avatar, size = "md" }: { name?: string, avatar?: str
   </div>
 );
 
-const AuthModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean, onClose: () => void, initialMode?: "login" | "register" }) => {
   const { login, register, loading } = useAuth();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<"CLIENT" | "PROVIDER">("CLIENT");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState('');
+
+  // Update mode when initialMode prop changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+    }
+  }, [isOpen, initialMode]);
 
   // Reset errors when mode changes or modal closes
   const handleModeChange = (newMode: "login" | "register") => {
@@ -277,7 +284,13 @@ export default function ProfilePage() {
   const router = useRouter();
   const { isAuthenticated, user, isBootstrapping, logout } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<"login" | "register">("login");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleOpenAuthModal = (mode: "login" | "register") => {
+    setAuthModalInitialMode(mode);
+    setShowAuthModal(true);
+  };
 
   const handleLogout = async () => {
     try {
@@ -338,13 +351,13 @@ export default function ProfilePage() {
             </div>
             <div className="w-full flex flex-col gap-3">
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => handleOpenAuthModal("register")}
                 className="w-full flex items-center justify-center rounded-2xl bg-indigo-600 px-6 py-4 text-base font-bold text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700 active:scale-95"
               >
                 Registrarse
               </button>
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => handleOpenAuthModal("login")}
                 className="w-full flex items-center justify-center rounded-2xl bg-white border-2 border-slate-200 px-6 py-4 text-base font-bold text-slate-700 transition hover:bg-slate-50 active:scale-95"
               >
                 Iniciar sesión
@@ -353,7 +366,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} initialMode={authModalInitialMode} />
       </div>
     );
   }
