@@ -40,7 +40,9 @@ function AuthContent() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      const targetPath = user.activeRole === 'CLIENT' || user.role === 'CLIENT' 
+      // Use activeRole for routing since it represents the current user context
+      // WORKER users have activeRole of PROVIDER when acting as service providers
+      const targetPath = user.activeRole === 'CLIENT' 
         ? '/client/home' 
         : '/pro/home';
       router.replace(targetPath);
@@ -60,6 +62,7 @@ function AuthContent() {
         await login(form.email, form.password, form.role);
         
         // On success, redirect based on role
+        // WORKER users should go to /pro/home (professional dashboard)
         const targetPath = form.role === 'CLIENT' ? '/client/home' : '/pro/home';
         toast.success('¡Sesión iniciada correctamente!');
         router.replace(targetPath);
@@ -68,6 +71,7 @@ function AuthContent() {
         await register(form.email, form.password, form.name, form.role, form.termsAccepted);
         
         // On success, redirect based on role
+        // WORKER users should go to /pro/home (professional dashboard)
         const targetPath = form.role === 'CLIENT' ? '/client/home' : '/pro/home';
         toast.success('¡Cuenta creada exitosamente!');
         router.replace(targetPath);
