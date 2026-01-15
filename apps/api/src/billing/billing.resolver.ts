@@ -1,6 +1,7 @@
-import { Resolver, Mutation, Args, Context, ObjectType, Field } from '@nestjs/graphql';
+import { Resolver, Mutation, Args, ObjectType, Field } from '@nestjs/graphql';
 import { UseGuards, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { MercadoPagoService } from './mercadopago.service';
 
 @ObjectType('PaymentPreference')
@@ -21,14 +22,12 @@ export class BillingResolver {
   async createPaymentPreference(
     @Args('serviceRequestId') serviceRequestId: string,
     @Args('amount', { nullable: true }) amount: number,
-    @Context() context: any,
+    @CurrentUser() user: any,
   ): Promise<PaymentPreferenceResponse> {
-    const userId = context.req.user?.id;
-    
-    if (!userId) {
+    if (!user?.sub) {
       throw new UnauthorizedException('Not authenticated');
     }
 
-    return this.mercadoPagoService.createPreference(serviceRequestId, amount, userId);
+    return this.mercadoPagoService.createPreference(serviceRequestId, amount, user.sub);
   }
 }

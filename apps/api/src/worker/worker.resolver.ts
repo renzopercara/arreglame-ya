@@ -1,7 +1,8 @@
 
-import { Resolver, Mutation, Args, Context, Query, ObjectType, Field } from '@nestjs/graphql';
+import { Resolver, Mutation, Args, Query, ObjectType, Field } from '@nestjs/graphql';
 import { UseGuards, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { RequireRoles, RequireActiveRole } from '../auth/roles.decorator';
 import { WorkerService } from './worker.service';
@@ -70,10 +71,9 @@ export class WorkerResolver {
   async updateWorkerLocation(
     @Args('lat') lat: number,
     @Args('lng') lng: number,
-    @Context() context: any
+    @CurrentUser() user: any
   ): Promise<UpdateLocationResponse> {
-    const userId = context.req.user.sub;
-    this.workerService.updateLocation(userId, lat, lng).catch(console.error);
+    this.workerService.updateLocation(user.sub, lat, lng).catch(console.error);
     return { success: true };
   }
 
@@ -83,20 +83,18 @@ export class WorkerResolver {
   @RequireActiveRole('PROVIDER')
   async setWorkerStatus(
     @Args('status') status: string,
-    @Context() context: any
+    @CurrentUser() user: any
   ): Promise<WorkerProfileResponse> {
-    const userId = context.req.user.sub;
-    return this.workerService.setStatus(userId, status);
+    return this.workerService.setStatus(user.sub, status);
   }
 
   @Mutation(() => WorkerProfileResponse)
   @UseGuards(AuthGuard)
   async submitKYC(
     @Args('input', { type: () => SubmitKYCInput }) input: SubmitKYCInput, 
-    @Context() context: any
+    @CurrentUser() user: any
   ): Promise<WorkerProfileResponse> {
-      const userId = context.req.user.sub;
-      const worker = await (this.prisma as any).workerProfile.findUnique({ where: { userId } });
+      const worker = await (this.prisma as any).workerProfile.findUnique({ where: { userId: user.sub } });
       
       if (!worker) throw new BadRequestException("Perfil no encontrado");
       if (worker.kycStatus === 'APPROVED') throw new BadRequestException("Ya estÃƒ¡s verificado.");
@@ -104,7 +102,7 @@ export class WorkerResolver {
       // En prod, aquÃƒ­ llamarÃƒ­amos a un proveedor de KYC (Onfido/SumSub)
       // Para MVP, guardamos y marcamos para revisiÃƒ³n manual
       return (this.prisma as any).workerProfile.update({
-          where: { userId },
+          where: { userId: user.sub },
           data: {
               kycStatus: 'PENDING_REVIEW',
               dniFront: input.dniFront,
