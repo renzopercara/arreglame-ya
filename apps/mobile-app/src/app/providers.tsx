@@ -122,10 +122,13 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   // Handle fetchMe error via useEffect
   useEffect(() => {
     if (meError) {
-      // Ignore AbortError - it's expected when requests are cancelled
-      if (meError.name !== 'AbortError') {
-        console.error('Error fetching user:', meError);
+      // Gracefully handle AbortError - it's expected when requests are cancelled
+      // (e.g., during React Strict Mode remounts or component unmounts)
+      if (meError.name === 'AbortError' || meError.message?.includes('abort')) {
+        // Silently ignore - this is normal behavior
+        return;
       }
+      console.error('Error fetching user:', meError);
       setUser(null);
       setIsBootstrapping(false);
     }
@@ -133,7 +136,9 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
 
   // Bootstrap authentication exactly once, safe for React 18 Strict Mode
   useEffect(() => {
-    // Prevent duplicate execution during React 18 Strict Mode double-mount
+    // Guard against duplicate execution:
+    // - isBootstrappingRef: prevents concurrent calls (e.g., multiple triggers)
+    // - hasBootstrappedRef: prevents re-execution after completion (e.g., Strict Mode remount)
     if (isBootstrappingRef.current || hasBootstrappedRef.current) {
       return;
     }
