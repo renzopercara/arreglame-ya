@@ -13,7 +13,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAuth } from '../providers';
 import LoadingButton from '@/components/LoadingButton';
-import { ApolloError } from '@apollo/client';
 
 /* -------------------------------------------------------------------------- */
 /* AUTH PAGE COMPONENT                                                        */
@@ -77,30 +76,28 @@ function AuthContent() {
       // Handle Apollo/GraphQL errors
       let errorMessage = 'Ocurrió un error inesperado';
       
-      if (err instanceof ApolloError) {
-        // Check for GraphQL errors in the response
-        if (err.graphQLErrors && err.graphQLErrors.length > 0) {
-          const gqlError = err.graphQLErrors[0];
-          
-          // Parse error.extensions.code for deterministic error handling
-          const errorCode = gqlError.extensions?.code;
-          
-          switch (errorCode) {
-            case 'CONFLICT':
-              errorMessage = gqlError.message || 'Este correo electrónico ya está registrado';
-              break;
-            case 'UNAUTHORIZED':
-              errorMessage = gqlError.message || 'Credenciales incorrectas';
-              break;
-            case 'BAD_REQUEST':
-              errorMessage = gqlError.message || 'Datos inválidos';
-              break;
-            default:
-              errorMessage = gqlError.message || errorMessage;
-          }
-        } else if (err.networkError) {
-          errorMessage = 'Error de conexión. Por favor verifica tu internet.';
+      // Check for GraphQL errors in the response
+      if (err.graphQLErrors && err.graphQLErrors.length > 0) {
+        const gqlError = err.graphQLErrors[0];
+        
+        // Parse error.extensions.code for deterministic error handling
+        const errorCode = gqlError.extensions?.code;
+        
+        switch (errorCode) {
+          case 'CONFLICT':
+            errorMessage = gqlError.message || 'Este correo electrónico ya está registrado';
+            break;
+          case 'UNAUTHORIZED':
+            errorMessage = gqlError.message || 'Credenciales incorrectas';
+            break;
+          case 'BAD_REQUEST':
+            errorMessage = gqlError.message || 'Datos inválidos';
+            break;
+          default:
+            errorMessage = gqlError.message || errorMessage;
         }
+      } else if (err.networkError) {
+        errorMessage = 'Error de conexión. Por favor verifica tu internet.';
       } else if (err.message) {
         errorMessage = err.message;
       }
