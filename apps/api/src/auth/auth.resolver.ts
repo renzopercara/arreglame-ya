@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { LegalService } from '../legal/legal.service';
 import { LoginInput, RegisterInput, BecomeWorkerInput } from './dto/auth.input';
 import { AuthGuard } from './auth.guard';
+import { CurrentUser } from './current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 
 @ObjectType('UserInfo')
@@ -186,26 +187,25 @@ export class AuthResolver {
   }
 
   @Query(() => UserInfoResponse, { nullable: true })
-  async me(@Context() context: any): Promise<UserInfoResponse | null> {
-    const userId = context.req?.user?.id;
-    if (!userId) return null;
-    const user = await this.loadUser(userId);
-    if (!user) return null;
+  @UseGuards(AuthGuard)
+  async me(@CurrentUser() user: any): Promise<UserInfoResponse | null> {
+    if (!user?.sub) return null;
+    const fullUser = await this.loadUser(user.sub);
+    if (!fullUser) return null;
 
-    const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, user.role as 'CLIENT' | 'WORKER');
-    return this.toUserInfo(user, !hasAccepted);
+    const hasAccepted = await this.legalService.hasAcceptedLatest(fullUser.id, fullUser.role as 'CLIENT' | 'WORKER');
+    return this.toUserInfo(fullUser, !hasAccepted);
   }
 
   @Mutation(() => UserInfoResponse)
   @UseGuards(AuthGuard)
   async switchActiveRole(
-    @Context() context: any,
+    @CurrentUser() user: any,
     @Args('activeRole') activeRole: 'CLIENT' | 'PROVIDER',
   ): Promise<UserInfoResponse> {
-    const userId = context.req?.user?.sub;
-    if (!userId) throw new UnauthorizedException('Usuario no autenticado');
+    if (!user?.sub) throw new UnauthorizedException('Usuario no autenticado');
 
-    const updatedUser = await this.authService.switchActiveRole(userId, activeRole);
+    const updatedUser = await this.authService.switchActiveRole(user.sub, activeRole);
     const fullUser = await this.loadUser(updatedUser.id);
     const hasAccepted = await this.legalService.hasAcceptedLatest(updatedUser.id, updatedUser.role as 'CLIENT' | 'WORKER');
 
@@ -215,11 +215,11 @@ export class AuthResolver {
   @Mutation(() => UserInfoResponse)
   @UseGuards(AuthGuard)
   async becomeWorker(
+    @CurrentUser() user: any,
     @Context() context: any,
     @Args('input', { type: () => BecomeWorkerInput }) input: BecomeWorkerInput,
   ): Promise<UserInfoResponse> {
-    const userId = context.req?.user?.sub;
-    if (!userId) throw new UnauthorizedException('Usuario no autenticado');
+    if (!user?.sub) throw new UnauthorizedException('Usuario no autenticado');
 
     if (!input.termsAccepted) {
       throw new UnauthorizedException('Debes aceptar los términos y condiciones');
@@ -231,12 +231,12 @@ export class AuthResolver {
       if (workerDoc && workerDoc.version === input.termsVersion) {
         const ip = context?.req?.ip || '0.0.0.0';
         const ua = context?.req?.headers?.['user-agent'] || 'BecomeWorker-Flow';
-        await this.legalService.acceptTerms(userId, workerDoc.id, { ip, ua });
+        await this.legalService.acceptTerms(user.sub, workerDoc.id, { ip, ua });
       }
     }
 
     // Create or update worker profile
-    await this.authService.becomeWorker(userId, {
+    await this.authService.becomeWorker(user.sub, {
       name: input.name,
       bio: input.bio,
       trade: input.trade,
@@ -245,8 +245,8 @@ export class AuthResolver {
     });
 
     // Load updated user
-    const fullUser = await this.loadUser(userId);
-    const hasAccepted = await this.legalService.hasAcceptedLatest(userId, 'WORKER');
+    const fullUser = await this.loadUser(user.sub);
+    const hasAccepted = await this.legalService.hasAcceptedLatest(user.sub, 'WORKER');
 
     return this.toUserInfo(fullUser, !hasAccepted);
   }
