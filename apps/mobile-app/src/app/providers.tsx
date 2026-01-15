@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { ApolloProvider, useLazyQuery, useMutation } from "@apollo/client/react"; 
 import { LocationProvider } from "@/contexts/LocationContext";
 import { Toaster } from "sonner";
@@ -35,6 +35,42 @@ interface User {
   isKycVerified?: boolean;
 }
 
+/* GraphQL Response Types */
+interface MeQueryResponse {
+  me: User;
+}
+
+interface LoginMutationResponse {
+  login: {
+    accessToken: string;
+    user: User;
+  };
+}
+
+interface LoginMutationVariables {
+  email: string;
+  password: string;
+  role: string;
+}
+
+interface RegisterMutationResponse {
+  register: {
+    accessToken: string;
+    user: User;
+  };
+}
+
+interface RegisterMutationVariables {
+  email: string;
+  password: string;
+  name: string;
+  role: string;
+  termsAccepted: boolean;
+  termsVersion: string;
+  termsDate: string;
+  userAgent: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -63,36 +99,66 @@ export const useAuth = () => {
 function AuthProviderInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  
+  // Guard to prevent duplicate bootstrap calls in React 18 Strict Mode
+  const isBootstrappingRef = useRef(false);
+  const hasBootstrappedRef = useRef(false);
 
-  const [fetchMe, { loading: meLoading }] = useLazyQuery(ME_QUERY, {
+  const [fetchMe, { loading: meLoading, data: meData, error: meError }] = useLazyQuery<MeQueryResponse>(ME_QUERY, {
     fetchPolicy: 'network-only',
-    onCompleted: (data) => {
-      if (data?.me) {
-        setUser(data.me);
-      }
-      setIsBootstrapping(false);
-    },
-    onError: (error) => {
-      console.error('Error fetching user:', error);
-      setUser(null);
-      setIsBootstrapping(false);
-    },
   });
 
-  const [loginMutation, { loading: loginLoading }] = useMutation(LOGIN_MUTATION);
-  const [registerMutation, { loading: registerLoading }] = useMutation(REGISTER_MUTATION);
+  const [loginMutation, { loading: loginLoading }] = useMutation<LoginMutationResponse, LoginMutationVariables>(LOGIN_MUTATION);
+  const [registerMutation, { loading: registerLoading }] = useMutation<RegisterMutationResponse, RegisterMutationVariables>(REGISTER_MUTATION);
 
+  // Handle fetchMe response via useEffect
   useEffect(() => {
+    if (meData?.me) {
+      setUser(meData.me);
+      setIsBootstrapping(false);
+    }
+  }, [meData]);
+
+  // Handle fetchMe error via useEffect
+  useEffect(() => {
+    if (meError) {
+      // Ignore AbortError - it's expected when requests are cancelled
+      if (meError.name !== 'AbortError') {
+        console.error('Error fetching user:', meError);
+      }
+      setUser(null);
+      setIsBootstrapping(false);
+    }
+  }, [meError]);
+
+  // Bootstrap authentication exactly once, safe for React 18 Strict Mode
+  useEffect(() => {
+    // Prevent duplicate execution during React 18 Strict Mode double-mount
+    if (isBootstrappingRef.current || hasBootstrappedRef.current) {
+      return;
+    }
+
+    isBootstrappingRef.current = true;
+
     const initAuth = async () => {
-      const token = await StorageAdapter.get('ay_auth_token');
-      if (token) {
-        await fetchMe();
-      } else {
+      try {
+        const token = await StorageAdapter.get('ay_auth_token');
+        if (token) {
+          await fetchMe();
+        } else {
+          setIsBootstrapping(false);
+        }
+      } catch (error) {
+        console.error('Error during auth bootstrap:', error);
         setIsBootstrapping(false);
+      } finally {
+        hasBootstrappedRef.current = true;
+        isBootstrappingRef.current = false;
       }
     };
+
     initAuth();
-  }, [fetchMe]);
+  }, []); // Empty dependency array - run once on mount
 
   const login = useCallback(async (email: string, password: string, role: string) => {
     const { data } = await loginMutation({
