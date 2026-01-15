@@ -60,18 +60,52 @@ import { join } from 'path';
       
       // Format errors with more info in development
       formatError: (error) => {
+        // Extract HTTP exception information if available
+        const originalError = error.extensions?.originalError as any;
+        const statusCode = originalError?.statusCode;
+        
+        // Map HTTP status codes to GraphQL error codes
+        let code = error.extensions?.code;
+        if (!code && statusCode) {
+          switch (statusCode) {
+            case 409:
+              code = 'CONFLICT';
+              break;
+            case 401:
+              code = 'UNAUTHORIZED';
+              break;
+            case 400:
+              code = 'BAD_REQUEST';
+              break;
+            case 403:
+              code = 'FORBIDDEN';
+              break;
+            case 404:
+              code = 'NOT_FOUND';
+              break;
+            default:
+              code = 'INTERNAL_SERVER_ERROR';
+          }
+        }
+        
         // In production, don't expose internal error details
         if (process.env.NODE_ENV === 'production') {
           return {
             message: error.message,
             extensions: {
-              code: error.extensions?.code,
+              code,
             },
           };
         }
         
-        // In development, return full error for debugging
-        return error;
+        // In development, return full error for debugging but ensure code is present
+        return {
+          ...error,
+          extensions: {
+            ...error.extensions,
+            code,
+          },
+        };
       },
       
       // Include stack traces in development

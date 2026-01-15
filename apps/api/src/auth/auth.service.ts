@@ -6,6 +6,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { UserRegisteredEvent } from './events/user-events.listener';
+import { Prisma } from '@prisma/client';
 
 // Rate limiting store (in production, use Redis)
 // TODO: Replace with Redis for production deployment
@@ -132,9 +133,6 @@ export class AuthService {
   }
 
   async register(email: string, password: string, name: string, role: string) {
-    const existing = await (this.prisma as any).user.findUnique({ where: { email } });
-    if (existing) throw new ConflictException('El email ya está registrado');
-
     // Validate password strength
     if (password.length < 8) {
       throw new BadRequestException('La contraseña debe tener al menos 8 caracteres');
@@ -154,59 +152,71 @@ export class AuthService {
     const passwordHash = await this.hashPassword(password);
     const emailVerificationToken = this.generateEmailVerificationToken();
 
-    const user = await (this.prisma as any).$transaction(async (tx: any) => {
-        const newUser = await tx.user.create({
-            data: {
-                email,
-                passwordHash,
-                role,
-                activeRole: role === 'WORKER' ? 'PROVIDER' : 'CLIENT',
-                status: 'LOGGED_IN', // User can login, but email needs verification
-                isEmailVerified: false, // Requires email verification
-                emailVerificationToken,
-            }
-        });
+    try {
+      const user = await (this.prisma as any).$transaction(async (tx: any) => {
+          const newUser = await tx.user.create({
+              data: {
+                  email,
+                  passwordHash,
+                  role,
+                  activeRole: role === 'WORKER' ? 'PROVIDER' : 'CLIENT',
+                  status: 'LOGGED_IN', // User can login, but email needs verification
+                  isEmailVerified: false, // Requires email verification
+                  emailVerificationToken,
+              }
+          });
 
-        // Crear perfiles duales para flexibilidad
-        await tx.customerProfile.create({
-            data: { userId: newUser.id, name }
-        });
+          // Crear perfiles duales para flexibilidad
+          await tx.customerProfile.create({
+              data: { userId: newUser.id, name }
+          });
 
-        if (role === 'CLIENT') {
-            await tx.clientProfile.create({
-                data: { userId: newUser.id, name }
-            });
-        } else if (role === 'WORKER') {
-            await tx.workerProfile.create({
-                data: { 
-                  userId: newUser.id, 
-                  name,
-                  kycStatus: 'PENDING_SUBMISSION',
-                  isKycVerified: false
-                }
-            });
+          if (role === 'CLIENT') {
+              await tx.clientProfile.create({
+                  data: { userId: newUser.id, name }
+              });
+          } else if (role === 'WORKER') {
+              await tx.workerProfile.create({
+                  data: { 
+                    userId: newUser.id, 
+                    name,
+                    kycStatus: 'PENDING_SUBMISSION',
+                    isKycVerified: false
+                  }
+              });
+          }
+
+          return newUser;
+      });
+
+      const payload = { 
+        sub: user.id, 
+        email: user.email, 
+        role: user.role,
+        activeRole: user.activeRole,
+        isEmailVerified: user.isEmailVerified 
+      };
+      const accessToken = await this.jwtService.signAsync(payload);
+
+      // Emitir evento para enviar email de verificación
+      this.eventEmitter.emit('user.registered', { 
+        email: user.email, 
+        name,
+        verificationToken: emailVerificationToken 
+      } as UserRegisteredEvent);
+
+      return { accessToken, user };
+    } catch (error) {
+      // Handle Prisma duplicate key error (P2002)
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          // The .meta property contains constraint information
+          throw new ConflictException('Este correo electrónico ya está registrado');
         }
-
-        return newUser;
-    });
-
-    const payload = { 
-      sub: user.id, 
-      email: user.email, 
-      role: user.role,
-      activeRole: user.activeRole,
-      isEmailVerified: user.isEmailVerified 
-    };
-    const accessToken = await this.jwtService.signAsync(payload);
-
-    // Emitir evento para enviar email de verificación
-    this.eventEmitter.emit('user.registered', { 
-      email: user.email, 
-      name,
-      verificationToken: emailVerificationToken 
-    } as UserRegisteredEvent);
-
-    return { accessToken, user };
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   async verifyEmail(token: string) {
