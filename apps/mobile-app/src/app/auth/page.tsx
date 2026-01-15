@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useState, createContext, useContext, useCallback, useMemo } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { 
   ArrowLeft, 
   Mail, 
@@ -8,85 +8,12 @@ import {
   User, 
   UserCog, 
   Loader2, 
-  Sparkles,
-  ShieldCheck,
-  LogOut
 } from "lucide-react";
-
-/* -------------------------------------------------------------------------- */
-/* MOCKS & SIMULATED DEPENDENCIES                                             */
-/* -------------------------------------------------------------------------- */
-
-// Mock de Next Navigation
-const useRouter = () => ({
-  push: (path: string) => console.log(`Navigating to ${path}`),
-  replace: (path: string) => console.log(`Replacing with ${path}`),
-});
-
-const useSearchParams = () => ({
-  get: (key: string) => null,
-  toString: () => "",
-});
-
-// Mock de Sonner Toast
-const toast = {
-  promise: (promise: Promise<any>, { loading, success, error }: any) => {
-    console.log(loading);
-    promise.then(() => console.log(success)).catch((err) => console.log(error(err)));
-  }
-};
-
-// Mock de LoadingButton
-const LoadingButton = ({ children, loading, className, disabled, ...props }: any) => (
-  <button 
-    disabled={disabled || loading} 
-    className={`${className} flex items-center justify-center gap-2`} 
-    {...props}
-  >
-    {loading && <Loader2 className="animate-spin" size={18} />}
-    {children}
-  </button>
-);
-
-/* -------------------------------------------------------------------------- */
-/* AUTH CONTEXT (Consolidated for Preview)                                    */
-/* -------------------------------------------------------------------------- */
-
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  activeRole: 'CLIENT' | 'PROVIDER';
-  mustAcceptTerms?: boolean;
-}
-
-interface AuthContextValue {
-  isAuthenticated: boolean;
-  user: AuthUser | null;
-  login: (token: string, user: AuthUser) => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const login = async (t: string, u: AuthUser) => { setUser(u); };
-  const logout = async () => { setUser(null); };
-  
-  return (
-    <AuthContext.Provider value={{ isAuthenticated: !!user, user, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within Provider");
-  return ctx;
-};
+import { useRouter, useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
+import { useAuth } from '../providers';
+import LoadingButton from '@/components/LoadingButton';
+import { ApolloError } from '@apollo/client';
 
 /* -------------------------------------------------------------------------- */
 /* AUTH PAGE COMPONENT                                                        */
@@ -96,46 +23,95 @@ type Mode = "login" | "register";
 
 function AuthContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("login");
-  const { login } = useAuth();
+  const { login, register, isAuthenticated, user } = useAuth();
   
-  // Estado local del formulario (Simplificado para evitar react-hook-form externo)
+  // Estado local del formulario
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
-    role: "CLIENT" as "CLIENT" | "PROVIDER",
+    role: "CLIENT" as "CLIENT" | "WORKER",
     termsAccepted: false
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const targetPath = user.activeRole === 'CLIENT' || user.role === 'CLIENT' 
+        ? '/client/home' 
+        : '/pro/home';
+      router.replace(targetPath);
+    }
+  }, [isAuthenticated, user, router]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     
-    const mutationPromise = new Promise((resolve) => {
-      setTimeout(() => {
-        const userData: AuthUser = {
-          id: "u-123",
-          name: form.name || "Usuario Demo",
-          email: form.email,
-          roles: [form.role],
-          activeRole: form.role,
-          mustAcceptTerms: false
-        };
-        login("fake-token", userData);
-        resolve(userData);
-      }, 1500);
-    });
-
-    toast.promise(mutationPromise, {
-      loading: mode === "login" ? "Iniciando sesión..." : "Creando tu cuenta...",
-      success: "¡Operación exitosa!",
-      error: () => "Ocurrió un error."
-    });
-
-    await mutationPromise;
-    setIsSubmitting(false);
+    // Clear any previous error state before new attempt
+    setError(null);
+    setIsLoading(true);
+    
+    try {
+      if (mode === "login") {
+        // Login mutation
+        await login(form.email, form.password, form.role);
+        
+        // On success, redirect based on role
+        const targetPath = form.role === 'CLIENT' ? '/client/home' : '/pro/home';
+        toast.success('¡Sesión iniciada correctamente!');
+        router.replace(targetPath);
+      } else {
+        // Register mutation
+        await register(form.email, form.password, form.name, form.role, form.termsAccepted);
+        
+        // On success, redirect based on role
+        const targetPath = form.role === 'CLIENT' ? '/client/home' : '/pro/home';
+        toast.success('¡Cuenta creada exitosamente!');
+        router.replace(targetPath);
+      }
+    } catch (err: any) {
+      // Handle Apollo/GraphQL errors
+      let errorMessage = 'Ocurrió un error inesperado';
+      
+      if (err instanceof ApolloError) {
+        // Check for GraphQL errors in the response
+        if (err.graphQLErrors && err.graphQLErrors.length > 0) {
+          const gqlError = err.graphQLErrors[0];
+          
+          // Parse error.extensions.code for deterministic error handling
+          const errorCode = gqlError.extensions?.code;
+          
+          switch (errorCode) {
+            case 'CONFLICT':
+              errorMessage = gqlError.message || 'Este correo electrónico ya está registrado';
+              break;
+            case 'UNAUTHORIZED':
+              errorMessage = gqlError.message || 'Credenciales incorrectas';
+              break;
+            case 'BAD_REQUEST':
+              errorMessage = gqlError.message || 'Datos inválidos';
+              break;
+            default:
+              errorMessage = gqlError.message || errorMessage;
+          }
+        } else if (err.networkError) {
+          errorMessage = 'Error de conexión. Por favor verifica tu internet.';
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      // Display error to user
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      // Always clear loading state, regardless of outcome
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -162,7 +138,11 @@ function AuthContent() {
         {/* Selector de Modo */}
         <div className="flex bg-slate-200/50 p-1.5 rounded-[1.5rem] border border-slate-200">
           <button
-            onClick={() => setMode("login")}
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setError(null); // Clear errors when switching modes
+            }}
             className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all ${
               mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
             }`}
@@ -170,7 +150,11 @@ function AuthContent() {
             Iniciar Sesión
           </button>
           <button
-            onClick={() => setMode("register")}
+            type="button"
+            onClick={() => {
+              setMode("register");
+              setError(null); // Clear errors when switching modes
+            }}
             className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all ${
               mode === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
             }`}
@@ -178,6 +162,13 @@ function AuthContent() {
             Registrarse
           </button>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="rounded-2xl bg-red-50 border border-red-200 p-4">
+            <p className="text-sm font-semibold text-red-800">{error}</p>
+          </div>
+        )}
 
         <div className="rounded-[2.5rem] bg-white p-8 shadow-xl shadow-slate-200/50 border border-slate-100">
           <form className="flex flex-col gap-5" onSubmit={onSubmit}>
@@ -238,9 +229,9 @@ function AuthContent() {
               </button>
               <button
                 type="button"
-                onClick={() => setForm({...form, role: "PROVIDER"})}
+                onClick={() => setForm({...form, role: "WORKER"})}
                 className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-[10px] font-black uppercase tracking-tight transition-all ${
-                  form.role === "PROVIDER" ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
+                  form.role === "WORKER" ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
                 }`}
               >
                 <UserCog size={14} /> Profesional
@@ -264,8 +255,8 @@ function AuthContent() {
 
             <LoadingButton
               type="submit"
-              loading={isSubmitting}
-              disabled={mode === "register" && !form.termsAccepted}
+              loading={isLoading}
+              disabled={(mode === "register" && !form.termsAccepted) || isLoading}
               className="mt-2 w-full py-4 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
             >
               {mode === "login" ? "Entrar al Sistema" : "Finalizar Registro"}
@@ -283,10 +274,8 @@ function AuthContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Suspense fallback={<div className="p-8 text-center font-bold">Cargando...</div>}>
-        <AuthContent />
-      </Suspense>
-    </AuthProvider>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-indigo-600" /></div>}>
+      <AuthContent />
+    </Suspense>
   );
 }
