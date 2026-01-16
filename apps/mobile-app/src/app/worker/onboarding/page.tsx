@@ -29,7 +29,7 @@ export default function WorkerOnboardingPage() {
 
   // Redirect if already a worker
   React.useEffect(() => {
-    if (user?.role === 'WORKER') {
+    if (user?.role === 'WORKER' || user?.role === 'ADMIN') {
       router.push('/worker/dashboard');
     }
   }, [user, router]);

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeftRight, Briefcase, ShoppingBag } from "lucide-react";
+import { ArrowLeftRight, Briefcase, ShoppingBag, Loader2 } from "lucide-react";
 import { useAuth } from "@/app/providers";
 
 /**
@@ -74,7 +74,7 @@ export default function RoleSwitcher() {
     >
       {isSwitching ? (
         <>
-          <ArrowLeftRight className="w-4 h-4 animate-spin" />
+          <Loader2 className="w-4 h-4 animate-spin" />
           <span>Cambiando...</span>
         </>
       ) : (
