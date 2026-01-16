@@ -5,7 +5,7 @@ import { ApolloProvider, useLazyQuery, useMutation } from "@apollo/client/react"
 import { LocationProvider } from "@/contexts/LocationContext";
 import { Toaster } from "sonner";
 import { client } from "../../../../graphql/client";
-import { ME_QUERY, LOGIN_MUTATION, REGISTER_MUTATION } from "@/graphql/queries";
+import { ME_QUERY, LOGIN_MUTATION, REGISTER_MUTATION, SWITCH_ACTIVE_ROLE } from "@/graphql/queries";
 import { StorageAdapter } from "@/lib/adapters/storage";
 
 /* -------------------------------------------------------------------------- */
@@ -71,15 +71,31 @@ interface RegisterMutationVariables {
   userAgent: string;
 }
 
+interface SwitchActiveRoleMutationResponse {
+  switchActiveRole: {
+    id: string;
+    activeRole: string;
+    name: string;
+    role: string;
+  };
+}
+
+interface SwitchActiveRoleMutationVariables {
+  activeRole: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
   isBootstrapping: boolean;
+  hasWorkerRole: boolean;
+  hasClientRole: boolean;
   login: (email: string, password: string, role: string) => Promise<void>;
   register: (email: string, password: string, name: string, role: string, termsAccepted: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
+  switchRole: (activeRole: 'CLIENT' | 'PROVIDER') => Promise<void>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -120,6 +136,12 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     onError: (error) => {
       // Errors will be thrown to the calling function
       console.error('Register mutation error:', error);
+    }
+  });
+
+  const [switchRoleMutation, { loading: switchRoleLoading }] = useMutation<SwitchActiveRoleMutationResponse, SwitchActiveRoleMutationVariables>(SWITCH_ACTIVE_ROLE, {
+    onError: (error) => {
+      console.error('Switch role mutation error:', error);
     }
   });
 
@@ -226,15 +248,32 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     await fetchMe();
   }, [fetchMe]);
 
+  const switchRole = useCallback(async (activeRole: 'CLIENT' | 'PROVIDER') => {
+    await switchRoleMutation({
+      variables: { activeRole },
+    });
+
+    // Refetch full user data after role switch
+    await fetchMe();
+    await client.resetStore();
+  }, [switchRoleMutation, fetchMe]);
+
+  // Determine user capabilities based on role
+  const hasWorkerRole = user?.role === 'WORKER' || user?.role === 'ADMIN';
+  const hasClientRole = true; // All users can act as clients
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
-    loading: meLoading || loginLoading || registerLoading,
+    loading: meLoading || loginLoading || registerLoading || switchRoleLoading,
     isBootstrapping,
+    hasWorkerRole,
+    hasClientRole,
     login,
     register,
     logout,
     refetchUser,
+    switchRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -239,7 +239,7 @@ export const REGISTER_MUTATION = gql`
 `;
 
 export const SWITCH_ACTIVE_ROLE = gql`
-  mutation SwitchActiveRole($activeRole: ActiveRole!) {
+  mutation SwitchActiveRole($activeRole: String!) {
     switchActiveRole(activeRole: $activeRole) {
       id
       activeRole

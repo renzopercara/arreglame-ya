@@ -1,6 +1,7 @@
 import React from "react";
 import type { Metadata, Viewport } from "next";
 import BottomNav from "@/components/BottomNav";
+import RoleSwitcher from "@/components/RoleSwitcher";
 import { Providers } from './providers';
 import "./globals.css";
 
@@ -40,6 +41,7 @@ export default function RootLayout({
             <main className="flex-1 px-4 pt-6 pb-24">
               {children}
             </main>
+            <RoleSwitcher />
             <BottomNav />
           </Providers>
         </div>
