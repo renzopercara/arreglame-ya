@@ -76,10 +76,13 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   isBootstrapping: boolean;
+  hasWorkerRole: boolean;
+  hasClientRole: boolean;
   login: (email: string, password: string, role: string) => Promise<void>;
   register: (email: string, password: string, name: string, role: string, termsAccepted: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
+  switchRole: (activeRole: 'CLIENT' | 'PROVIDER') => Promise<void>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -120,6 +123,12 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     onError: (error) => {
       // Errors will be thrown to the calling function
       console.error('Register mutation error:', error);
+    }
+  });
+
+  const [switchRoleMutation, { loading: switchRoleLoading }] = useMutation(SWITCH_ACTIVE_ROLE, {
+    onError: (error) => {
+      console.error('Switch role mutation error:', error);
     }
   });
 
@@ -226,15 +235,33 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     await fetchMe();
   }, [fetchMe]);
 
+  const switchRole = useCallback(async (activeRole: 'CLIENT' | 'PROVIDER') => {
+    const { data } = await switchRoleMutation({
+      variables: { activeRole },
+    });
+
+    if (data?.switchActiveRole) {
+      setUser(data.switchActiveRole);
+      await client.resetStore();
+    }
+  }, [switchRoleMutation]);
+
+  // Determine user capabilities based on role
+  const hasWorkerRole = user?.role === 'WORKER' || user?.role === 'ADMIN';
+  const hasClientRole = true; // All users can act as clients
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
-    loading: meLoading || loginLoading || registerLoading,
+    loading: meLoading || loginLoading || registerLoading || switchRoleLoading,
     isBootstrapping,
+    hasWorkerRole,
+    hasClientRole,
     login,
     register,
     logout,
     refetchUser,
+    switchRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

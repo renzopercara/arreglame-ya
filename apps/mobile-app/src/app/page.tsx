@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { GET_SERVICE_CATEGORIES } from "../graphql/queries";
 import useServices from "@/hooks/useServices";
 import { useLocationContext } from "@/contexts/LocationContext";
+import { useAuth } from "@/app/providers";
 import { getLucideIcon } from "../lib/icons";
 import { ServiceCategory } from "../types/category";
 import { 
@@ -117,6 +118,7 @@ const EmptyState = ({ message }: { message: string }) => (
 export default function HomePage() {
   const router = useRouter();
   const { status: locStatus, latitude, longitude, cityName } = useLocationContext();
+  const { isAuthenticated, user, hasWorkerRole } = useAuth();
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   
   // Fetch dynamic categories
@@ -326,19 +328,51 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Banner Profesional */}
-      <section className="mt-4 p-6 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2.5rem] text-white shadow-xl shadow-blue-200">
-        <h3 className="text-xl font-black mb-1">¡Súmate al equipo!</h3>
-        <p className="text-blue-100 text-xs mb-4 leading-relaxed">
-          Publica tus servicios y llega a cientos de clientes en tu zona de forma inmediata.
-        </p>
-        <button 
-          onClick={() => router.push("/auth?mode=register")}
-          className="w-full py-3.5 bg-white text-blue-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg"
-        >
-          REGISTRARME AHORA
-        </button>
-      </section>
+      {/* Banner Profesional - Smart CTA based on auth state and roles */}
+      {!isAuthenticated && (
+        <section className="mt-4 p-6 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2.5rem] text-white shadow-xl shadow-blue-200">
+          <h3 className="text-xl font-black mb-1">¡Súmate al equipo!</h3>
+          <p className="text-blue-100 text-xs mb-4 leading-relaxed">
+            Publica tus servicios y llega a cientos de clientes en tu zona de forma inmediata.
+          </p>
+          <button 
+            onClick={() => router.push("/auth?mode=register")}
+            className="w-full py-3.5 bg-white text-blue-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg"
+          >
+            REGISTRARME AHORA
+          </button>
+        </section>
+      )}
+
+      {isAuthenticated && !hasWorkerRole && (
+        <section className="mt-4 p-6 bg-gradient-to-br from-emerald-600 to-green-700 rounded-[2.5rem] text-white shadow-xl shadow-green-200">
+          <h3 className="text-xl font-black mb-1">¿Quieres trabajar?</h3>
+          <p className="text-green-100 text-xs mb-4 leading-relaxed">
+            Conviértete en profesional y empieza a ofrecer tus servicios hoy mismo.
+          </p>
+          <button 
+            onClick={() => router.push("/worker/onboarding")}
+            className="w-full py-3.5 bg-white text-green-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg"
+          >
+            QUIERO TRABAJAR
+          </button>
+        </section>
+      )}
+
+      {isAuthenticated && hasWorkerRole && (
+        <section className="mt-4 p-6 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-[2.5rem] text-white shadow-xl shadow-purple-200">
+          <h3 className="text-xl font-black mb-1">Panel Profesional</h3>
+          <p className="text-purple-100 text-xs mb-4 leading-relaxed">
+            Gestiona tus servicios y trabajos desde tu panel de control.
+          </p>
+          <button 
+            onClick={() => router.push("/worker/dashboard")}
+            className="w-full py-3.5 bg-white text-purple-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg"
+          >
+            IR A MI PANEL
+          </button>
+        </section>
+      )}
     </div>
   );
 }
