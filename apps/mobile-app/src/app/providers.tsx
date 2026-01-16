@@ -108,8 +108,20 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     fetchPolicy: 'network-only',
   });
 
-  const [loginMutation, { loading: loginLoading }] = useMutation<LoginMutationResponse, LoginMutationVariables>(LOGIN_MUTATION);
-  const [registerMutation, { loading: registerLoading }] = useMutation<RegisterMutationResponse, RegisterMutationVariables>(REGISTER_MUTATION);
+  const [loginMutation, { loading: loginLoading }] = useMutation<LoginMutationResponse, LoginMutationVariables>(LOGIN_MUTATION, {
+    onError: (error) => {
+      // Errors will be thrown to the calling function
+      // This ensures we don't leave the app in a partially authenticated state
+      console.error('Login mutation error:', error);
+    }
+  });
+  
+  const [registerMutation, { loading: registerLoading }] = useMutation<RegisterMutationResponse, RegisterMutationVariables>(REGISTER_MUTATION, {
+    onError: (error) => {
+      // Errors will be thrown to the calling function
+      console.error('Register mutation error:', error);
+    }
+  });
 
   // Handle fetchMe response via useEffect
   useEffect(() => {
@@ -129,6 +141,12 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
         return;
       }
       console.error('Error fetching user:', meError);
+      
+      // Clear invalid token on authentication failure
+      StorageAdapter.remove('ay_auth_token').catch(err => {
+        console.error('Error clearing token:', err);
+      });
+      
       setUser(null);
       setIsBootstrapping(false);
     }
