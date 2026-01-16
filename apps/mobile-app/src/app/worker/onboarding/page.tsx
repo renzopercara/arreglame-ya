@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@apollo/client";
+import { useMutation } from "@apollo/client/react";
 import { useAuth } from "@/app/providers";
 import { BECOME_WORKER } from "@/graphql/queries";
 import { Briefcase, CheckCircle, Loader2 } from "lucide-react";

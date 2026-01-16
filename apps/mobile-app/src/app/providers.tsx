@@ -5,7 +5,7 @@ import { ApolloProvider, useLazyQuery, useMutation } from "@apollo/client/react"
 import { LocationProvider } from "@/contexts/LocationContext";
 import { Toaster } from "sonner";
 import { client } from "../../../../graphql/client";
-import { ME_QUERY, LOGIN_MUTATION, REGISTER_MUTATION } from "@/graphql/queries";
+import { ME_QUERY, LOGIN_MUTATION, REGISTER_MUTATION, SWITCH_ACTIVE_ROLE } from "@/graphql/queries";
 import { StorageAdapter } from "@/lib/adapters/storage";
 
 /* -------------------------------------------------------------------------- */
@@ -71,6 +71,19 @@ interface RegisterMutationVariables {
   userAgent: string;
 }
 
+interface SwitchActiveRoleMutationResponse {
+  switchActiveRole: {
+    id: string;
+    activeRole: string;
+    name: string;
+    role: string;
+  };
+}
+
+interface SwitchActiveRoleMutationVariables {
+  activeRole: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -126,7 +139,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const [switchRoleMutation, { loading: switchRoleLoading }] = useMutation(SWITCH_ACTIVE_ROLE, {
+  const [switchRoleMutation, { loading: switchRoleLoading }] = useMutation<SwitchActiveRoleMutationResponse, SwitchActiveRoleMutationVariables>(SWITCH_ACTIVE_ROLE, {
     onError: (error) => {
       console.error('Switch role mutation error:', error);
     }
@@ -236,15 +249,14 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   }, [fetchMe]);
 
   const switchRole = useCallback(async (activeRole: 'CLIENT' | 'PROVIDER') => {
-    const { data } = await switchRoleMutation({
+    await switchRoleMutation({
       variables: { activeRole },
     });
 
-    if (data?.switchActiveRole) {
-      setUser(data.switchActiveRole);
-      await client.resetStore();
-    }
-  }, [switchRoleMutation]);
+    // Refetch full user data after role switch
+    await fetchMe();
+    await client.resetStore();
+  }, [switchRoleMutation, fetchMe]);
 
   // Determine user capabilities based on role
   const hasWorkerRole = user?.role === 'WORKER' || user?.role === 'ADMIN';
