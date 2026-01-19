@@ -20,7 +20,13 @@ export class UserInfoResponse {
   name: string;
 
   @Field()
-  role: string;
+  role: string; // Kept for backward compatibility
+
+  @Field(() => [String])
+  roles: string[]; // New: Array of all roles user has
+
+  @Field()
+  currentRole: string; // New: Current primary role
 
   @Field()
   activeRole: string;
@@ -117,7 +123,9 @@ export class AuthResolver {
       id: user.id,
       email: user.email,
       name: client?.name || worker?.name || user.name || '',
-      role: user.role,
+      role: user.currentRole || user.role, // Backward compatibility
+      roles: user.roles || [user.role || user.currentRole], // New multi-role support
+      currentRole: user.currentRole || user.role, // New current role field
       activeRole: user.activeRole,
       avatar: client?.avatar || null,
       mustAcceptTerms,
@@ -141,7 +149,7 @@ export class AuthResolver {
   async login(@Args('input', { type: () => LoginInput }) input: LoginInput): Promise<AuthResponse> {
     const { accessToken, user } = await this.authService.login(input.email, input.password, input.role);
     const fullUser = await this.loadUser(user.id);
-    const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, user.role as 'CLIENT' | 'WORKER');
+    const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, fullUser.currentRole as 'CLIENT' | 'WORKER');
 
     return {
       accessToken,
@@ -193,7 +201,7 @@ export class AuthResolver {
     const fullUser = await this.loadUser(user.sub);
     if (!fullUser) return null;
 
-    const hasAccepted = await this.legalService.hasAcceptedLatest(fullUser.id, fullUser.role as 'CLIENT' | 'WORKER');
+    const hasAccepted = await this.legalService.hasAcceptedLatest(fullUser.id, fullUser.currentRole as 'CLIENT' | 'WORKER');
     return this.toUserInfo(fullUser, !hasAccepted);
   }
 
@@ -207,7 +215,7 @@ export class AuthResolver {
 
     const updatedUser = await this.authService.switchActiveRole(user.sub, activeRole);
     const fullUser = await this.loadUser(updatedUser.id);
-    const hasAccepted = await this.legalService.hasAcceptedLatest(updatedUser.id, updatedUser.role as 'CLIENT' | 'WORKER');
+    const hasAccepted = await this.legalService.hasAcceptedLatest(updatedUser.id, updatedUser.currentRole as 'CLIENT' | 'WORKER');
 
     return this.toUserInfo(fullUser, !hasAccepted);
   }
