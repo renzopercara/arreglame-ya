@@ -16,7 +16,9 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: string; // Backward compatibility - primary role
+  roles: string[]; // New: Array of all roles user has
+  currentRole: string; // New: Current primary role
   activeRole: string;
   status?: string;
   avatar?: string;
@@ -77,6 +79,8 @@ interface SwitchActiveRoleMutationResponse {
     activeRole: string;
     name: string;
     role: string;
+    roles: string[];
+    currentRole: string;
   };
 }
 
@@ -258,9 +262,9 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     await client.resetStore();
   }, [switchRoleMutation, fetchMe]);
 
-  // Determine user capabilities based on role
-  const hasWorkerRole = user?.role === 'WORKER' || user?.role === 'ADMIN';
-  const hasClientRole = true; // All users can act as clients
+  // Determine user capabilities based on roles array (multi-role support)
+  const hasWorkerRole = user?.roles?.includes('WORKER') || user?.roles?.includes('ADMIN') || user?.role === 'WORKER' || user?.role === 'ADMIN';
+  const hasClientRole = user?.roles?.includes('CLIENT') || user?.roles?.includes('ADMIN') || true; // All users can act as clients
 
   const value: AuthContextType = {
     user,
