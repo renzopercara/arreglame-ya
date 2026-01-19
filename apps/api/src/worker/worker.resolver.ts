@@ -8,6 +8,8 @@ import { RequireRoles, RequireActiveRole } from '../auth/roles.decorator';
 import { WorkerService } from './worker.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubmitKYCInput } from './dto/submit-kyc.input';
+import { CreateWorkerSpecialtyInput, UpdateWorkerSpecialtyInput, AddMultipleSpecialtiesInput } from './dto/worker-specialty.input';
+import { WorkerSpecialtyType } from './dto/worker-specialty.type';
 
 @ObjectType('WorkerProfile')
 export class WorkerProfileResponse {
@@ -49,12 +51,24 @@ export class WorkerProfileResponse {
 
   @Field({ nullable: true })
   selfie?: string;
+
+  @Field(() => [WorkerSpecialtyType], { nullable: true })
+  specialties?: WorkerSpecialtyType[];
 }
 
 @ObjectType('UpdateLocationResponse')
 export class UpdateLocationResponse {
   @Field()
   success: boolean;
+}
+
+@ObjectType('GenericSuccessResponse')
+export class GenericSuccessResponse {
+  @Field()
+  success: boolean;
+
+  @Field()
+  message: string;
 }
 
 @Resolver()
@@ -97,10 +111,10 @@ export class WorkerResolver {
       const worker = await (this.prisma as any).workerProfile.findUnique({ where: { userId: user.sub } });
       
       if (!worker) throw new BadRequestException("Perfil no encontrado");
-      if (worker.kycStatus === 'APPROVED') throw new BadRequestException("Ya estÃƒ¡s verificado.");
+      if (worker.kycStatus === 'APPROVED') throw new BadRequestException("Ya estás verificado.");
 
-      // En prod, aquÃƒ­ llamarÃƒ­amos a un proveedor de KYC (Onfido/SumSub)
-      // Para MVP, guardamos y marcamos para revisiÃƒ³n manual
+      // En prod, aquí llamaríamos a un proveedor de KYC (Onfido/SumSub)
+      // Para MVP, guardamos y marcamos para revisión manual
       return (this.prisma as any).workerProfile.update({
           where: { userId: user.sub },
           data: {
@@ -117,12 +131,18 @@ export class WorkerResolver {
   @UseGuards(AuthGuard)
   async getPublicWorkerProfile(@Args('workerId') workerId: string): Promise<WorkerProfileResponse | null> {
       const profile = await (this.prisma as any).workerProfile.findUnique({
-          where: { id: workerId }
+          where: { id: workerId },
+          include: {
+              workerSpecialties: {
+                  where: { status: 'ACTIVE' },
+                  include: { category: true }
+              }
+          }
       });
       
       if (!profile) return null;
 
-      // SanitizaciÃƒ³n: Solo devolvemos datos pÃƒºblicos
+      // Sanitización: Solo devolvemos datos públicos
       return {
           id: profile.id,
           userId: profile.userId,
@@ -131,7 +151,127 @@ export class WorkerResolver {
           totalJobs: profile.totalJobs,
           currentPlan: profile.currentPlan,
           bio: profile.bio || "Cortador verificado de la comunidad.",
-          status: profile.status
+          status: profile.status,
+          specialties: profile.workerSpecialties
       };
   }
+
+  // ============================================
+  // WORKER SPECIALTY MUTATIONS & QUERIES
+  // ============================================
+
+  @Mutation(() => WorkerSpecialtyType)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  async addWorkerSpecialty(
+    @Args('input', { type: () => CreateWorkerSpecialtyInput }) input: CreateWorkerSpecialtyInput,
+    @CurrentUser() user: any
+  ): Promise<WorkerSpecialtyType> {
+    // Get worker profile
+    const worker = await (this.prisma as any).workerProfile.findUnique({
+      where: { userId: user.sub }
+    });
+
+    if (!worker) {
+      throw new BadRequestException('Worker profile not found');
+    }
+
+    return this.workerService.addSpecialty(worker.id, input);
+  }
+
+  @Mutation(() => [WorkerSpecialtyType])
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  async addMultipleWorkerSpecialties(
+    @Args('input', { type: () => AddMultipleSpecialtiesInput }) input: AddMultipleSpecialtiesInput,
+    @CurrentUser() user: any
+  ): Promise<any> {
+    // Get worker profile
+    const worker = await (this.prisma as any).workerProfile.findUnique({
+      where: { userId: user.sub }
+    });
+
+    if (!worker) {
+      throw new BadRequestException('Worker profile not found');
+    }
+
+    return this.workerService.addMultipleSpecialties(worker.id, input.specialties);
+  }
+
+  @Mutation(() => WorkerSpecialtyType)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  async updateWorkerSpecialty(
+    @Args('input', { type: () => UpdateWorkerSpecialtyInput }) input: UpdateWorkerSpecialtyInput,
+    @CurrentUser() user: any
+  ): Promise<WorkerSpecialtyType> {
+    // Get worker profile
+    const worker = await (this.prisma as any).workerProfile.findUnique({
+      where: { userId: user.sub }
+    });
+
+    if (!worker) {
+      throw new BadRequestException('Worker profile not found');
+    }
+
+    return this.workerService.updateSpecialty(worker.id, input);
+  }
+
+  @Mutation(() => GenericSuccessResponse)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  async removeWorkerSpecialty(
+    @Args('specialtyId') specialtyId: string,
+    @CurrentUser() user: any
+  ): Promise<GenericSuccessResponse> {
+    // Get worker profile
+    const worker = await (this.prisma as any).workerProfile.findUnique({
+      where: { userId: user.sub }
+    });
+
+    if (!worker) {
+      throw new BadRequestException('Worker profile not found');
+    }
+
+    return this.workerService.removeSpecialty(worker.id, specialtyId);
+  }
+
+  @Query(() => [WorkerSpecialtyType])
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  async getMyWorkerSpecialties(
+    @Args('includeInactive', { defaultValue: false }) includeInactive: boolean,
+    @CurrentUser() user: any
+  ): Promise<WorkerSpecialtyType[]> {
+    // Get worker profile
+    const worker = await (this.prisma as any).workerProfile.findUnique({
+      where: { userId: user.sub }
+    });
+
+    if (!worker) {
+      throw new BadRequestException('Worker profile not found');
+    }
+
+    return this.workerService.getWorkerSpecialties(worker.id, includeInactive);
+  }
+
+  @Query(() => WorkerSpecialtyType, { nullable: true })
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  async getWorkerSpecialtyById(
+    @Args('specialtyId') specialtyId: string,
+    @CurrentUser() user: any
+  ): Promise<WorkerSpecialtyType | null> {
+    // Get worker profile
+    const worker = await (this.prisma as any).workerProfile.findUnique({
+      where: { userId: user.sub }
+    });
+
+    if (!worker) {
+      throw new BadRequestException('Worker profile not found');
+    }
+
+    return this.workerService.getWorkerSpecialtyById(worker.id, specialtyId);
+  }
 }
+
