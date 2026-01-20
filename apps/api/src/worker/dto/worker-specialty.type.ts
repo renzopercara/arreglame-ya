@@ -27,7 +27,7 @@ export class WorkerSpecialtyType {
   @Field()
   updatedAt: Date;
 
-  // Relations - using lazy type resolution to avoid circular dependency
+  // Relations - using lazy type resolution (arrow function) to avoid circular dependency
   @Field(() => ServiceCategoryGraphQL, { nullable: true })
   category?: ServiceCategoryGraphQL;
 }
