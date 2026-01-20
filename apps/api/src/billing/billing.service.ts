@@ -21,7 +21,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { CommissionService } from './commission.service';
 import { PaymentAuditLog, throwBillingException } from './billing.exceptions';
 import { WalletBalance, TransactionHistory } from './billing.entity';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 
 @Injectable()
 export class BillingService {
@@ -423,8 +423,8 @@ export class BillingService {
         throw new BadRequestException('Usuario no encontrado');
       }
 
-      // Solo trabajadores pueden solicitar retiros
-      if (user.role !== 'WORKER') {
+      // Solo trabajadores pueden solicitar retiros - validación multi-role
+      if (!user.roles.includes(UserRole.WORKER)) {
         throw new BadRequestException('Solo los trabajadores pueden solicitar retiros');
       }
 
@@ -435,8 +435,15 @@ export class BillingService {
         );
       }
 
+      // Verificar que el trabajador tenga un perfil de trabajador
+      if (!user.workerProfile) {
+        throw new BadRequestException(
+          'Debes completar tu perfil de trabajador antes de poder retirar fondos.'
+        );
+      }
+
       // Verificar KYC
-      if (!user.workerProfile?.isKycVerified || user.workerProfile?.kycStatus !== 'APPROVED') {
+      if (!user.workerProfile.isKycVerified || user.workerProfile.kycStatus !== 'APPROVED') {
         throw new BadRequestException(
           'Debes completar tu verificación de identidad (KYC) antes de poder retirar fondos.'
         );
