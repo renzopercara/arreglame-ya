@@ -1,4 +1,5 @@
 import { ObjectType, Field, Int } from '@nestjs/graphql';
+import { ServiceCategoryGraphQL } from '../../service-categories/service-category.model';
 
 @ObjectType()
 export class WorkerSpecialtyType {
@@ -26,43 +27,7 @@ export class WorkerSpecialtyType {
   @Field()
   updatedAt: Date;
 
-  // Relations
-  @Field({ nullable: true })
-  category?: ServiceCategoryType;
-}
-
-@ObjectType()
-export class ServiceCategoryType {
-  @Field()
-  id: string;
-
-  @Field()
-  slug: string;
-
-  @Field()
-  name: string;
-
-  @Field()
-  iconName: string;
-
-  @Field({ nullable: true })
-  description?: string;
-
-  @Field()
-  basePrice: number;
-
-  @Field()
-  hourlyRate: number;
-
-  @Field()
-  estimatedHours: number;
-
-  @Field()
-  active: boolean;
-
-  @Field()
-  createdAt: Date;
-
-  @Field()
-  updatedAt: Date;
+  // Relations - using lazy type resolution to avoid circular dependency
+  @Field(() => ServiceCategoryGraphQL, { nullable: true })
+  category?: ServiceCategoryGraphQL;
 }
