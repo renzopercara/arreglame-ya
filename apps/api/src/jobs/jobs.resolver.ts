@@ -306,7 +306,7 @@ export class JobsResolver {
     });
 
     // If coordinates are provided, filter and sort by proximity
-    if (latitude && longitude) {
+    if (latitude != null && longitude != null) {
       const radius = radiusKm || 50; // Default 50km radius
       const radiusMeters = radius * 1000;
 

@@ -145,7 +145,7 @@ npm run db:studio
 # Crear una nueva migración
 npm run db:migrate
 
-# Seed database (si tienes script en prisma/seed.js)
+# Seed database (si tienes script en prisma/seed.ts)
 npm run db:seed
 
 # Parar servicios Docker

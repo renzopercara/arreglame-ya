@@ -67,18 +67,30 @@ export default function useNearbyWorkers(
 ): UseNearbyWorkersResult {
   const { latitude, longitude, radiusKm = 50, skip = false } = options;
 
-  // Skip query if coordinates are not available or explicitly skipped
-  const shouldSkip = skip || !latitude || !longitude;
+  /**
+   * Validación estricta:
+   * Verificamos que latitude y longitude sean números válidos.
+   * Usamos Number.isFinite para evitar NaN o Infinity.
+   */
+  const hasValidCoordinates = 
+    typeof latitude === 'number' && 
+    typeof longitude === 'number' && 
+    !isNaN(latitude) && 
+    !isNaN(longitude);
+
+  // La query SOLO debe saltarse si 'skip' es true O si no hay coordenadas válidas
+  const shouldSkipQuery = skip || !hasValidCoordinates;
 
   const { data, loading, error, refetch } = useQuery<GetNearbyWorkersResponse>(
     GET_NEARBY_WORKERS,
     {
-      variables: {
+      // Solo pasamos variables si la validación es correcta
+      variables: hasValidCoordinates ? {
         latitude,
         longitude,
         radiusKm,
-      },
-      skip: shouldSkip,
+      } : undefined,
+      skip: shouldSkipQuery, // Aquí es donde Apollo decide si disparar la petición o no
       fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
     }
@@ -105,7 +117,7 @@ export default function useNearbyWorkers(
     return workers.map((worker, index) => {
       const angle = (index / workers.length) * 2 * Math.PI;
       const radius = BASE_RADIUS + (index % RADIUS_TIERS) * RADIUS_VARIATION;
-      
+
       return {
         id: worker.id,
         lat: latitude + radius * Math.cos(angle),
