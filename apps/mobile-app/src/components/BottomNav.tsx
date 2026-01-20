@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Briefcase, ClipboardList, Home, LayoutDashboard, MessageSquare, Search, UserIcon } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Briefcase, ClipboardList, Home, LayoutDashboard, MessageSquare, Search, UserIcon, ArrowLeftRight } from "lucide-react";
 import { useAuth } from "@/app/providers";
 
 
@@ -16,10 +16,42 @@ interface NavItem {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { isAuthenticated, user, isBootstrapping } = useAuth();
+  const router = useRouter();
+  const { isAuthenticated, user, isBootstrapping, hasWorkerRole, switchRole } = useAuth();
+  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
 
   const isWorkerMode = user?.activeRole === 'PROVIDER';
   const themeColor = isWorkerMode ? 'green' : 'blue';
+
+  // Quick role switch handler
+  const handleQuickRoleSwitch = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!user) return;
+    
+    setIsSwitchingRole(true);
+    
+    try {
+      if (isWorkerMode) {
+        // Switch to CLIENT mode
+        await switchRole('CLIENT');
+        router.push('/');
+      } else {
+        // Switch to PROVIDER mode
+        if (hasWorkerRole) {
+          await switchRole('PROVIDER');
+          router.push('/worker/dashboard');
+        } else {
+          router.push('/worker/onboarding');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to switch role:', error);
+    } finally {
+      setIsSwitchingRole(false);
+    }
+  };
 
   const isNavItemActive = (itemHref: string, currentPath: string): boolean => {
     if (itemHref === "/") return currentPath === "/";
@@ -72,9 +104,14 @@ export default function BottomNav() {
 
   return (
     <div className="fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-6">
-      <nav className="rounded-3xl border border-white/40 bg-white/80 p-2 shadow-2xl shadow-slate-200/50 backdrop-blur-xl">
-        <ul className="flex items-center justify-around">
-          {navItems.map((item) => {
+      <nav className={`
+        rounded-3xl border p-2 shadow-2xl backdrop-blur-xl
+        ${isWorkerMode 
+          ? 'border-emerald-200/40 bg-white/80 shadow-emerald-200/50' 
+          : 'border-blue-200/40 bg-white/80 shadow-blue-200/50'}
+      `}>
+        <ul className="flex items-center justify-around relative">
+          {navItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = isNavItemActive(item.href, pathname);
 
@@ -108,6 +145,29 @@ export default function BottomNav() {
               </li>
             );
           })}
+
+          {/* Role Mode Indicator - Only shown when authenticated */}
+          {isAuthenticated && user && (
+            <li className="absolute -top-14 right-0">
+              <button
+                onClick={handleQuickRoleSwitch}
+                disabled={isSwitchingRole}
+                className={`
+                  flex items-center gap-1.5 px-3 py-1.5 rounded-full
+                  text-[10px] font-bold uppercase tracking-wide
+                  transition-all duration-300 shadow-md
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  active:scale-95
+                  ${isWorkerMode 
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'}
+                `}
+              >
+                <span>{isWorkerMode ? '🔧 Pro' : '👤 Cliente'}</span>
+                <ArrowLeftRight size={10} />
+              </button>
+            </li>
+          )}
         </ul>
       </nav>
     </div>

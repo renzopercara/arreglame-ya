@@ -56,6 +56,8 @@ export const ME_QUERY = gql`
       name
       email
       role
+      roles
+      currentRole
       activeRole
       status
       avatar
@@ -169,6 +171,8 @@ export const LOGIN_MUTATION = gql`
         name
         email
         role
+        roles
+        currentRole
         activeRole
         status
         avatar
@@ -217,6 +221,8 @@ export const REGISTER_MUTATION = gql`
         name
         email
         role
+        roles
+        currentRole
         activeRole
         status
         avatar
@@ -245,6 +251,8 @@ export const SWITCH_ACTIVE_ROLE = gql`
       activeRole
       name
       role
+      roles
+      currentRole
     }
   }
 `;
@@ -262,6 +270,8 @@ export const BECOME_WORKER = gql`
       name
       email
       role
+      roles
+      currentRole
       activeRole
       status
       avatar
@@ -553,6 +563,123 @@ export const DELETE_NOTIFICATION = gql`
   mutation DeleteNotification($notificationId: String!) {
     deleteNotification(notificationId: $notificationId) {
       success
+    }
+  }
+`;
+
+// ============================================
+// WORKER SPECIALTIES
+// ============================================
+
+export const ADD_WORKER_SPECIALTY = gql`
+  mutation AddWorkerSpecialty($input: CreateWorkerSpecialtyInput!) {
+    addWorkerSpecialty(input: $input) {
+      id
+      workerId
+      categoryId
+      status
+      experienceYears
+      metadata
+      createdAt
+      updatedAt
+      category {
+        id
+        slug
+        name
+        iconName
+        description
+      }
+    }
+  }
+`;
+
+export const ADD_MULTIPLE_WORKER_SPECIALTIES = gql`
+  mutation AddMultipleWorkerSpecialties($input: AddMultipleSpecialtiesInput!) {
+    addMultipleWorkerSpecialties(input: $input) {
+      success
+      specialty {
+        id
+        categoryId
+        status
+        experienceYears
+      }
+      categoryId
+      error
+    }
+  }
+`;
+
+export const UPDATE_WORKER_SPECIALTY = gql`
+  mutation UpdateWorkerSpecialty($input: UpdateWorkerSpecialtyInput!) {
+    updateWorkerSpecialty(input: $input) {
+      id
+      workerId
+      categoryId
+      status
+      experienceYears
+      metadata
+      updatedAt
+      category {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const REMOVE_WORKER_SPECIALTY = gql`
+  mutation RemoveWorkerSpecialty($specialtyId: String!) {
+    removeWorkerSpecialty(specialtyId: $specialtyId) {
+      success
+      message
+    }
+  }
+`;
+
+export const GET_MY_WORKER_SPECIALTIES = gql`
+  query GetMyWorkerSpecialties($includeInactive: Boolean) {
+    getMyWorkerSpecialties(includeInactive: $includeInactive) {
+      id
+      workerId
+      categoryId
+      status
+      experienceYears
+      metadata
+      createdAt
+      updatedAt
+      category {
+        id
+        slug
+        name
+        iconName
+        description
+        basePrice
+        hourlyRate
+      }
+    }
+  }
+`;
+
+export const GET_WORKER_SPECIALTY_BY_ID = gql`
+  query GetWorkerSpecialtyById($specialtyId: String!) {
+    getWorkerSpecialtyById(specialtyId: $specialtyId) {
+      id
+      workerId
+      categoryId
+      status
+      experienceYears
+      metadata
+      createdAt
+      updatedAt
+      category {
+        id
+        slug
+        name
+        iconName
+        description
+        basePrice
+        hourlyRate
+      }
     }
   }
 `;

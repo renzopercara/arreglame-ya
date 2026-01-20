@@ -36,17 +36,23 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Usuario no autenticado');
     }
 
-    // Check if user has required role
-    if (requiredRoles && !requiredRoles.includes(user.role)) {
-      const roleNameMap: Record<string, string> = {
-        'WORKER': 'Profesional',
-        'CLIENT': 'Cliente',
-        'ADMIN': 'Administrador',
-      };
-      const friendlyRoles = requiredRoles.map(r => roleNameMap[r] || r).join(', ');
-      throw new ForbiddenException(
-        `Se requiere uno de los siguientes roles: ${friendlyRoles}`
-      );
+    // Check if user has required role(s) - now supports multiple roles
+    if (requiredRoles) {
+      // User can have multiple roles, check if they have at least one required role
+      const userRoles = user.roles || [user.currentRole || user.role];
+      const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
+      
+      if (!hasRequiredRole) {
+        const roleNameMap: Record<string, string> = {
+          'WORKER': 'Profesional',
+          'CLIENT': 'Cliente',
+          'ADMIN': 'Administrador',
+        };
+        const friendlyRoles = requiredRoles.map(r => roleNameMap[r] || r).join(', ');
+        throw new ForbiddenException(
+          `Se requiere uno de los siguientes roles: ${friendlyRoles}`
+        );
+      }
     }
 
     // Check if user has required active role

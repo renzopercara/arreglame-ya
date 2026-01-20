@@ -105,7 +105,8 @@ export class AuthService {
       throw new UnauthorizedException(genericError);
     }
 
-    if (user.role !== role) {
+    // Check if user has the requested role in their roles array
+    if (!user.roles || !user.roles.includes(role)) {
       this.recordFailedAttempt(email);
       throw new UnauthorizedException(`Este usuario no tiene el rol de ${role}`);
     }
@@ -119,11 +120,12 @@ export class AuthService {
     // Clear failed attempts on successful login
     this.clearFailedAttempts(email);
 
-    // JWT Payload seguro
+    // JWT Payload seguro - includes roles array and currentRole
     const payload = { 
       sub: user.id, 
       email: user.email, 
-      role: user.role,
+      roles: user.roles,
+      currentRole: user.currentRole,
       activeRole: user.activeRole,
       isEmailVerified: user.isEmailVerified 
     };
@@ -158,7 +160,8 @@ export class AuthService {
               data: {
                   email,
                   passwordHash,
-                  role,
+                  roles: [role], // Initialize roles array with selected role
+                  currentRole: role,
                   activeRole: role === 'WORKER' ? 'PROVIDER' : 'CLIENT',
                   status: 'LOGGED_IN', // User can login, but email needs verification
                   isEmailVerified: false, // Requires email verification
@@ -192,7 +195,8 @@ export class AuthService {
       const payload = { 
         sub: user.id, 
         email: user.email, 
-        role: user.role,
+        roles: user.roles,
+        currentRole: user.currentRole,
         activeRole: user.activeRole,
         isEmailVerified: user.isEmailVerified 
       };
@@ -330,11 +334,17 @@ export class AuthService {
         },
       });
 
-      // Update user role to WORKER and set activeRole to PROVIDER
+      // Update user to add WORKER role if not present, and set currentRole to WORKER
+      const currentRoles = user.roles || [user.currentRole];
+      const updatedRoles = currentRoles.includes('WORKER') 
+        ? currentRoles 
+        : [...currentRoles, 'WORKER'];
+
       await this.prisma.user.update({
         where: { id: userId },
         data: {
-          role: 'WORKER',
+          roles: updatedRoles,
+          currentRole: 'WORKER',
           activeRole: 'PROVIDER',
         },
       });
@@ -356,11 +366,17 @@ export class AuthService {
       },
     });
 
-    // Update user role to WORKER
+    // Update user to add WORKER role and set currentRole to WORKER
+    const currentRoles = user.roles || [user.currentRole];
+    const updatedRoles = currentRoles.includes('WORKER') 
+      ? currentRoles 
+      : [...currentRoles, 'WORKER'];
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        role: 'WORKER',
+        roles: updatedRoles,
+        currentRole: 'WORKER',
         activeRole: 'PROVIDER',
       },
     });
