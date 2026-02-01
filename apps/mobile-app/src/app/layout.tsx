@@ -41,7 +41,7 @@ export default function RootLayout({
             <main className="flex-1 px-4 pt-6 pb-24">
               {children}
             </main>
-            <RoleSwitcher />
+            {/* <RoleSwitcher /> */}
             <BottomNav />
           </Providers>
         </div>

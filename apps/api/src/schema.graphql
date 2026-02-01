@@ -2,6 +2,10 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+input AddMultipleSpecialtiesInput {
+  specialties: [CreateWorkerSpecialtyInput!]!
+}
+
 type AuditResponse {
   approved: Boolean!
   confidence: Float!
@@ -37,6 +41,12 @@ input CreateJobInput {
   squareMeters: Float!
 }
 
+input CreateWorkerSpecialtyInput {
+  categoryId: String!
+  experienceYears: Int! = 0
+  metadata: String
+}
+
 """
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
@@ -60,6 +70,11 @@ input EstimateJobInput {
 }
 
 type GenericResponse {
+  message: String!
+  success: Boolean!
+}
+
+type GenericSuccessResponse {
   message: String!
   success: Boolean!
 }
@@ -125,6 +140,8 @@ input LoginInput {
 
 type Mutation {
   acceptLatestTerms(documentId: String!, userId: String!): Boolean!
+  addMultipleWorkerSpecialties(input: AddMultipleSpecialtiesInput!): [WorkerSpecialtyType!]!
+  addWorkerSpecialty(input: CreateWorkerSpecialtyInput!): WorkerSpecialtyType!
   arriveAtJob(jobId: String!, lat: Float!, lng: Float!, workerId: String!): Boolean!
   becomeWorker(input: BecomeWorkerInput!): UserInfo!
   completeJob(evidenceImages: [String!], imageAfter: String!, jobId: String!): AuditResponse!
@@ -136,6 +153,7 @@ type Mutation {
   markAllNotificationsAsRead: MutationResponse!
   markNotificationAsRead(notificationId: String!): Notification!
   register(input: RegisterInput!): AuthResponse!
+  removeWorkerSpecialty(specialtyId: String!): GenericSuccessResponse!
   resendVerificationEmail(email: String!): GenericResponse!
   setWorkerStatus(status: String!): WorkerProfile!
   startJob(jobId: String!, pin: String!): Job!
@@ -143,6 +161,7 @@ type Mutation {
   submitReview(input: JSON!): Review!
   switchActiveRole(activeRole: String!): UserInfo!
   updateWorkerLocation(lat: Float!, lng: Float!): UpdateLocationResponse!
+  updateWorkerSpecialty(input: UpdateWorkerSpecialtyInput!): WorkerSpecialtyType!
   verifyEmail(token: String!): GenericResponse!
 }
 
@@ -194,11 +213,13 @@ type Query {
   """
   calculateServicePrice(categoryId: String!, complexityFactor: Float! = 1): Float!
   estimateJob(input: EstimateJobInput!): JobEstimateResponse!
+  getMyWorkerSpecialties(includeInactive: Boolean! = false): [WorkerSpecialtyType!]!
   getNotifications(limit: Float): [Notification!]!
   getPublicWorkerProfile(workerId: String!): WorkerProfile
   getServices(category: String, latitude: Float, location: String, longitude: Float, query: String, radiusKm: Int): [Job!]!
   getUnreadCount: UnreadCountResult!
   getWorkerReputation(workerId: String!): ReputationInfo!
+  getWorkerSpecialtyById(specialtyId: String!): WorkerSpecialtyType
   healthCheckReputation: String!
   latestTerms(role: String!): LegalDocument!
   me: UserInfo
@@ -285,12 +306,20 @@ type UpdateLocationResponse {
   success: Boolean!
 }
 
+input UpdateWorkerSpecialtyInput {
+  experienceYears: Int
+  id: String!
+  metadata: String
+  status: String
+}
+
 type UserInfo {
   activeRole: String!
   avatar: String
   balance: Float
   bio: String
   currentPlan: String
+  currentRole: String!
   email: String!
   id: String!
   isEmailVerified: Boolean
@@ -303,6 +332,7 @@ type UserInfo {
   name: String!
   rating: Float
   role: String!
+  roles: [String!]!
   status: String
   totalJobs: Int
   workerStatus: String
@@ -319,7 +349,20 @@ type WorkerProfile {
   name: String!
   rating: Float
   selfie: String
+  specialties: [WorkerSpecialtyType!]
   status: String
   totalJobs: Float
   userId: String!
+}
+
+type WorkerSpecialtyType {
+  category: ServiceCategory
+  categoryId: String!
+  createdAt: DateTime!
+  experienceYears: Int!
+  id: String!
+  metadata: String
+  status: String!
+  updatedAt: DateTime!
+  workerId: String!
 }
