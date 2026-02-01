@@ -57,13 +57,19 @@ export default function JobCard({ job, onView, onAccept }: JobCardProps) {
 
       {/* Details */}
       <div className="flex items-center gap-4 text-xs text-slate-500">
-        {job.distance !== undefined && (
+        {job.distance !== undefined && job.location && (
+          <div className="flex items-center gap-1.5">
+            <MapPin className="h-4 w-4" />
+            <span className="truncate">{job.location} • {job.distance.toFixed(1)} km</span>
+          </div>
+        )}
+        {job.distance !== undefined && !job.location && (
           <div className="flex items-center gap-1.5">
             <MapPin className="h-4 w-4" />
             <span>{job.distance.toFixed(1)} km</span>
           </div>
         )}
-        {job.location && (
+        {!job.distance && job.location && (
           <div className="flex items-center gap-1.5">
             <MapPin className="h-4 w-4" />
             <span className="truncate">{job.location}</span>

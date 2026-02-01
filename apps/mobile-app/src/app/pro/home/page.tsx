@@ -23,6 +23,10 @@ import JobCard, { JobListSkeleton, Job } from "@/components/JobCard";
  * - Nearby job requests feed
  * - Loading, empty, and error states
  */
+
+// Constants
+const MS_PER_DAY = 86400000;
+
 export default function ProHomePage() {
   const { user, isAuthenticated, hasWorkerRole, isBootstrapping } = useAuth();
   const router = useRouter();
@@ -75,7 +79,7 @@ export default function ProHomePage() {
             location: "Barrio Norte, Buenos Aires",
             distance: 2.3,
             description: "Reparación de cañería en cocina, pérdida de agua.",
-            scheduledDate: new Date().toISOString(),
+            scheduledDate: new Date(Date.now() + MS_PER_DAY).toISOString(),
             status: "Nuevo",
           },
           {
@@ -85,7 +89,7 @@ export default function ProHomePage() {
             location: "Palermo, Buenos Aires",
             distance: 3.7,
             description: "Instalación de tomas eléctricas adicionales.",
-            scheduledDate: new Date(Date.now() + 86400000).toISOString(),
+            scheduledDate: new Date(Date.now() + MS_PER_DAY * 2).toISOString(),
             status: "Nuevo",
           },
           {
@@ -95,7 +99,7 @@ export default function ProHomePage() {
             location: "Villa Crespo, Buenos Aires",
             distance: 4.1,
             description: "Pintura de habitación completa.",
-            scheduledDate: new Date(Date.now() + 172800000).toISOString(),
+            scheduledDate: new Date(Date.now() + MS_PER_DAY * 3).toISOString(),
             status: "Nuevo",
           },
         ];
@@ -134,6 +138,13 @@ export default function ProHomePage() {
     // TODO: Call backend mutation to accept job
   };
 
+  const handleRetry = () => {
+    setIsLoadingJobs(true);
+    setHasError(false);
+    // Re-trigger the useEffect by toggling state
+    setNearbyJobs([]);
+  };
+
   // Show loading during authentication bootstrap
   if (isBootstrapping || !user) {
     return (
@@ -148,22 +159,30 @@ export default function ProHomePage() {
     {
       icon: Briefcase,
       label: "Trabajos Pendientes",
-      value: user.totalJobs || 0,
-      color: "emerald",
+      value: String(user.totalJobs || 0),
+      color: "emerald" as const,
     },
     {
       icon: Star,
       label: "Calificación",
       value: user.rating ? user.rating.toFixed(1) : "N/A",
-      color: "yellow",
+      color: "yellow" as const,
     },
     {
       icon: DollarSign,
       label: "Ganancias del Mes",
       value: user.balance ? `$${user.balance.toFixed(0)}` : "$0",
-      color: "blue",
+      color: "blue" as const,
     },
   ];
+
+  // Helper function to get first name
+  const getFirstName = (fullName?: string): string => {
+    if (!fullName) return "Profesional";
+    const trimmed = fullName.trim();
+    const firstName = trimmed.split(/\s+/)[0];
+    return firstName || "Profesional";
+  };
 
   return (
     <div className="flex flex-col gap-6 max-w-md mx-auto min-h-screen py-6">
@@ -171,7 +190,7 @@ export default function ProHomePage() {
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <h1 className="text-2xl font-black text-slate-900">
-            Hola, {user.name?.split(" ")[0] || "Profesional"} 👋
+            Hola, {getFirstName(user.name)} 👋
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             {isAvailable ? "Estás disponible para trabajos" : "Actualmente no disponible"}
@@ -261,7 +280,7 @@ export default function ProHomePage() {
                 No pudimos cargar las solicitudes. Por favor, intenta nuevamente.
               </p>
               <button
-                onClick={() => window.location.reload()}
+                onClick={handleRetry}
                 className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl active:scale-95 transition-all"
               >
                 Reintentar
