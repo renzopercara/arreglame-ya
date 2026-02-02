@@ -683,3 +683,49 @@ export const GET_WORKER_SPECIALTY_BY_ID = gql`
     }
   }
 `;
+
+// REAL-TIME NOTIFICATIONS (GraphQL Subscriptions)
+export const REGISTER_DEVICE_TOKEN = gql`
+  mutation RegisterDeviceToken($token: String!, $platform: String) {
+    registerDeviceToken(token: $token, platform: $platform)
+  }
+`;
+
+export const NOTIFICATION_SUBSCRIPTION = gql`
+  subscription OnNotificationReceived {
+    notificationReceived {
+      id
+      userId
+      title
+      message
+      type
+      data
+      createdAt
+    }
+  }
+`;
+
+// PRO DASHBOARD
+export const GET_PRO_DASHBOARD = gql`
+  query GetProDashboard {
+    me {
+      id
+      name
+      email
+      rating
+      totalJobs
+      balance
+      workerStatus
+      currentPlan
+    }
+  }
+`;
+
+export const UPDATE_WORKER_STATUS = gql`
+  mutation UpdateWorkerStatus($status: String!) {
+    updateWorkerStatus(status: $status) {
+      id
+      workerStatus
+    }
+  }
+`;

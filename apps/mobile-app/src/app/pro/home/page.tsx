@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/app/providers";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { 
   Briefcase, 
   Star, 
@@ -10,18 +11,21 @@ import {
   TrendingUp,
   MapPin,
   AlertCircle,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import JobCard, { JobListSkeleton, Job } from "@/components/JobCard";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { GET_PRO_DASHBOARD, UPDATE_WORKER_STATUS } from "@/graphql/queries";
 
 /**
- * Professional (PRO) Home Screen
+ * Professional (PRO) Home Screen - Enhanced Version
  * 
- * Entry point for professionals after completing onboarding
  * Features:
- * - Personalized greeting with availability switch
- * - Metrics dashboard (pending jobs, rating, monthly earnings)
- * - Nearby job requests feed
- * - Loading, empty, and error states
+ * - Real-time notifications via GraphQL Subscriptions
+ * - Online/Offline toggle with optimistic updates
+ * - WebSocket connection status indicator
+ * - Error boundaries and loading states
  */
 
 // Constants
@@ -30,6 +34,15 @@ const MS_PER_DAY = 86400000;
 export default function ProHomePage() {
   const { user, isAuthenticated, hasWorkerRole, isBootstrapping } = useAuth();
   const router = useRouter();
+  
+  // GraphQL
+  const { data: dashboardData, loading: loadingDashboard, refetch } = useQuery(GET_PRO_DASHBOARD, {
+    skip: !isAuthenticated || !hasWorkerRole,
+  });
+  const [updateWorkerStatus] = useMutation(UPDATE_WORKER_STATUS);
+  
+  // Real-time Notifications via GraphQL Subscriptions
+  const { lastNotification, isConnected } = usePushNotifications(user?.id);
   
   // UI States
   const [isAvailable, setIsAvailable] = useState(false);
@@ -59,6 +72,14 @@ export default function ProHomePage() {
       setIsAvailable(user.workerStatus === "ONLINE");
     }
   }, [isAuthenticated, hasWorkerRole, user, router, isBootstrapping]);
+
+  // Handle new notification messages
+  useEffect(() => {
+    if (lastNotification) {
+      console.log('New notification received:', lastNotification);
+      // Dashboard data will be automatically refetched by the hook
+    }
+  }, [lastNotification]);
 
   // Simulate data fetching
   useEffect(() => {
@@ -118,13 +139,32 @@ export default function ProHomePage() {
     }
   }, [isAuthenticated, hasWorkerRole, user]);
 
-  // Handle availability toggle
+  // Handle availability toggle with optimistic update
   const handleAvailabilityToggle = async () => {
     const newStatus = !isAvailable;
+    const statusValue = newStatus ? "ONLINE" : "OFFLINE";
+    
+    // Optimistic update
     setIsAvailable(newStatus);
     
-    // TODO: Call backend mutation to update worker status
-    console.log("Worker availability changed to:", newStatus ? "ONLINE" : "OFFLINE");
+    try {
+      await updateWorkerStatus({
+        variables: { status: statusValue },
+        optimisticResponse: {
+          __typename: 'Mutation',
+          updateWorkerStatus: {
+            __typename: 'User',
+            id: user?.id || '',
+            workerStatus: statusValue,
+          },
+        },
+      });
+      console.log("Worker availability changed to:", statusValue);
+    } catch (error) {
+      console.error("Failed to update worker status:", error);
+      // Revert optimistic update on error
+      setIsAvailable(!newStatus);
+    }
   };
 
   // Handle job actions
@@ -138,11 +178,17 @@ export default function ProHomePage() {
     // TODO: Call backend mutation to accept job
   };
 
-  const handleRetry = () => {
+  const handleRetry = async () => {
     setIsLoadingJobs(true);
     setHasError(false);
-    // Re-trigger the useEffect by toggling state
-    setNearbyJobs([]);
+    try {
+      // Clear Apollo cache and refetch
+      await refetch();
+      setNearbyJobs([]);
+    } catch (error) {
+      console.error('Failed to retry:', error);
+      setHasError(true);
+    }
   };
 
   // Show loading during authentication bootstrap
@@ -185,7 +231,25 @@ export default function ProHomePage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-md mx-auto min-h-screen py-6">
+    <div className="flex flex-col gap-6 max-w-md mx-auto min-h-screen py-6 px-4">
+      {/* Connection Status Indicator */}
+      {isConnected && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <Wifi className="w-4 h-4 text-emerald-600" />
+          <span className="text-xs font-medium text-emerald-700">
+            Conectado en tiempo real
+          </span>
+        </div>
+      )}
+      {!isConnected && user && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+          <WifiOff className="w-4 h-4 text-amber-600" />
+          <span className="text-xs font-medium text-amber-700">
+            Reconectando...
+          </span>
+        </div>
+      )}
+
       {/* Header with Greeting and Availability Switch */}
       <div className="flex items-center justify-between">
         <div className="flex-1">

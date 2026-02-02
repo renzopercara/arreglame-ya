@@ -258,4 +258,41 @@ export class AuthResolver {
 
     return this.toUserInfo(fullUser, !hasAccepted);
   }
+
+  @Mutation(() => UserInfoResponse)
+  @UseGuards(AuthGuard)
+  async updateWorkerStatus(
+    @CurrentUser() user: any,
+    @Args('status') status: string,
+  ): Promise<UserInfoResponse> {
+    // Validate status against WorkerStatus enum
+    const validStatuses: Record<string, string> = {
+      'ONLINE': 'ONLINE',
+      'OFFLINE': 'OFFLINE',
+      'PAUSED': 'PAUSED',
+      'ON_JOB': 'ON_JOB',
+    };
+    
+    if (!validStatuses[status]) {
+      throw new Error(`Invalid status. Must be one of: ${Object.keys(validStatuses).join(', ')}`);
+    }
+
+    // Update worker profile status
+    const worker = await this.prisma.workerProfile.findUnique({
+      where: { userId: user.sub },
+    });
+
+    if (!worker) {
+      throw new Error('Worker profile not found');
+    }
+
+    await this.prisma.workerProfile.update({
+      where: { userId: user.sub },
+      data: { status: validStatuses[status] as 'ONLINE' | 'OFFLINE' | 'PAUSED' | 'ON_JOB' },
+    });
+
+    // Return updated user info
+    const fullUser = await this.loadUser(user.sub);
+    return this.toUserInfo(fullUser, false);
+  }
 }

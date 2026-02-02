@@ -1,64 +1,110 @@
 
-import { useEffect, useState } from 'react';
-import { NotificationAdapter, IPushMessage } from '../lib/adapters/notifications';
+import { useEffect, useState, useCallback } from 'react';
+import { useApolloClient, useMutation, useSubscription } from '@apollo/client/react';
+import { gql } from '@apollo/client';
+import { REGISTER_DEVICE_TOKEN } from '../graphql/queries';
 
-interface UsePushNotificationsResult {
-  token: string | null;
-  lastMessage: IPushMessage | null;
-  permission: 'granted' | 'denied' | 'default';
-  initPush: () => Promise<void>;
+// GraphQL Subscription for real-time notifications
+const NOTIFICATION_SUBSCRIPTION = gql`
+  subscription OnNotificationReceived {
+    notificationReceived {
+      id
+      userId
+      title
+      message
+      type
+      data
+      createdAt
+    }
+  }
+`;
+
+interface NotificationData {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  data?: any;
 }
 
-export const usePushNotifications = (userId?: string): UsePushNotificationsResult => {
-  const [token, setToken] = useState<string | null>(null);
-  const [lastMessage, setLastMessage] = useState<IPushMessage | null>(null);
-  const [permission, setPermission] = useState<'granted' | 'denied' | 'default'>('default');
+interface UseRealtimeNotificationsResult {
+  lastNotification: NotificationData | null;
+  isConnected: boolean;
+}
 
-  const initPush = async () => {
-    try {
-      const granted = await NotificationAdapter.requestPermission();
-      setPermission(granted ? 'granted' : 'denied');
+/**
+ * Hook for real-time notifications via GraphQL Subscriptions
+ * Replaces push notifications with WebSocket-based updates
+ */
+export const usePushNotifications = (userId?: string): UseRealtimeNotificationsResult => {
+  const [lastNotification, setLastNotification] = useState<NotificationData | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const client = useApolloClient();
+  const [registerDeviceToken] = useMutation(REGISTER_DEVICE_TOKEN);
 
-      if (granted) {
-        // 1. Configurar Listeners antes de registrar
-        NotificationAdapter.onRegistration((token) => {
-          console.log('[Push] Token received:', token);
-          setToken(token);
-          if (userId) {
-             // AquÃƒÂ­ llamarÃƒÂ­amos al backend para guardar el token
-             // saveDeviceToken(userId, token);
-             console.log(`[Backend] Token guardado para usuario ${userId}`);
-          }
-        });
+  // Subscribe to real-time notifications
+  const { data: subscriptionData, error } = useSubscription(NOTIFICATION_SUBSCRIPTION, {
+    skip: !userId,
+    onComplete: () => {
+      console.log('[Subscription] Notification subscription completed');
+    },
+    onError: (error) => {
+      console.error('[Subscription] Error:', error);
+      setIsConnected(false);
+    },
+  });
 
-        NotificationAdapter.onRegistrationError((err) => {
-          console.error('[Push] Registration failed:', err);
-        });
-
-        NotificationAdapter.onMessageReceived((msg) => {
-          console.log('[Push] Message received:', msg);
-          setLastMessage(msg);
-        });
-
-        NotificationAdapter.onActionPerformed((action) => {
-          console.log('[Push] Action performed:', action);
-          // Navegar a la pantalla correspondiente segÃƒÂºn action.notification.data.jobId
-        });
-
-        // 2. Iniciar registro
-        await NotificationAdapter.register();
-      }
-    } catch (e) {
-      console.error('[Push] Init failed:', e);
-    }
-  };
-
-  // Limpiar listeners al desmontar
+  // Handle subscription data
   useEffect(() => {
-    return () => {
-      NotificationAdapter.removeAllListeners();
-    };
-  }, []);
+    if (subscriptionData?.notificationReceived) {
+      const notification = subscriptionData.notificationReceived;
+      console.log('[Subscription] Notification received:', notification);
+      setLastNotification(notification);
+      setIsConnected(true);
+      
+      // Refetch dashboard data when notification received
+      client.refetchQueries({
+        include: ['GetProDashboard'],
+      });
+    }
+  }, [subscriptionData, client]);
 
-  return { token, lastMessage, permission, initPush };
+  // Handle subscription errors
+  useEffect(() => {
+    if (error) {
+      console.error('[Subscription] Connection error:', error);
+      setIsConnected(false);
+    }
+  }, [error]);
+
+  // Register device/session token on mount
+  useEffect(() => {
+    if (userId) {
+      const registerSession = async () => {
+        try {
+          // Generate a session token (simple timestamp-based for web)
+          const sessionToken = `web-session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          await registerDeviceToken({
+            variables: {
+              token: sessionToken,
+              platform: 'web',
+            },
+          });
+          
+          console.log('[Session] Registered with backend');
+          setIsConnected(true);
+        } catch (error) {
+          console.error('[Session] Failed to register:', error);
+        }
+      };
+      
+      registerSession();
+    }
+  }, [userId, registerDeviceToken]);
+
+  return { 
+    lastNotification, 
+    isConnected,
+  };
 };
