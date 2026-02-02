@@ -1,6 +1,9 @@
 
 import { useEffect, useState } from 'react';
+import { useApolloClient, useMutation } from '@apollo/client';
 import { NotificationAdapter, IPushMessage } from '../lib/adapters/notifications';
+import { REGISTER_DEVICE_TOKEN } from '../graphql/queries';
+import { Capacitor } from '@capacitor/core';
 
 interface UsePushNotificationsResult {
   token: string | null;
@@ -13,6 +16,8 @@ export const usePushNotifications = (userId?: string): UsePushNotificationsResul
   const [token, setToken] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<IPushMessage | null>(null);
   const [permission, setPermission] = useState<'granted' | 'denied' | 'default'>('default');
+  const client = useApolloClient();
+  const [registerDeviceToken] = useMutation(REGISTER_DEVICE_TOKEN);
 
   const initPush = async () => {
     try {
@@ -20,40 +25,63 @@ export const usePushNotifications = (userId?: string): UsePushNotificationsResul
       setPermission(granted ? 'granted' : 'denied');
 
       if (granted) {
-        // 1. Configurar Listeners antes de registrar
-        NotificationAdapter.onRegistration((token) => {
-          console.log('[Push] Token received:', token);
-          setToken(token);
+        // Configure listeners before registration
+        NotificationAdapter.onRegistration(async (deviceToken) => {
+          console.log('[Push] Token received:', deviceToken);
+          setToken(deviceToken);
+          
           if (userId) {
-             // AquÃƒÂ­ llamarÃƒÂ­amos al backend para guardar el token
-             // saveDeviceToken(userId, token);
-             console.log(`[Backend] Token guardado para usuario ${userId}`);
+            try {
+              // Determine platform
+              const platform = Capacitor.isNativePlatform()
+                ? Capacitor.getPlatform()
+                : 'web';
+              
+              // Register token with backend
+              await registerDeviceToken({
+                variables: {
+                  token: deviceToken,
+                  platform,
+                },
+              });
+              console.log(`[Backend] Device token registered for user ${userId}`);
+            } catch (error) {
+              console.error('[Backend] Failed to register token:', error);
+            }
           }
         });
 
         NotificationAdapter.onRegistrationError((err) => {
           console.error('[Push] Registration failed:', err);
+          setPermission('denied');
         });
 
         NotificationAdapter.onMessageReceived((msg) => {
           console.log('[Push] Message received:', msg);
           setLastMessage(msg);
+          
+          // Refetch dashboard data when notification received
+          client.refetchQueries({
+            include: ['GetProDashboard'],
+          });
         });
 
         NotificationAdapter.onActionPerformed((action) => {
           console.log('[Push] Action performed:', action);
-          // Navegar a la pantalla correspondiente segÃƒÂºn action.notification.data.jobId
+          // Navigate based on notification data
+          // This can be handled in the component using this hook
         });
 
-        // 2. Iniciar registro
+        // Start registration
         await NotificationAdapter.register();
       }
     } catch (e) {
       console.error('[Push] Init failed:', e);
+      setPermission('denied');
     }
   };
 
-  // Limpiar listeners al desmontar
+  // Clean up listeners on unmount
   useEffect(() => {
     return () => {
       NotificationAdapter.removeAllListeners();

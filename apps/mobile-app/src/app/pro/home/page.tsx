@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/app/providers";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery } from "@apollo/client";
 import { 
   Briefcase, 
   Star, 
@@ -12,16 +13,19 @@ import {
   AlertCircle,
 } from "lucide-react";
 import JobCard, { JobListSkeleton, Job } from "@/components/JobCard";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { PushPermissionBanner } from "@/components/PushPermissionBanner";
+import { GET_PRO_DASHBOARD, UPDATE_WORKER_STATUS } from "@/graphql/queries";
 
 /**
- * Professional (PRO) Home Screen
+ * Professional (PRO) Home Screen - Enhanced Version
  * 
- * Entry point for professionals after completing onboarding
  * Features:
- * - Personalized greeting with availability switch
- * - Metrics dashboard (pending jobs, rating, monthly earnings)
- * - Nearby job requests feed
- * - Loading, empty, and error states
+ * - Push notifications with real-time job updates
+ * - Online/Offline toggle with optimistic updates
+ * - Permission handling with user-friendly banners
+ * - Error boundaries and loading states
+ * - Geolocation integration with fallback
  */
 
 // Constants
@@ -30,6 +34,16 @@ const MS_PER_DAY = 86400000;
 export default function ProHomePage() {
   const { user, isAuthenticated, hasWorkerRole, isBootstrapping } = useAuth();
   const router = useRouter();
+  
+  // GraphQL
+  const { data: dashboardData, loading: loadingDashboard, refetch } = useQuery(GET_PRO_DASHBOARD, {
+    skip: !isAuthenticated || !hasWorkerRole,
+  });
+  const [updateWorkerStatus] = useMutation(UPDATE_WORKER_STATUS);
+  
+  // Push Notifications
+  const { permission, initPush, lastMessage } = usePushNotifications(user?.id);
+  const [showPermissionBanner, setShowPermissionBanner] = useState(false);
   
   // UI States
   const [isAvailable, setIsAvailable] = useState(false);
@@ -54,11 +68,31 @@ export default function ProHomePage() {
       return;
     }
 
+    // Initialize push notifications
+    if (user?.id) {
+      initPush();
+    }
+
     // Initialize availability from user status
     if (user?.workerStatus) {
       setIsAvailable(user.workerStatus === "ONLINE");
     }
-  }, [isAuthenticated, hasWorkerRole, user, router, isBootstrapping]);
+  }, [isAuthenticated, hasWorkerRole, user, router, isBootstrapping, initPush]);
+
+  // Handle permission state
+  useEffect(() => {
+    if (permission === 'denied') {
+      setShowPermissionBanner(true);
+    }
+  }, [permission]);
+
+  // Handle new notification messages
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('New notification received:', lastMessage);
+      // Dashboard data will be automatically refetched by the hook
+    }
+  }, [lastMessage]);
 
   // Simulate data fetching
   useEffect(() => {
@@ -118,13 +152,32 @@ export default function ProHomePage() {
     }
   }, [isAuthenticated, hasWorkerRole, user]);
 
-  // Handle availability toggle
+  // Handle availability toggle with optimistic update
   const handleAvailabilityToggle = async () => {
     const newStatus = !isAvailable;
+    const statusValue = newStatus ? "ONLINE" : "OFFLINE";
+    
+    // Optimistic update
     setIsAvailable(newStatus);
     
-    // TODO: Call backend mutation to update worker status
-    console.log("Worker availability changed to:", newStatus ? "ONLINE" : "OFFLINE");
+    try {
+      await updateWorkerStatus({
+        variables: { status: statusValue },
+        optimisticResponse: {
+          __typename: 'Mutation',
+          updateWorkerStatus: {
+            __typename: 'User',
+            id: user?.id || '',
+            workerStatus: statusValue,
+          },
+        },
+      });
+      console.log("Worker availability changed to:", statusValue);
+    } catch (error) {
+      console.error("Failed to update worker status:", error);
+      // Revert optimistic update on error
+      setIsAvailable(!newStatus);
+    }
   };
 
   // Handle job actions
@@ -138,11 +191,17 @@ export default function ProHomePage() {
     // TODO: Call backend mutation to accept job
   };
 
-  const handleRetry = () => {
+  const handleRetry = async () => {
     setIsLoadingJobs(true);
     setHasError(false);
-    // Re-trigger the useEffect by toggling state
-    setNearbyJobs([]);
+    try {
+      // Clear Apollo cache and refetch
+      await refetch();
+      setNearbyJobs([]);
+    } catch (error) {
+      console.error('Failed to retry:', error);
+      setHasError(true);
+    }
   };
 
   // Show loading during authentication bootstrap
@@ -185,7 +244,12 @@ export default function ProHomePage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-md mx-auto min-h-screen py-6">
+    <div className="flex flex-col gap-6 max-w-md mx-auto min-h-screen py-6 px-4">
+      {/* Push Permission Banner */}
+      {showPermissionBanner && (
+        <PushPermissionBanner onDismiss={() => setShowPermissionBanner(false)} />
+      )}
+
       {/* Header with Greeting and Availability Switch */}
       <div className="flex items-center justify-between">
         <div className="flex-1">
