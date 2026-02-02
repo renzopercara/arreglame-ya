@@ -2,21 +2,42 @@
 
 ## Overview
 
-This document describes the complete implementation of the PRO Dashboard with real-time push notifications, error handling, and optimistic UI updates for the ArreglaMe-Ya platform.
+This document describes the complete implementation of the PRO Dashboard with **real-time notifications via GraphQL Subscriptions**, error handling, and optimistic UI updates for the ArreglaMe-Ya platform.
+
+**Key Architecture Decision:** This implementation uses **GraphQL Subscriptions over WebSockets** for real-time updates instead of external push notification services (Firebase, OneSignal, etc.), keeping all infrastructure within the existing NestJS + Apollo stack.
 
 ## Architecture
 
-### Backend (NestJS + Prisma + GraphQL)
+### Backend (NestJS + Prisma + GraphQL + PubSub)
 
-#### 1. Database Schema (`apps/api/prisma/schema.prisma`)
+#### Real-time Infrastructure
 
-**DeviceToken Model**
+The system uses the existing **GraphQL Subscriptions** infrastructure with in-memory PubSub:
+
+```typescript
+// apps/api/src/common/pubsub.module.ts
+@Global()
+@Module({
+  providers: [
+    {
+      provide: 'PUB_SUB',
+      useValue: new PubSub(), // In-memory PubSub. Use RedisPubSub for production scaling.
+    },
+  ],
+  exports: ['PUB_SUB'],
+})
+export class PubSubModule {}
+```
+
+#### 1. Database Schema
+
+**DeviceToken Model** - Tracks active WebSocket sessions
 ```prisma
 model DeviceToken {
   id        String   @id @default(uuid())
   userId    String
   token     String   @unique
-  platform  String   // "ios", "android", "web"
+  platform  String   // "web" for GraphQL subscription sessions
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -24,152 +45,180 @@ model DeviceToken {
 }
 ```
 
-#### 2. NotificationService (`apps/api/src/notifications/notifications.service.ts`)
+#### 2. NotificationService
+
+**Real-time Notification Delivery:**
+```typescript
+async sendRealtimeNotification(
+  userId: string,
+  title: string,
+  body: string,
+  data?: any,
+): Promise<void> {
+  // Create in-app notification
+  const notification = await this.createNotification(userId, title, body, 'REALTIME', data);
+  
+  // Publish to GraphQL subscription for real-time delivery
+  await this.pubSub.publish(`NOTIFICATION_${userId}`, {
+    notificationReceived: notification,
+  });
+}
+```
+
+**Professional Job Notifications:**
+```typescript
+async notifyProfessionalAboutNewJob(
+  professionalId: string,
+  jobData: {
+    jobId: string;
+    clientName: string;
+    jobType: string;
+    location: string;
+    distance: number;
+  },
+): Promise<void> {
+  const title = 'Nuevo Trabajo Disponible';
+  const body = `${jobData.jobType} - ${jobData.clientName} (${jobData.distance.toFixed(1)}km)`;
+  
+  await this.sendRealtimeNotification(
+    professionalId,
+    title,
+    body,
+    {
+      type: 'NEW_JOB',
+      jobId: jobData.jobId,
+      deeplink: `/worker/jobs/${jobData.jobId}`,
+    },
+  );
+}
+```
+
+#### 3. GraphQL Subscription
+
+**Resolver Implementation:**
+```typescript
+@Subscription(() => NotificationResponse, {
+  name: 'notificationReceived',
+  resolve: (payload) => payload.notificationReceived,
+})
+notificationReceived(@CurrentUser() user: any) {
+  return this.pubSub.asyncIterator(`NOTIFICATION_${user.sub}`);
+}
+```
+
+**Client Subscription:**
+```graphql
+subscription OnNotificationReceived {
+  notificationReceived {
+    id
+    userId
+    title
+    message
+    type
+    data
+    createdAt
+  }
+}
+```
+
+### Frontend (Next.js 14 + Apollo Client + WebSockets)
+
+#### 1. Real-time Notifications Hook
+
+**usePushNotifications** - Subscribes to GraphQL notifications
+```typescript
+export const usePushNotifications = (userId?: string): UseRealtimeNotificationsResult => {
+  const [lastNotification, setLastNotification] = useState<NotificationData | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const client = useApolloClient();
+
+  // Subscribe to real-time notifications
+  const { data: subscriptionData, error } = useSubscription(NOTIFICATION_SUBSCRIPTION, {
+    skip: !userId,
+  });
+
+  // Handle subscription data
+  useEffect(() => {
+    if (subscriptionData?.notificationReceived) {
+      const notification = subscriptionData.notificationReceived;
+      setLastNotification(notification);
+      setIsConnected(true);
+      
+      // Refetch dashboard data when notification received
+      client.refetchQueries({
+        include: ['GetProDashboard'],
+      });
+    }
+  }, [subscriptionData, client]);
+
+  return { lastNotification, isConnected };
+};
+```
 
 **Key Features:**
-- Firebase Admin SDK integration (placeholder for easy provider swap)
-- Device token management
-- Push notification sending to specific users
-- Professional job notification system
+- Automatic WebSocket connection via Apollo Client
+- Connection status tracking (`isConnected`)
+- Apollo cache refetch on notification received
+- No external dependencies (Capacitor Push Notifications not needed)
 
-**Main Methods:**
-- `registerDeviceToken(userId, token, platform)`: Register a device for push notifications
-- `getActiveDeviceTokens(userId)`: Get all active devices for a user
-- `sendPushNotificationToUser(userId, title, body, data)`: Send push to user's devices
-- `notifyProfessionalAboutNewJob(professionalId, jobData)`: Specialized method for job notifications
+#### 2. Error Boundary & Loading States
 
-#### 3. GraphQL Mutations
+**Error Boundary** (`/pro/error.tsx`):
+- Apollo cache clearing on retry via `useApolloClient` hook
+- Graceful degradation without session loss
 
-**registerDeviceToken**
-```graphql
-mutation RegisterDeviceToken($token: String!, $platform: String) {
-  registerDeviceToken(token: $token, platform: $platform)
-}
+**Loading Skeleton** (`/pro/loading.tsx`):
+- Mirrors dashboard structure to prevent layout shift
+- Animated pulse effect
+
+#### 3. PRO Dashboard Integration
+
+**Connection Status Indicator:**
+```tsx
+{isConnected && (
+  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+    <Wifi className="w-4 h-4 text-emerald-600" />
+    <span className="text-xs font-medium text-emerald-700">
+      Conectado en tiempo real
+    </span>
+  </div>
+)}
 ```
-
-**updateWorkerStatus**
-```graphql
-mutation UpdateWorkerStatus($status: String!) {
-  updateWorkerStatus(status: $status) {
-    id
-    workerStatus
-  }
-}
-```
-
-### Frontend (Next.js 14 + Apollo Client + Capacitor)
-
-#### 1. Enhanced Push Notifications Hook (`apps/mobile-app/src/hooks/usePushNotifications.ts`)
-
-**Integration Features:**
-- Automatic device token registration with backend
-- Apollo Client cache refetch on notification received
-- Platform detection (iOS, Android, Web)
-- Error handling with permission state tracking
-
-**Usage:**
-```typescript
-const { token, lastMessage, permission, initPush } = usePushNotifications(user?.id);
-
-useEffect(() => {
-  if (user?.id) {
-    initPush();
-  }
-}, [user?.id, initPush]);
-```
-
-#### 2. Permission Banner Component (`apps/mobile-app/src/components/PushPermissionBanner.tsx`)
-
-**Purpose:**
-- Warn professionals about denied notification permissions
-- Explain the impact on job opportunities
-- Dismissible with persistent state
 
 **Features:**
-- Clear, user-friendly messaging
-- Lucide icons for visual communication
-- Tailwind styling consistent with app design
-
-#### 3. Error Boundary (`apps/mobile-app/src/app/pro/error.tsx`)
-
-**Capabilities:**
-- Graceful error handling for PRO routes
-- Apollo Store clearing on retry
-- User-friendly error messages
-- Development mode error details
-
-**Key Features:**
-- Retry mechanism with cache clearing
-- Fallback navigation to home
-- Visual consistency with app theme
-
-#### 4. Loading Skeleton (`apps/mobile-app/src/app/pro/loading.tsx`)
-
-**Design:**
-- Mirrors actual dashboard structure
-- Animated pulse effect
-- Three metric cards skeleton
-- Job cards skeleton (3 items)
-- No jarring layout shifts
-
-#### 5. PRO Dashboard Page (`apps/mobile-app/src/app/pro/home/page.tsx`)
-
-**Enhanced Features:**
-
-1. **Push Notification Integration**
-   - Initializes on component mount
-   - Registers device token with backend
-   - Listens for new job notifications
-   - Auto-refetches dashboard data
-
-2. **Online/Offline Toggle**
-   - Optimistic Apollo updates
-   - Immediate UI feedback
-   - GraphQL mutation with error handling
-   - Rollback on failure
-
-3. **Permission Handling**
-   - Shows banner when permissions denied
-   - Dismissible but persistent warning
-   - Clear impact messaging
-
-4. **Error Resilience**
-   - Error boundary catches failures
-   - Retry with cache clearing
-   - No session disruption
+- Real-time notification subscription on mount
+- Online/Offline toggle with optimistic Apollo updates
+- WebSocket connection status display
+- Automatic dashboard data refresh on notification
 
 ## Data Flow
 
-### Push Notification Flow
+### Real-time Notification Flow
 
 ```
-1. User opens PRO Dashboard
+1. Professional opens PRO Dashboard
    ↓
-2. usePushNotifications.initPush() called
+2. usePushNotifications hook subscribes to GraphQL subscription
    ↓
-3. Capacitor requests native permissions
+3. Apollo Client establishes WebSocket connection
    ↓
-4. On granted: Register with platform (FCM/APNS)
+4. Backend registers user subscription channel (NOTIFICATION_${userId})
    ↓
-5. Receive device token
+5. Connection status updates (isConnected = true)
    ↓
-6. Send token to backend via GraphQL mutation
+6. New job created matching professional criteria
    ↓
-7. Backend stores in DeviceToken table
+7. Backend calls notifyProfessionalAboutNewJob()
    ↓
-8. New job created matching professional criteria
+8. NotificationService publishes to PubSub channel
    ↓
-9. Backend calls notifyProfessionalAboutNewJob()
+9. GraphQL subscription delivers notification via WebSocket
    ↓
-10. NotificationService resolves active device tokens
+10. Frontend hook receives notification
     ↓
-11. Firebase Admin SDK sends push notification
+11. Apollo Client refetches dashboard queries
     ↓
-12. Professional receives notification
-    ↓
-13. Hook triggers Apollo Client refetch
-    ↓
-14. Dashboard updates with new data
+12. Dashboard updates with new data
 ```
 
 ### Worker Status Update Flow
@@ -196,115 +245,169 @@ useEffect(() => {
 
 ## Configuration
 
-### Native Permissions (Manual Setup Required)
+### WebSocket Setup
 
-#### Android (`android/app/src/main/AndroidManifest.xml`)
-```xml
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+The existing Apollo Client configuration already supports WebSockets:
+
+```typescript
+// graphql/client.ts
+const wsLink = typeof window !== "undefined" ? new GraphQLWsLink(createClient({
+  url: WS_URL,
+  connectionParams: async () => {
+    const token = await StorageAdapter.get('ay_auth_token');
+    return {
+      Authorization: token ? `Bearer ${token}` : "",
+    };
+  },
+  retryAttempts: 5,
+})) : null;
 ```
 
-#### iOS (`ios/App/App/Info.plist`)
-```xml
-<key>UIBackgroundModes</key>
-<array>
-    <string>remote-notification</string>
-</array>
-```
+### No External Configuration Required
 
-### Firebase Setup (Production)
-
-1. Initialize Firebase Admin SDK in NotificationService
-2. Add Firebase credentials to environment variables
-3. Update FirebasePushProvider with actual implementation
-4. Configure FCM server key for Android
-5. Upload APNS certificate for iOS
+Unlike Firebase/OneSignal implementations, this approach requires:
+- ✅ No API keys
+- ✅ No native permissions (AndroidManifest.xml, Info.plist)
+- ✅ No service worker registration
+- ✅ No external dependencies
 
 ## Testing
 
-### Push Notifications
+### Subscription Testing
 
-**Local Testing (Web):**
-```javascript
-// In browser console
-window.simulatePush('Nuevo Trabajo', 'Plomería - María González (2.3km)', {
-  type: 'NEW_JOB',
+**Backend Testing:**
+```typescript
+// Trigger a notification
+await notificationsService.notifyProfessionalAboutNewJob(professionalId, {
   jobId: '123',
-  deeplink: '/worker/jobs/123'
+  clientName: 'María González',
+  jobType: 'Plomería',
+  location: 'Buenos Aires',
+  distance: 2.3,
 });
 ```
 
-**Native Testing:**
-- Use Firebase Console to send test notifications
-- Verify token is stored in database
-- Check notification appears in device tray
-- Confirm dashboard refetches data
+**Frontend Testing:**
+1. Open PRO dashboard
+2. Check connection status indicator shows "Conectado en tiempo real"
+3. Trigger notification from backend
+4. Verify notification appears in dashboard
+5. Confirm data is refetched
 
-### Error Boundaries
+### Connection Status Testing
 
-1. Throw error in PRO dashboard component
-2. Verify error boundary catches and displays
-3. Test retry mechanism
-4. Confirm cache is cleared on retry
-
-### Loading States
-
-1. Add artificial delay to GraphQL query
-2. Verify skeleton loader appears
-3. Confirm smooth transition to actual content
-4. Check no layout shift occurs
+**Test reconnection:**
+1. Disconnect network
+2. Verify status shows "Reconectando..."
+3. Reconnect network
+4. Verify status shows "Conectado en tiempo real"
 
 ## Security Considerations
 
-1. **Device Token Privacy**: Tokens are user-specific and deleted on account deletion (Cascade)
-2. **Mutation Authentication**: All mutations require valid JWT token
-3. **Status Validation**: Worker status values are validated before database update
-4. **Permission Handling**: App gracefully handles denied permissions without breaking UX
+1. **Authentication**: All subscriptions require valid JWT token via WebSocket connectionParams
+2. **User Isolation**: Subscriptions are user-specific (`NOTIFICATION_${userId}`)
+3. **No Token Exposure**: No device tokens sent to external services
+4. **CORS**: WebSocket connections use existing CORS configuration
 
 ## Performance
 
+- **WebSocket Efficiency**: Single persistent connection for all real-time updates
 - **Optimistic Updates**: Immediate UI feedback before server response
-- **Selective Refetch**: Only refetches `GetProDashboard` query, not entire cache
-- **Efficient Queries**: Dashboard query fetches only required fields
-- **Skeleton Loading**: Reduces perceived load time
+- **Selective Refetch**: Only refetches affected queries (GetProDashboard)
+- **In-memory PubSub**: Fast for single-server deployments
 
 ## Scalability
 
-- **Provider Abstraction**: Easy to swap Firebase for OneSignal, Pusher, etc.
-- **Batch Notifications**: NotificationService can send to multiple tokens at once
-- **Token Management**: Active flag allows disabling tokens without deletion
-- **Platform Agnostic**: Works on iOS, Android, and Web
+### Current Setup (In-memory PubSub)
+- ✅ Perfect for single-server deployments
+- ✅ No external dependencies
+- ✅ Low latency
+- ⚠️ Limited to single server instance
 
-## Known Limitations
+### Production Scaling (RedisPubSub)
 
-1. Firebase Admin SDK is placeholder - requires production setup
-2. Job matching logic not implemented (will need to be added)
-3. Geolocation integration mentioned but not fully implemented
-4. No notification history UI (data stored in Notification model)
+To scale across multiple servers:
+
+```typescript
+// apps/api/src/common/pubsub.module.ts
+import { RedisPubSub } from 'graphql-redis-subscriptions';
+
+@Global()
+@Module({
+  providers: [
+    {
+      provide: 'PUB_SUB',
+      useValue: new RedisPubSub({
+        connection: {
+          host: process.env.REDIS_HOST,
+          port: parseInt(process.env.REDIS_PORT),
+        },
+      }),
+    },
+  ],
+  exports: ['PUB_SUB'],
+})
+export class PubSubModule {}
+```
+
+## Advantages Over External Push Services
+
+### Development & Maintenance
+- ✅ No Firebase/OneSignal SDK to maintain
+- ✅ No API key management
+- ✅ No service quota limits
+- ✅ Simplified architecture
+
+### Technical Benefits
+- ✅ Unified stack (GraphQL for everything)
+- ✅ Type-safe end-to-end
+- ✅ Real-time bidirectional communication
+- ✅ Works on all platforms (Web, iOS, Android)
+
+### User Experience
+- ✅ Instant delivery (WebSocket vs. FCM delays)
+- ✅ No permission prompts
+- ✅ Works in-app without background workers
+- ✅ Connection status visibility
+
+### Cost
+- ✅ No external service fees
+- ✅ No usage quotas
+- ✅ No vendor lock-in
+
+## Limitations & Trade-offs
+
+### Background Notifications
+- ⚠️ Requires app to be open (WebSocket connection active)
+- ⚠️ No notifications when app is closed
+- ✅ For in-app real-time updates, this is ideal
+
+### Native Platform Features
+- ⚠️ No notification badges, sounds, or native UI
+- ✅ Can add `@capacitor/local-notifications` if needed for foreground notifications
+
+### Battery Impact
+- ⚠️ WebSocket connection uses battery when app is open
+- ✅ Modern WebSocket implementations are very efficient
+- ✅ Connection auto-closes when app closes
 
 ## Future Enhancements
 
-1. **Rich Notifications**: Add images, actions, and deep links
-2. **Notification Preferences**: Let professionals choose notification types
-3. **Silent Updates**: Background data sync without user notification
-4. **Analytics**: Track notification open rates and conversion
-5. **A/B Testing**: Test different notification copy for engagement
+1. **Hybrid Approach** (if background notifications needed):
+   - GraphQL Subscriptions for in-app real-time updates (current)
+   - Optional Capacitor Local Notifications for foreground alerts
+   - No external push services required
 
-## Maintenance
+2. **Redis PubSub**: For multi-server production scaling
 
-### Adding New Notification Types
+3. **Notification Preferences**: Let professionals choose notification types
 
-1. Add type to NotificationService
-2. Create specialized method (like `notifyProfessionalAboutNewJob`)
-3. Add notification template
-4. Update frontend to handle notification action
+4. **Analytics**: Track connection uptime and notification delivery
 
-### Updating Firebase Configuration
-
-1. Update environment variables
-2. Replace FirebasePushProvider implementation
-3. Test with Firebase Console
-4. Deploy to production
+5. **Offline Queue**: Store notifications when disconnected, deliver on reconnect
 
 ## Conclusion
 
-The PRO Dashboard implementation provides a production-ready, scalable foundation for real-time professional notifications. The architecture follows best practices for separation of concerns, error handling, and user experience.
+The PRO Dashboard implementation provides a production-ready, scalable foundation for real-time professional notifications **without external dependencies**. Using GraphQL Subscriptions keeps the entire stack unified, type-safe, and maintainable within the existing NestJS + Apollo architecture.
+
+This approach is ideal for in-app real-time updates and can be extended with Capacitor Local Notifications if native foreground alerts are desired in the future.

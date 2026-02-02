@@ -1,9 +1,10 @@
-import { Resolver, Query, Mutation, Args, ObjectType, Field } from '@nestjs/graphql';
-import { UseGuards } from '@nestjs/common';
+import { Resolver, Query, Mutation, Subscription, Args, ObjectType, Field } from '@nestjs/graphql';
+import { UseGuards, Inject } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { NotificationsService } from './notifications.service';
 import { GraphQLJSON } from 'graphql-type-json';
+import { PubSubEngine } from 'graphql-subscriptions';
 
 @ObjectType('Notification')
 export class NotificationResponse {
@@ -50,7 +51,10 @@ export class MutationResponse {
 @Resolver()
 @UseGuards(AuthGuard)
 export class NotificationsResolver {
-  constructor(private notificationsService: NotificationsService) {}
+  constructor(
+    private notificationsService: NotificationsService,
+    @Inject('PUB_SUB') private pubSub: PubSubEngine,
+  ) {}
 
   @Query(() => [NotificationResponse])
   async getNotifications(
@@ -100,6 +104,18 @@ export class NotificationsResolver {
       token,
       platform || 'web',
     );
+  }
+
+  /**
+   * GraphQL Subscription for real-time notifications
+   * Replaces push notifications with WebSocket-based updates
+   */
+  @Subscription(() => NotificationResponse, {
+    name: 'notificationReceived',
+    resolve: (payload) => payload.notificationReceived,
+  })
+  notificationReceived(@CurrentUser() user: any) {
+    return this.pubSub.asyncIterator(`NOTIFICATION_${user.sub}`);
   }
 }
 

@@ -1,49 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-/**
- * Push Notification Provider Interface
- * Allows easy replacement of notification provider (Firebase, OneSignal, etc.)
- */
-interface IPushProvider {
-  sendPushNotification(tokens: string[], title: string, body: string, data?: any): Promise<void>;
-}
-
-/**
- * Firebase Admin SDK Push Provider (Placeholder)
- * In production, initialize with Firebase Admin credentials
- */
-class FirebasePushProvider implements IPushProvider {
-  private logger = new Logger(FirebasePushProvider.name);
-
-  async sendPushNotification(
-    tokens: string[],
-    title: string,
-    body: string,
-    data?: any,
-  ): Promise<void> {
-    // TODO: Initialize Firebase Admin SDK
-    // const admin = require('firebase-admin');
-    // await admin.messaging().sendMulticast({
-    //   tokens,
-    //   notification: { title, body },
-    //   data,
-    // });
-    
-    this.logger.log(`[Firebase Placeholder] Sending push to ${tokens.length} devices`);
-    this.logger.log(`Title: ${title}, Body: ${body}`);
-    this.logger.log(`Data:`, data);
-  }
-}
+import { PubSubEngine } from 'graphql-subscriptions';
 
 @Injectable()
 export class NotificationsService {
-  private pushProvider: IPushProvider;
   private logger = new Logger(NotificationsService.name);
 
-  constructor(private prisma: PrismaService) {
-    this.pushProvider = new FirebasePushProvider();
-  }
+  constructor(
+    private prisma: PrismaService,
+    @Inject('PUB_SUB') private pubSub: PubSubEngine,
+  ) {}
 
   async createNotification(
     userId: string,
@@ -115,6 +81,7 @@ export class NotificationsService {
 
   /**
    * Register device token for push notifications
+   * Note: With GraphQL subscriptions, this is mainly for tracking connected clients
    */
   async registerDeviceToken(
     userId: string,
@@ -176,28 +143,27 @@ export class NotificationsService {
   }
 
   /**
-   * Send push notification to user's devices
+   * Send real-time notification via GraphQL Subscription
+   * This replaces push notifications with subscription-based updates
    */
-  async sendPushNotificationToUser(
+  async sendRealtimeNotification(
     userId: string,
     title: string,
     body: string,
     data?: any,
   ): Promise<void> {
     try {
-      const tokens = await this.getActiveDeviceTokens(userId);
+      // Create in-app notification
+      const notification = await this.createNotification(userId, title, body, 'REALTIME', data);
       
-      if (tokens.length === 0) {
-        this.logger.log(`No active devices for user ${userId}`);
-        return;
-      }
-
-      await this.pushProvider.sendPushNotification(tokens, title, body, data);
+      // Publish to GraphQL subscription for real-time delivery
+      await this.pubSub.publish(`NOTIFICATION_${userId}`, {
+        notificationReceived: notification,
+      });
       
-      // Also create in-app notification
-      await this.createNotification(userId, title, body, 'PUSH', data);
+      this.logger.log(`Real-time notification sent to user ${userId}`);
     } catch (error) {
-      this.logger.error('Failed to send push notification', error);
+      this.logger.error('Failed to send real-time notification', error);
     }
   }
 
@@ -217,7 +183,7 @@ export class NotificationsService {
     const title = 'Nuevo Trabajo Disponible';
     const body = `${jobData.jobType} - ${jobData.clientName} (${jobData.distance.toFixed(1)}km)`;
     
-    await this.sendPushNotificationToUser(
+    await this.sendRealtimeNotification(
       professionalId,
       title,
       body,

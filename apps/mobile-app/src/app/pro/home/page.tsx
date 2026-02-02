@@ -11,21 +11,21 @@ import {
   TrendingUp,
   MapPin,
   AlertCircle,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import JobCard, { JobListSkeleton, Job } from "@/components/JobCard";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { PushPermissionBanner } from "@/components/PushPermissionBanner";
 import { GET_PRO_DASHBOARD, UPDATE_WORKER_STATUS } from "@/graphql/queries";
 
 /**
  * Professional (PRO) Home Screen - Enhanced Version
  * 
  * Features:
- * - Push notifications with real-time job updates
+ * - Real-time notifications via GraphQL Subscriptions
  * - Online/Offline toggle with optimistic updates
- * - Permission handling with user-friendly banners
+ * - WebSocket connection status indicator
  * - Error boundaries and loading states
- * - Geolocation integration with fallback
  */
 
 // Constants
@@ -41,9 +41,8 @@ export default function ProHomePage() {
   });
   const [updateWorkerStatus] = useMutation(UPDATE_WORKER_STATUS);
   
-  // Push Notifications
-  const { permission, initPush, lastMessage } = usePushNotifications(user?.id);
-  const [showPermissionBanner, setShowPermissionBanner] = useState(false);
+  // Real-time Notifications via GraphQL Subscriptions
+  const { lastNotification, isConnected } = usePushNotifications(user?.id);
   
   // UI States
   const [isAvailable, setIsAvailable] = useState(false);
@@ -68,31 +67,19 @@ export default function ProHomePage() {
       return;
     }
 
-    // Initialize push notifications
-    if (user?.id) {
-      initPush();
-    }
-
     // Initialize availability from user status
     if (user?.workerStatus) {
       setIsAvailable(user.workerStatus === "ONLINE");
     }
-  }, [isAuthenticated, hasWorkerRole, user, router, isBootstrapping, initPush]);
-
-  // Handle permission state
-  useEffect(() => {
-    if (permission === 'denied') {
-      setShowPermissionBanner(true);
-    }
-  }, [permission]);
+  }, [isAuthenticated, hasWorkerRole, user, router, isBootstrapping]);
 
   // Handle new notification messages
   useEffect(() => {
-    if (lastMessage) {
-      console.log('New notification received:', lastMessage);
+    if (lastNotification) {
+      console.log('New notification received:', lastNotification);
       // Dashboard data will be automatically refetched by the hook
     }
-  }, [lastMessage]);
+  }, [lastNotification]);
 
   // Simulate data fetching
   useEffect(() => {
@@ -245,9 +232,22 @@ export default function ProHomePage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-md mx-auto min-h-screen py-6 px-4">
-      {/* Push Permission Banner */}
-      {showPermissionBanner && (
-        <PushPermissionBanner onDismiss={() => setShowPermissionBanner(false)} />
+      {/* Connection Status Indicator */}
+      {isConnected && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <Wifi className="w-4 h-4 text-emerald-600" />
+          <span className="text-xs font-medium text-emerald-700">
+            Conectado en tiempo real
+          </span>
+        </div>
+      )}
+      {!isConnected && user && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+          <WifiOff className="w-4 h-4 text-amber-600" />
+          <span className="text-xs font-medium text-amber-700">
+            Reconectando...
+          </span>
+        </div>
       )}
 
       {/* Header with Greeting and Availability Switch */}
