@@ -88,5 +88,18 @@ export class NotificationsResolver {
     await this.notificationsService.deleteNotification(notificationId, user.sub);
     return { success: true };
   }
+
+  @Mutation(() => Boolean)
+  async registerDeviceToken(
+    @CurrentUser() user: any,
+    @Args('token') token: string,
+    @Args('platform', { nullable: true, defaultValue: 'web' }) platform?: string,
+  ): Promise<boolean> {
+    return this.notificationsService.registerDeviceToken(
+      user.sub,
+      token,
+      platform || 'web',
+    );
+  }
 }
 
