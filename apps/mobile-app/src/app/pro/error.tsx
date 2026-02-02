@@ -3,7 +3,7 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { client } from '../../../../graphql/client';
+import { client } from '../../../../../graphql/client';
 
 interface ErrorBoundaryProps {
   error: Error & { digest?: string };

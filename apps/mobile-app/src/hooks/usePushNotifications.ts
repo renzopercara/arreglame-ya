@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { useApolloClient, useMutation } from '@apollo/client';
+import { useApolloClient, useMutation } from '@apollo/client/react';
 import { NotificationAdapter, IPushMessage } from '../lib/adapters/notifications';
 import { REGISTER_DEVICE_TOKEN } from '../graphql/queries';
 import { Capacitor } from '@capacitor/core';
