@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useApolloClient, useMutation } from '@apollo/client/react';
 import { NotificationAdapter, IPushMessage } from '../lib/adapters/notifications';
 import { REGISTER_DEVICE_TOKEN } from '../graphql/queries';
@@ -19,7 +19,7 @@ export const usePushNotifications = (userId?: string): UsePushNotificationsResul
   const client = useApolloClient();
   const [registerDeviceToken] = useMutation(REGISTER_DEVICE_TOKEN);
 
-  const initPush = async () => {
+  const initPush = useCallback(async () => {
     try {
       const granted = await NotificationAdapter.requestPermission();
       setPermission(granted ? 'granted' : 'denied');
@@ -79,7 +79,7 @@ export const usePushNotifications = (userId?: string): UsePushNotificationsResul
       console.error('[Push] Init failed:', e);
       setPermission('denied');
     }
-  };
+  }, [userId, registerDeviceToken, client]);
 
   // Clean up listeners on unmount
   useEffect(() => {

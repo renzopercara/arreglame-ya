@@ -265,10 +265,16 @@ export class AuthResolver {
     @CurrentUser() user: any,
     @Args('status') status: string,
   ): Promise<UserInfoResponse> {
-    // Validate status
-    const validStatuses = ['ONLINE', 'OFFLINE', 'PAUSED', 'ON_JOB'];
-    if (!validStatuses.includes(status)) {
-      throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    // Validate status against WorkerStatus enum
+    const validStatuses: Record<string, string> = {
+      'ONLINE': 'ONLINE',
+      'OFFLINE': 'OFFLINE',
+      'PAUSED': 'PAUSED',
+      'ON_JOB': 'ON_JOB',
+    };
+    
+    if (!validStatuses[status]) {
+      throw new Error(`Invalid status. Must be one of: ${Object.keys(validStatuses).join(', ')}`);
     }
 
     // Update worker profile status
@@ -282,7 +288,7 @@ export class AuthResolver {
 
     await this.prisma.workerProfile.update({
       where: { userId: user.sub },
-      data: { status: status as any },
+      data: { status: validStatuses[status] as 'ONLINE' | 'OFFLINE' | 'PAUSED' | 'ON_JOB' },
     });
 
     // Return updated user info

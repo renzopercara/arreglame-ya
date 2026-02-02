@@ -3,7 +3,7 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { client } from '../../../../../graphql/client';
+import { useApolloClient } from '@apollo/client/react';
 
 interface ErrorBoundaryProps {
   error: Error & { digest?: string };
@@ -16,6 +16,7 @@ interface ErrorBoundaryProps {
  */
 export default function ProErrorBoundary({ error, reset }: ErrorBoundaryProps) {
   const router = useRouter();
+  const client = useApolloClient();
 
   const handleRetry = async () => {
     try {
