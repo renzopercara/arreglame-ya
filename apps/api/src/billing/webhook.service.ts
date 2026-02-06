@@ -1,13 +1,20 @@
 /**
- * Webhooks Service
+ * Webhooks Service - Enhanced with State Machine and Idempotency
  * Processes incoming notifications from Mercado Pago
  * Updates order status and releases funds to workers
+ * 
+ * Features:
+ * - State machine for valid transitions
+ * - Complete idempotency with event_id
+ * - Payment provider logging for audit
+ * - Integration with new PaymentService
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from './billing.service';
 import { MercadoPagoService } from './mercadopago.service';
+import { PaymentService } from './payment.service';
 import { PaymentAuditLog, throwBillingException } from './billing.exceptions';
 
 interface MercadoPagoWebhook {
@@ -21,6 +28,16 @@ interface MercadoPagoWebhook {
   };
 }
 
+// Valid state transitions for payment transactions
+const VALID_TRANSITIONS = {
+  PENDING: ['AUTHORIZED', 'PAID', 'FAILED', 'CANCELLED'],
+  AUTHORIZED: ['PAID', 'FAILED', 'CANCELLED'],
+  PAID: ['REFUNDED'],
+  FAILED: [],
+  CANCELLED: [],
+  REFUNDED: [],
+};
+
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
@@ -29,15 +46,20 @@ export class WebhookService {
     private prisma: PrismaService,
     private billingService: BillingService,
     private mercadoPagoService: MercadoPagoService,
+    private paymentService: PaymentService,
   ) {}
 
   /**
    * Process Mercado Pago webhook notification
    * Idempotent: safe to call multiple times for same payment
+   * State machine: only valid transitions allowed
    */
   async processMercadoPagoWebhook(webhook: MercadoPagoWebhook): Promise<void> {
     const startTime = Date.now();
     const { type, data } = webhook;
+
+    // Generate event_id for idempotency
+    const eventId = `MP-${data.id}-${data.status}`;
 
     // Log incoming webhook
     PaymentAuditLog.log('info', 'WEBHOOK_RECEIVED', {
@@ -45,7 +67,21 @@ export class WebhookService {
       paymentId: data.id,
       externalReference: data.external_reference,
       status: data.status,
+      eventId,
     });
+
+    // Check idempotency: has this event been processed?
+    const existingLog = await this.prisma.paymentProviderLog.findUnique({
+      where: { eventId },
+    });
+
+    if (existingLog) {
+      PaymentAuditLog.log('info', 'WEBHOOK_DUPLICATE', {
+        eventId,
+        reason: 'Event already processed',
+      });
+      return;
+    }
 
     // Only process payment events
     if (type !== 'payment') {
@@ -53,72 +89,39 @@ export class WebhookService {
       return;
     }
 
-    // Extract service request ID from external reference
-    const serviceRequestId = data.external_reference;
-    if (!serviceRequestId) {
+    // Extract external reference (transaction ID)
+    const externalReference = data.external_reference;
+    if (!externalReference) {
       PaymentAuditLog.log('warn', 'WEBHOOK_INVALID', {
-        reason: 'Missing external_reference (service request ID)',
+        reason: 'Missing external_reference',
         paymentId: data.id,
       });
       return;
     }
 
     try {
-      // Fetch service request
-      const serviceRequest = await (this.prisma as any).serviceRequest.findUnique({
-        where: { id: serviceRequestId },
-        include: { worker: true, client: true },
-      });
-
-      if (!serviceRequest) {
-        throw new Error(`Service request not found: ${serviceRequestId}`);
-      }
-
-      // Check if already processed (idempotency)
-      const existingTransaction = await (this.prisma as any).transaction.findFirst({
-        where: {
-          referenceId: data.id,
-          type: { in: ['PAYMENT_RECEIVED', 'PAYMENT_FAILED'] },
-        },
-      });
-
-      if (existingTransaction) {
-        PaymentAuditLog.log('info', 'WEBHOOK_DUPLICATE', {
-          paymentId: data.id,
-          serviceRequestId,
-          status: `Already processed as ${existingTransaction.status}`,
-        });
-        return;
-      }
-
       // Handle different payment statuses
       switch (data.status) {
         case 'approved':
-          await this.handlePaymentApproved(
-            serviceRequestId,
-            data.id,
-            serviceRequest,
-            data.transaction_amount || 0,
+          await this.paymentService.handlePaymentApproved(
+            externalReference,
+            eventId,
+            webhook,
           );
           break;
 
         case 'pending':
-          await this.handlePaymentPending(serviceRequestId, data.id);
+        case 'in_process':
+          await this.handlePaymentPending(externalReference, eventId, webhook);
           break;
 
         case 'rejected':
         case 'cancelled':
-          await this.handlePaymentFailed(
-            serviceRequestId,
-            data.id,
-            `Payment ${data.status}`,
-            serviceRequest,
-          );
-          break;
-
-        case 'in_process':
-          this.logger.log(
-            `Payment ${data.id} for service ${serviceRequestId} is processing...`,
+          await this.paymentService.handlePaymentFailed(
+            externalReference,
+            eventId,
+            webhook,
+            `Payment ${data.status}: ${data.status_detail || 'unknown'}`,
           );
           break;
 
@@ -129,14 +132,14 @@ export class WebhookService {
       const duration = Date.now() - startTime;
       PaymentAuditLog.log('info', 'WEBHOOK_PROCESSED', {
         paymentId: data.id,
-        serviceRequestId,
+        externalReference,
         status: data.status,
         durationMs: duration,
       });
     } catch (error) {
       PaymentAuditLog.log('error', 'WEBHOOK_ERROR', {
         paymentId: data.id,
-        serviceRequestId,
+        externalReference,
         error: error.message,
       });
 
@@ -146,6 +149,51 @@ export class WebhookService {
       );
       // Don't re-throw: Mercado Pago will retry
     }
+  }
+
+  /**
+   * Handle pending payment (waiting for confirmation)
+   */
+  private async handlePaymentPending(
+    externalReference: string,
+    eventId: string,
+    payload: any,
+  ): Promise<void> {
+    const transaction = await this.prisma.paymentTransaction.findUnique({
+      where: { externalReference },
+    });
+
+    if (!transaction) {
+      this.logger.warn(`Transaction not found: ${externalReference}`);
+      return;
+    }
+
+    // Log event
+    await this.prisma.paymentProviderLog.create({
+      data: {
+        transactionId: transaction.id,
+        provider: 'MERCADOPAGO',
+        eventId,
+        eventType: 'payment.pending',
+        payload,
+      },
+    });
+
+    this.logger.log(
+      `Payment pending: ${transaction.id} (${externalReference})`,
+    );
+  }
+
+  /**
+   * Validate state transition
+   * Ensures only valid transitions are allowed
+   */
+  private canTransition(
+    currentStatus: string,
+    newStatus: string,
+  ): boolean {
+    const validNext = VALID_TRANSITIONS[currentStatus];
+    return validNext && validNext.includes(newStatus);
   }
 
   /**
