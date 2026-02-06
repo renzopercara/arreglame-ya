@@ -23,6 +23,8 @@ interface DebtStatus {
   canReceiveJobs: boolean;
 }
 
+export { DebtStatus };
+
 @Injectable()
 export class DebtManagementService {
   private readonly logger = new Logger(DebtManagementService.name);
@@ -85,15 +87,13 @@ export class DebtManagementService {
     const externalReference = `DEBT-${userId}-${Date.now()}`;
     
     try {
+      // Convert centavos to pesos for MP
+      const amountInPesos = debtStatus.debtAmount / 100;
+      
       const preference = await this.mercadoPagoService.createPreference(
         externalReference,
+        amountInPesos,
         userId,
-        {
-          title: 'Pago de Deuda - Arreglame Ya',
-          description: 'Liquidación de deuda de comisiones pendientes',
-          quantity: 1,
-          unit_price: debtStatus.debtAmount / 100, // Convert centavos to pesos
-        },
       );
 
       this.logger.log(

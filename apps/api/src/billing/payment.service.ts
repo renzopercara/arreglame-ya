@@ -135,8 +135,12 @@ export class PaymentService {
       // 3. Create MP preference (don't wait for payment yet)
       let paymentData;
       try {
+        // Convert centavos to pesos for MP
+        const amountInPesos = input.totalAmount / 100;
+        
         const preference = await this.mercadoPagoService.createPreference(
           externalReference,
+          amountInPesos,
           input.userId,
         );
         paymentData = preference;

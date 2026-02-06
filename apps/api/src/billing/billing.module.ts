@@ -8,6 +8,8 @@ import { PricingService } from './pricing.service';
 import { LedgerService } from './ledger.service';
 import { PaymentService } from './payment.service';
 import { DebtManagementService } from './debt-management.service';
+import { PaymentController } from './payment.controller';
+import { WebhookService } from './webhook.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ConfigModule } from '../config/config.module';
 
@@ -20,12 +22,17 @@ import { ConfigModule } from '../config/config.module';
  * - Commission calculation with caching (CommissionService)
  * - Debt management (DebtManagementService)
  * - Mercado Pago integration (MercadoPagoService)
+ * - Webhook processing (WebhookService)
  * - Legacy services (BillingService, PricingService)
+ * 
+ * Controllers:
+ * - PaymentController (REST API for payments)
  * 
  * Exports: All services for use in other modules
  */
 @Module({
   imports: [PrismaModule, ConfigModule],
+  controllers: [PaymentController],
   providers: [
     BillingService,
     BillingResolver,
@@ -36,6 +43,7 @@ import { ConfigModule } from '../config/config.module';
     LedgerService,
     PaymentService,
     DebtManagementService,
+    WebhookService,
   ],
   exports: [
     BillingService,
@@ -45,6 +53,7 @@ import { ConfigModule } from '../config/config.module';
     LedgerService,
     PaymentService,
     DebtManagementService,
+    WebhookService,
   ],
 })
 export class BillingModule {}
