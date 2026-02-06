@@ -232,7 +232,7 @@ export class JobsResolver {
     private readonly prisma: PrismaService,
     private readonly aiService: AiVisionService,
     private readonly securityService: ContentSecurityService,
-    @Inject('PUB_SUB') private readonly pubSub: any, // any to allow asyncIterator
+    @Inject('PUB_SUB') private readonly pubSub: PubSubEngine,
   ) {}
 
   // ------------------------------------------
@@ -568,6 +568,6 @@ export class JobsResolver {
     resolve: (payload) => payload.jobUpdated,
   })
   jobUpdated(@Args('jobId') jobId: string) {
-    return this.pubSub.asyncIterator(`JOB_UPDATE_${jobId}`);
+    return this.pubSub.asyncIterableIterator(`JOB_UPDATE_${jobId}`);
   }
 }
