@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CommissionBreakdownDto } from './billing.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * Commission Service - Centralized and Immutable
+ * Commission Service - Centralized and Immutable with Caching
  * 
  * REGLA DE ORO: Este servicio es la ÚNICA fuente de verdad para cálculos de comisiones
  * 
@@ -10,13 +11,29 @@ import { CommissionBreakdownDto } from './billing.dto';
  * - Cliente paga +5% sobre el precio base (fee de plataforma)
  * - Trabajador recibe precio base - 5% (comisión de plataforma)
  * - Plataforma recibe 10% total (5% del cliente + 5% del trabajador)
+ * 
+ * Features:
+ * - In-memory caching of commission rates
+ * - Configurable from database (SystemSetting table)
+ * - Snapshotting support for immutable transaction records
  */
 @Injectable()
 export class CommissionService {
+  private readonly logger = new Logger(CommissionService.name);
+
   // Immutable commission rates - DO NOT MODIFY without business approval
-  private readonly PLATFORM_FEE_PERCENTAGE = 0.05; // 5% fee
-  private readonly PAYMENT_GATEWAY_FEE_PCT = 0.0; // Gateway fee (0% by default, puede configurarse)
-  private readonly TAX_PCT = 0; // Tax calculation (0% by default, puede configurarse)
+  private PLATFORM_FEE_PERCENTAGE = 0.05; // 5% fee
+  private PAYMENT_GATEWAY_FEE_PCT = 0.0; // Gateway fee (0% by default, puede configurarse)
+  private TAX_PCT = 0; // Tax calculation (0% by default, puede configurarse)
+
+  // Cache for commission configuration
+  private configCache: Map<string, number> = new Map();
+  private cacheTimestamp: number = 0;
+  private readonly CACHE_TTL = 300000; // 5 minutes
+
+  constructor(private prisma: PrismaService) {
+    this.loadConfiguration();
+  }
 
   /**
    * Calculate commission breakdown from base amount
@@ -82,6 +99,102 @@ export class CommissionService {
     const baseAmount = this.round(safeTotal / (1 + this.PLATFORM_FEE_PERCENTAGE));
     
     return this.calculateCommissionBreakdown(baseAmount);
+  }
+
+  /**
+   * Load commission configuration from database
+   * Falls back to default values if not found
+   */
+  async loadConfiguration(): Promise<void> {
+    try {
+      const settings = await this.prisma.systemSetting.findMany({
+        where: {
+          key: {
+            in: [
+              'PLATFORM_FEE_PERCENTAGE',
+              'PAYMENT_GATEWAY_FEE_PCT',
+              'TAX_PCT',
+            ],
+          },
+        },
+      });
+
+      for (const setting of settings) {
+        const value = parseFloat(setting.value);
+        this.configCache.set(setting.key, value);
+
+        // Update in-memory values
+        if (setting.key === 'PLATFORM_FEE_PERCENTAGE') {
+          this.PLATFORM_FEE_PERCENTAGE = value;
+        } else if (setting.key === 'PAYMENT_GATEWAY_FEE_PCT') {
+          this.PAYMENT_GATEWAY_FEE_PCT = value;
+        } else if (setting.key === 'TAX_PCT') {
+          this.TAX_PCT = value;
+        }
+      }
+
+      this.cacheTimestamp = Date.now();
+      this.logger.log('Commission configuration loaded from database');
+    } catch (error) {
+      this.logger.warn(
+        'Failed to load commission config from database, using defaults',
+      );
+    }
+  }
+
+  /**
+   * Refresh cache if TTL expired
+   */
+  private async refreshCacheIfNeeded(): Promise<void> {
+    const now = Date.now();
+    if (now - this.cacheTimestamp > this.CACHE_TTL) {
+      await this.loadConfiguration();
+    }
+  }
+
+  /**
+   * Get current commission rates (for snapshotting)
+   * Returns rates in basis points (e.g., 500 = 5.00%)
+   */
+  async getCommissionRates(): Promise<{
+    platformFeePercent: number;
+    serviceTaxPercent: number;
+    gatewayFeePercent: number;
+  }> {
+    await this.refreshCacheIfNeeded();
+
+    return {
+      platformFeePercent: Math.round(this.PLATFORM_FEE_PERCENTAGE * 10000),
+      serviceTaxPercent: Math.round(this.TAX_PCT * 10000),
+      gatewayFeePercent: Math.round(this.PAYMENT_GATEWAY_FEE_PCT * 10000),
+    };
+  }
+
+  /**
+   * Create snapshot data for a transaction
+   * Captures current rates and breakdown at T0
+   */
+  async createSnapshot(totalAmount: number): Promise<{
+    platformFeePercent: number;
+    serviceTaxPercent: number;
+    platformAmount: number;
+    professionalAmount: number;
+    metadata: any;
+  }> {
+    const breakdown = this.calculateFromTotalAmount(totalAmount);
+    const rates = await this.getCommissionRates();
+
+    return {
+      platformFeePercent: rates.platformFeePercent,
+      serviceTaxPercent: rates.serviceTaxPercent,
+      platformAmount: breakdown.platformFee,
+      professionalAmount: breakdown.workerNetAmount,
+      metadata: {
+        breakdown,
+        timestamp: new Date().toISOString(),
+        rates,
+      },
+    };
   }
 
   private round(value: number): number {

@@ -76,6 +76,18 @@ enum TransactionStatus {
   COMPLETED
   CANCELLED
   FAILED
+  AUTHORIZED
+  PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MP // Mercado Pago
+  CASH
+}
+
+enum PaymentProvider {
+  MERCADOPAGO
 }
 
 enum ActiveRole {
@@ -171,11 +183,12 @@ model User {
   sentMessages     ChatMessage[] @relation("SenderRelation")
   receivedMessages ChatMessage[] @relation("ReceiverRelation")
 
-  wallet         Wallet?
-  payoutRequests PayoutRequest[]
-  userConsents   UserConsent[]
-  notifications  Notification[]
-  deviceTokens   DeviceToken[]
+  wallet              Wallet?
+  payoutRequests      PayoutRequest[]
+  userConsents        UserConsent[]
+  notifications       Notification[]
+  deviceTokens        DeviceToken[]
+  paymentTransactions PaymentTransaction[]
 
   @@index([email])
   @@index([status])
@@ -221,11 +234,11 @@ model WorkerProfile {
   updatedAt DateTime @updatedAt
 
   // Relations
-  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
-  serviceRequests   ServiceRequest[]   @relation("WorkerServiceRequests")
-  reviewsGiven      Review[]           @relation("ReviewAuthor")
-  reviewsReceived   Review[]           @relation("ReviewTarget")
-  workerSpecialties WorkerSpecialty[]  // N:M relationship with ServiceCategory
+  user              User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  serviceRequests   ServiceRequest[]  @relation("WorkerServiceRequests")
+  reviewsGiven      Review[]          @relation("ReviewAuthor")
+  reviewsReceived   Review[]          @relation("ReviewTarget")
+  workerSpecialties WorkerSpecialty[] // N:M relationship with ServiceCategory
   // @@index([location]) // Removed: location field is now commented out
 
   @@index([userId])
@@ -278,24 +291,24 @@ model CustomerProfile {
 // Service Category (Dynamic DB-driven model)
 
 model ServiceCategory {
-  id             String           @id @default(uuid())
-  slug           String           @unique
+  id             String   @id @default(uuid())
+  slug           String   @unique
   name           String
   iconName       String
   description    String?
   // Usamos Decimal para precisión financiera en producción
-  basePrice      Decimal          @db.Decimal(10, 2)
-  hourlyRate     Decimal          @db.Decimal(10, 2)
+  basePrice      Decimal  @db.Decimal(10, 2)
+  hourlyRate     Decimal  @db.Decimal(10, 2)
   estimatedHours Float
-  active         Boolean          @default(true)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
   services          ServiceRequest[]  @relation("ServiceCategoryRelation")
   serviceFormulas   ServiceFormula[]
   workerSpecialties WorkerSpecialty[] // N:M relationship with WorkerProfile
-  reviews           Review[]          // Reviews linked to this category
+  reviews           Review[] // Reviews linked to this category
 
   @@index([slug])
   @@index([active])
@@ -310,13 +323,13 @@ model WorkerSpecialty {
   categoryId      String
   status          SpecialtyStatus @default(PENDING)
   experienceYears Int             @default(0)
-  metadata        Json?           // Certifications, specific skills, etc.
+  metadata        Json? // Certifications, specific skills, etc.
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
   // Relations
-  worker          WorkerProfile   @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  category        ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  worker   WorkerProfile   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  category ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@unique([workerId, categoryId]) // A worker can only have one entry per category
   @@index([workerId])
@@ -332,14 +345,14 @@ model ServiceFormula {
   // o asegurar que el Enum existe antes de esta tabla.
   subcategory       ServiceSubcategory @unique
   serviceCategoryId String?
-  baseTimeFormula   String             // Recomendación: Almacenar como String descriptivo
-  defaultMetadata   Json?              
+  baseTimeFormula   String // Recomendación: Almacenar como String descriptivo
+  defaultMetadata   Json?
   active            Boolean            @default(true)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
   // Relations
-  serviceCategory   ServiceCategory?   @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+  serviceCategory ServiceCategory? @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
 
   @@index([subcategory])
   @@index([active])
@@ -373,13 +386,13 @@ model ExtrasMultiplier {
 }
 
 model ServiceRequest {
-  id                String               @id @default(uuid())
-  status            JobStatus            @default(CREATED)
-  paymentStatus     String               @default("PENDING") 
-  
+  id            String    @id @default(uuid())
+  status        JobStatus @default(CREATED)
+  paymentStatus String    @default("PENDING")
+
   subcategory       ServiceSubcategory?
-  metadata          Json? 
-  difficultyLevel   DifficultyLevel      @default(MEDIUM)
+  metadata          Json?
+  difficultyLevel   DifficultyLevel     @default(MEDIUM)
   serviceCategoryId String?
 
   clientId          String
@@ -388,42 +401,42 @@ model ServiceRequest {
   longitude         Float
   address           String?
   city              String?
-  coverageRadius    Float                @default(15.0)
+  coverageRadius    Float    @default(15.0)
   description       String?
   squareMeters      Float
   gardenImageBefore String
   gardenImageAfter  String?
   evidenceImages    String[]
-  difficulty        Float                @default(1.0)
+  difficulty        Float    @default(1.0)
   estimatedHours    Float
   aiReasoning       String?
-  
-  // Estructura de precio recomendada
-  price             Json                 // { total, workerNet, platformFee, taxes, currency }
-  priceWorkerNet    Decimal?             @db.Decimal(10, 2)
-  pricePlatformFee  Decimal?             @db.Decimal(10, 2)
-  
-  pin               String               @default("0000")
-  extraTimeStatus   ExtraTimeStatus      @default(NONE)
-  extraTimeMinutes  Int?
-  extraTimeReason   String?
-  paidAt            DateTime?
 
-  createdAt         DateTime             @default(now())
+  // Estructura de precio recomendada
+  price            Json // { total, workerNet, platformFee, taxes, currency }
+  priceWorkerNet   Decimal? @db.Decimal(10, 2)
+  pricePlatformFee Decimal? @db.Decimal(10, 2)
+
+  pin              String          @default("0000")
+  extraTimeStatus  ExtraTimeStatus @default(NONE)
+  extraTimeMinutes Int?
+  extraTimeReason  String?
+  paidAt           DateTime?
+
+  createdAt         DateTime  @default(now())
   startedAt         DateTime?
   completedAt       DateTime?
   warrantyExpiresAt DateTime?
 
   // Relations
-  client            ClientProfile        @relation("ClientServiceRequests", fields: [clientId], references: [id], onDelete: Restrict)
-  worker            WorkerProfile?       @relation("WorkerServiceRequests", fields: [workerId], references: [id], onDelete: SetNull)
-  serviceCategory   ServiceCategory?     @relation("ServiceCategoryRelation", fields: [serviceCategoryId], references: [id], onDelete: SetNull)
-  dispute           Dispute?
+  client          ClientProfile    @relation("ClientServiceRequests", fields: [clientId], references: [id], onDelete: Restrict)
+  worker          WorkerProfile?   @relation("WorkerServiceRequests", fields: [workerId], references: [id], onDelete: SetNull)
+  serviceCategory ServiceCategory? @relation("ServiceCategoryRelation", fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+  dispute         Dispute?
 
-  reviews           Review[]
-  supportTickets    SupportTicket[]
-  transactions      Transaction[]
-  chatMessages      ChatMessage[]
+  reviews        Review[]
+  supportTickets SupportTicket[]
+  transactions   Transaction[]
+  chatMessages   ChatMessage[]
 
   @@index([status])
   @@index([paymentStatus])
@@ -459,17 +472,23 @@ model Wallet {
   userId           String   @unique
   balancePending   Decimal  @default(0) @db.Decimal(14, 2)
   balanceAvailable Decimal  @default(0) @db.Decimal(14, 2)
+  currentBalance   Int      @default(0) // Balance in centavos (derived from ledger)
+  debtLimit        Int      @default(-50000) // Maximum negative balance allowed (in centavos)
+  status           String   @default("ACTIVE") // ACTIVE | INACTIVE_DEBT
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   // Relations
-  user           User            @relation(fields: [userId], references: [id], onDelete: Restrict)
-  transactions   Transaction[]
-  payoutRequests PayoutRequest[]
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions        Transaction[]
+  payoutRequests      PayoutRequest[]
+  ledgerEntries       LedgerEntry[]
+  paymentTransactions PaymentTransaction[]
 
   // Billing performance indices
   @@index([userId])
   @@index([updatedAt]) // For recent wallet activity queries
+  @@index([status])
 }
 
 model Transaction {
@@ -551,7 +570,7 @@ model ChatMessage {
 model Review {
   id         String   @id @default(uuid())
   jobId      String
-  categoryId String?  // Link to ServiceCategory for category-specific ratings
+  categoryId String? // Link to ServiceCategory for category-specific ratings
   rating     Int
   comment    String?
   authorId   String
@@ -710,4 +729,96 @@ model DeviceToken {
   @@index([userId])
   @@index([token])
   @@index([active])
+}
+
+// ============================================
+// FINANCIAL CORE - ELITE MARKETPLACE SYSTEM
+// ============================================
+
+// Main payment transaction record (Single source of truth)
+model PaymentTransaction {
+  id                String            @id @default(uuid())
+  userId            String // Client who is paying
+  professionalId    String? // Professional receiving payment
+  walletId          String? // For tracking
+  status            TransactionStatus @default(PENDING)
+  paymentMethod     PaymentMethod
+  amountTotal       Int // Total amount in centavos
+  externalReference String            @unique // Unique reference for external systems
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  wallet        Wallet?              @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  snapshot      TransactionSnapshot?
+  ledgerEntries LedgerEntry[]
+  providerLogs  PaymentProviderLog[]
+
+  @@index([userId])
+  @@index([professionalId])
+  @@index([status])
+  @@index([externalReference])
+  @@index([createdAt])
+  @@map("payment_transactions")
+}
+
+// Immutable snapshot of commission rules at transaction time
+model TransactionSnapshot {
+  id                 String   @id @default(uuid())
+  transactionId      String   @unique
+  platformFeePercent Int // e.g., 500 = 5.00%
+  serviceTaxPercent  Int // e.g., 500 = 5.00%
+  platformAmount     Int // Platform commission in centavos
+  professionalAmount Int // Professional net amount in centavos
+  metadata           Json? // Additional data (discounts, bonuses, etc.)
+  createdAt          DateTime @default(now())
+
+  // Relations
+  transaction PaymentTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("transaction_snapshots")
+}
+
+// Double-entry ledger for accounting
+model LedgerEntry {
+  id            String   @id @default(uuid())
+  accountId     String // user_id or "PLATFORM" for platform account
+  transactionId String? // Link to payment transaction
+  walletId      String? // Link to wallet
+  debit         Int      @default(0) // Amount debited (in centavos)
+  credit        Int      @default(0) // Amount credited (in centavos)
+  balanceAfter  Int // Balance after this entry (in centavos)
+  description   String?
+  createdAt     DateTime @default(now())
+
+  // Relations
+  transaction PaymentTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  wallet      Wallet?             @relation(fields: [walletId], references: [id], onDelete: SetNull)
+
+  @@index([accountId])
+  @@index([transactionId])
+  @@index([walletId])
+  @@index([createdAt])
+  @@map("ledger_entries")
+}
+
+// Audit log for payment provider events
+model PaymentProviderLog {
+  id            String          @id @default(uuid())
+  transactionId String?
+  provider      PaymentProvider
+  eventId       String          @unique // External event ID for idempotency
+  eventType     String // e.g., "payment.approved", "payment.refunded"
+  payload       Json // Full webhook payload
+  processedAt   DateTime        @default(now())
+
+  // Relations
+  transaction PaymentTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([transactionId])
+  @@index([processedAt])
+  @@map("payment_provider_logs")
 }
