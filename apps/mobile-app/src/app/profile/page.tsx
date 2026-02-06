@@ -22,10 +22,10 @@ import {
 } from "lucide-react";
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import PaymentMethodsSection from '../components/PaymentMethodsSection';
-import CollectionsCenterSection from '../components/CollectionsCenterSection';
-import TransactionHistory, { Transaction } from '../components/TransactionHistory';
-import CashPaymentConfirmationModal from '../components/CashPaymentConfirmationModal';
+import PaymentMethodsSection from '../../components/PaymentMethodsSection';
+import CollectionsCenterSection from '../../components/CollectionsCenterSection';
+import TransactionHistory, { Transaction } from '../../components/TransactionHistory';
+import CashPaymentConfirmationModal from '../../components/CashPaymentConfirmationModal';
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENTS                                                                 */
