@@ -4,7 +4,6 @@ import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { NotificationsService } from './notifications.service';
 import { GraphQLJSON } from 'graphql-type-json';
-import { PubSubEngine } from 'graphql-subscriptions';
 
 @ObjectType('Notification')
 export class NotificationResponse {
@@ -53,7 +52,7 @@ export class MutationResponse {
 export class NotificationsResolver {
   constructor(
     private notificationsService: NotificationsService,
-    @Inject('PUB_SUB') private pubSub: PubSubEngine,
+    @Inject('PUB_SUB') private pubSub: any, // any to allow asyncIterator
   ) {}
 
   @Query(() => [NotificationResponse])
