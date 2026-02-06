@@ -115,7 +115,7 @@ export class NotificationsResolver {
     resolve: (payload) => payload.notificationReceived,
   })
   notificationReceived(@CurrentUser() user: any) {
-    return this.pubSub.asyncIterator(`NOTIFICATION_${user.sub}`);
+    return this.pubSub.asyncIterableIterator(`NOTIFICATION_${user.sub}`);
   }
 }
 
