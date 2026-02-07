@@ -31,6 +31,17 @@ export default function DebtPaymentModal({
   };
 
   const handlePayDebt = async () => {
+    // Client-side validation
+    if (debtAmount <= 0) {
+      toast.error('Monto de deuda inválido');
+      return;
+    }
+
+    if (debtAmount > 1000000) { // Sanity check: max 1M ARS
+      toast.error('Monto de deuda excesivo. Contacta con soporte.');
+      return;
+    }
+
     setLoading(true);
     try {
       const { initPoint } = await initiateDebtPayment(userId, debtAmount);

@@ -5,7 +5,7 @@
  * Security: Access tokens are never stored in frontend
  */
 
-const MP_OAUTH_BASE_URL = process.env.NEXT_PUBLIC_MP_OAUTH_URL || 'https://auth.mercadopago.com/authorization';
+// Note: MP_OAUTH_BASE_URL kept for reference but OAuth flow handled entirely by backend
 const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface MercadoPagoOAuthConfig {

@@ -5,7 +5,7 @@
  * TODO: Implement GraphQL query when backend exposes transaction endpoints
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface Transaction {
   id: string;
@@ -36,7 +36,7 @@ export function useTransactions(userId?: string): UseTransactionsResult {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     if (!userId) {
       setTransactions([]);
       return;
@@ -61,11 +61,11 @@ export function useTransactions(userId?: string): UseTransactionsResult {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     fetchTransactions();
-  }, [userId]);
+  }, [fetchTransactions]);
 
   return {
     transactions,

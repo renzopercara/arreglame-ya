@@ -532,11 +532,16 @@ export default function ProfilePage() {
         <>
           {transactionsError && (
             <section className="flex flex-col gap-3 rounded-3xl bg-red-50 p-6 border border-red-100">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <p className="text-sm font-semibold text-red-900">
-                  Error al cargar el historial de transacciones
-                </p>
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-900 mb-1">
+                    Error al cargar el historial de transacciones
+                  </p>
+                  <p className="text-xs text-red-700 leading-relaxed">
+                    {transactionsError.message || 'No se pudo cargar tu historial. Por favor, intenta recargar la página o contacta con soporte si el problema persiste.'}
+                  </p>
+                </div>
               </div>
             </section>
           )}
