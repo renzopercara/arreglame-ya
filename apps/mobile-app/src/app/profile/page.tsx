@@ -22,6 +22,10 @@ import {
 } from "lucide-react";
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import PaymentMethodsSection from '../../components/PaymentMethodsSection';
+import CollectionsCenterSection from '../../components/CollectionsCenterSection';
+import TransactionHistory, { Transaction } from '../../components/TransactionHistory';
+import CashPaymentConfirmationModal from '../../components/CashPaymentConfirmationModal';
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENTS                                                                 */
@@ -293,6 +297,43 @@ export default function ProfilePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalInitialMode, setAuthModalInitialMode] = useState<"login" | "register">("login");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showCashPaymentModal, setShowCashPaymentModal] = useState(false);
+
+  // Mock transaction data - in real app, this would come from GraphQL
+  const mockTransactions: Transaction[] = [
+    {
+      id: '1',
+      date: '2026-02-05T10:30:00Z',
+      serviceName: 'Jardinería residencial',
+      paymentMethod: 'MERCADOPAGO',
+      amount: 5000,
+      commission: 250,
+      status: 'COMPLETED'
+    },
+    {
+      id: '2',
+      date: '2026-02-03T15:45:00Z',
+      serviceName: 'Poda de árboles',
+      paymentMethod: 'CASH',
+      amount: 8000,
+      commission: 800,
+      status: 'COMPLETED'
+    },
+    {
+      id: '3',
+      date: '2026-02-01T09:00:00Z',
+      serviceName: 'Limpieza de jardín',
+      paymentMethod: 'MERCADOPAGO',
+      amount: 3500,
+      commission: 175,
+      status: 'COMPLETED'
+    }
+  ];
+
+  // Calculate cash debt from transactions (mock)
+  const cashDebt = mockTransactions
+    .filter(t => t.paymentMethod === 'CASH')
+    .reduce((sum, t) => sum + t.commission, 0);
 
   const handleOpenAuthModal = (mode: "login" | "register") => {
     setAuthModalInitialMode(mode);
@@ -381,6 +422,16 @@ export default function ProfilePage() {
   // Authenticated state
   const firstName = user.name?.split(' ')[0] || 'Usuario';
   const mpConnected = !!user.mercadopagoCustomerId;
+  const isProvider = user.activeRole === 'PROVIDER';
+  const isClient = user.activeRole === 'CLIENT';
+
+  const handleSettleDebt = () => {
+    toast.success('Funcionalidad de liquidación de deuda en desarrollo');
+  };
+
+  const handleCashPaymentConfirm = () => {
+    toast.success('Pago en efectivo registrado correctamente');
+  };
 
   return (
     <div className="max-w-md mx-auto p-6 flex flex-col gap-6 font-sans bg-slate-50/50 min-h-screen">
@@ -425,40 +476,70 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      {/* MercadoPago Section */}
-      <section className="flex flex-col gap-4 rounded-3xl bg-white p-5 shadow-sm border border-slate-200/60">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${mpConnected ? 'bg-emerald-50' : 'bg-slate-50'}`}>
-              <CreditCard className={`h-5 w-5 ${mpConnected ? 'text-emerald-600' : 'text-slate-400'}`} />
+      {/* Financial Sections Based on Role */}
+      
+      {/* CLIENT: Payment Methods Section */}
+      {isClient && (
+        <PaymentMethodsSection 
+          isMercadoPagoConnected={mpConnected}
+          onConfigurePayments={() => toast.info('Redirigiendo a configuración de pagos...')}
+        />
+      )}
+
+      {/* PROVIDER: Collections Center & Wallet */}
+      {isProvider && (
+        <CollectionsCenterSection 
+          isMercadoPagoConnected={mpConnected}
+          availableBalance={user.balance || 0}
+          cashDebt={cashDebt}
+          onConnectMercadoPago={() => toast.info('Redirigiendo a vinculación de Mercado Pago...')}
+          onSettleDebt={handleSettleDebt}
+        />
+      )}
+
+      {/* PROVIDER: Transaction History */}
+      {isProvider && mockTransactions.length > 0 && (
+        <TransactionHistory 
+          transactions={mockTransactions}
+        />
+      )}
+
+      {/* Legacy Mercado Pago Section (kept for backward compatibility) */}
+      {!isClient && !isProvider && (
+        <section className="flex flex-col gap-4 rounded-3xl bg-white p-5 shadow-sm border border-slate-200/60">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${mpConnected ? 'bg-emerald-50' : 'bg-slate-50'}`}>
+                <CreditCard className={`h-5 w-5 ${mpConnected ? 'text-emerald-600' : 'text-slate-400'}`} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">Mercado Pago</p>
+                <p className="text-xs text-slate-500">
+                  {mpConnected ? 'Cuenta vinculada' : 'No vinculado'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-bold text-slate-900">Mercado Pago</p>
-              <p className="text-xs text-slate-500">
-                {mpConnected ? 'Cuenta vinculada' : 'No vinculado'}
-              </p>
-            </div>
+            {mpConnected ? (
+              <CheckCircle className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+            )}
           </div>
+
           {mpConnected ? (
-            <CheckCircle className="h-5 w-5 text-emerald-600" />
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+              <p className="text-xs font-medium text-emerald-800">Cuenta configurada correctamente</p>
+            </div>
           ) : (
-            <AlertCircle className="h-5 w-5 text-amber-500" />
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-600">Vincula tu cuenta para recibir y realizar pagos de forma segura.</p>
+            </div>
           )}
-        </div>
+        </section>
+      )}
 
-        {mpConnected ? (
-          <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
-            <p className="text-xs font-medium text-emerald-800">Cuenta configurada correctamente</p>
-          </div>
-        ) : (
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-            <p className="text-xs text-slate-600">Vincula tu cuenta para recibir y realizar pagos de forma segura.</p>
-          </div>
-        )}
-      </section>
-
-      {/* Account Stats */}
-      {user.balance !== undefined && user.balance > 0 && (
+      {/* Account Balance (Legacy - shown only if no role-specific section) */}
+      {!isProvider && user.balance !== undefined && user.balance > 0 && (
         <section className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 p-6 shadow-lg shadow-blue-100 text-white">
           <div className="flex items-center gap-2 text-sm font-medium opacity-90">
             <DollarSign className="h-4 w-4" />
@@ -507,6 +588,17 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {/* Cash Payment Confirmation Modal */}
+      <CashPaymentConfirmationModal 
+        isOpen={showCashPaymentModal}
+        onClose={() => setShowCashPaymentModal(false)}
+        onConfirm={handleCashPaymentConfirm}
+        serviceName="Servicio de jardinería"
+        amount={8000}
+        commissionAmount={800}
+        commissionPercentage={10}
+      />
     </div>
   );
 }
