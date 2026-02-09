@@ -684,6 +684,22 @@ export const GET_WORKER_SPECIALTY_BY_ID = gql`
   }
 `;
 
+export const GET_MY_SERVICES = gql`
+  query GetMyServices {
+    getMyServices {
+      id
+      name
+      slug
+      description
+      iconName
+      isActive
+      experienceYears
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
 // REAL-TIME NOTIFICATIONS (GraphQL Subscriptions)
 export const REGISTER_DEVICE_TOKEN = gql`
   mutation RegisterDeviceToken($token: String!, $platform: String) {
