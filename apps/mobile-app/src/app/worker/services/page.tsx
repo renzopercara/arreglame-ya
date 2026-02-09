@@ -19,6 +19,35 @@ import {
 } from "@/graphql/queries";
 import { toast } from "sonner";
 
+// Type definitions
+interface ServiceSelectionData {
+  experienceYears: number;
+  description: string;
+}
+
+interface ServiceCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  iconName: string;
+  basePrice: number | string;
+  hourlyRate: number | string;
+  active: boolean;
+}
+
+interface WorkerService {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  iconName: string;
+  isActive: boolean;
+  experienceYears: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * Worker Services Management Page
  * 
@@ -31,7 +60,7 @@ import { toast } from "sonner";
 export default function WorkerServicesPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [selectedServices, setSelectedServices] = useState<Map<string, { experienceYears: number; description: string }>>(new Map());
+  const [selectedServices, setSelectedServices] = useState<Map<string, ServiceSelectionData>>(new Map());
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -73,11 +102,11 @@ export default function WorkerServicesPage() {
   // Initialize selected services from current worker services
   useEffect(() => {
     if (servicesData?.getMyServices) {
-      const newMap = new Map();
-      servicesData.getMyServices.forEach((service: any) => {
+      const newMap = new Map<string, ServiceSelectionData>();
+      servicesData.getMyServices.forEach((service: WorkerService) => {
         // Find the corresponding category ID
         const category = categoriesData?.serviceCategories?.find(
-          (cat: any) => cat.name === service.name || cat.slug === service.slug
+          (cat: ServiceCategory) => cat.name === service.name || cat.slug === service.slug
         );
         
         if (category) {
@@ -99,7 +128,7 @@ export default function WorkerServicesPage() {
     );
   }
 
-  const categories = categoriesData?.serviceCategories || [];
+  const categories: ServiceCategory[] = categoriesData?.serviceCategories || [];
   const isLoading = loadingCategories || loadingServices;
 
   const handleToggleService = (categoryId: string) => {
@@ -207,7 +236,7 @@ export default function WorkerServicesPage() {
 
             {/* Services Grid */}
             <div className="space-y-4">
-              {categories.map((category: any) => {
+              {categories.map((category: ServiceCategory) => {
                 const isSelected = selectedServices.has(category.id);
                 const serviceData = selectedServices.get(category.id);
 

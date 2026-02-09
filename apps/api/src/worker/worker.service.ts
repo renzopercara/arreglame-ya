@@ -253,6 +253,7 @@ export class WorkerService {
     }
 
     // Get current specialties
+    // Note: Using 'as any' for Prisma models that aren't in the base type
     const currentSpecialties = await (this.prisma as any).workerSpecialty.findMany({
       where: { workerId },
     });
@@ -270,12 +271,12 @@ export class WorkerService {
     // Find categories to update (in both)
     const categoriesToUpdate = services.filter(s => currentCategoryIds.includes(s.categoryId));
 
-    // Perform operations in a transaction
-    await (this.prisma as any).$transaction(async (tx: any) => {
+    // Perform operations in a transaction for atomicity
+    await this.prisma.$transaction(async (tx) => {
       // Add new specialties
       for (const service of categoriesToAdd) {
         // Validate category exists
-        const category = await tx.serviceCategory.findUnique({
+        const category = await (tx as any).serviceCategory.findUnique({
           where: { id: service.categoryId },
         });
 
@@ -289,7 +290,7 @@ export class WorkerService {
           metadata = { description: service.description };
         }
 
-        await tx.workerSpecialty.create({
+        await (tx as any).workerSpecialty.create({
           data: {
             workerId,
             categoryId: service.categoryId,
@@ -313,7 +314,7 @@ export class WorkerService {
             updateData.metadata = { description: service.description };
           }
 
-          await tx.workerSpecialty.update({
+          await (tx as any).workerSpecialty.update({
             where: { id: existing.id },
             data: updateData,
           });
@@ -322,7 +323,7 @@ export class WorkerService {
 
       // Remove unselected specialties
       for (const specialty of categoriesToRemove) {
-        await tx.workerSpecialty.delete({
+        await (tx as any).workerSpecialty.delete({
           where: { id: specialty.id },
         });
       }
