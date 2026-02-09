@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/app/providers";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation } from "@apollo/client";
+import { useQuery, useMutation } from "@apollo/client/react";
 import { 
   LayoutDashboard, 
   Briefcase, 
