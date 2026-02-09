@@ -205,5 +205,37 @@ export class WorkerService {
 
     return specialty;
   }
+
+  /**
+   * Get worker services (simplified view of specialties for frontend)
+   * Maps WorkerSpecialty + ServiceCategory to Service type
+   */
+  async getMyServices(workerId: string) {
+    const specialties = await (this.prisma as any).workerSpecialty.findMany({
+      where: { 
+        workerId,
+        status: { in: ['PENDING', 'ACTIVE'] }
+      },
+      include: {
+        category: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Map to Service type
+    return specialties.map((specialty: any) => ({
+      id: specialty.id,
+      name: specialty.category.name,
+      slug: specialty.category.slug,
+      description: specialty.category.description,
+      iconName: specialty.category.iconName,
+      isActive: specialty.status === 'ACTIVE',
+      experienceYears: specialty.experienceYears,
+      createdAt: specialty.createdAt,
+      updatedAt: specialty.updatedAt,
+    }));
+  }
 }
 
