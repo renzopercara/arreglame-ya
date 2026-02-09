@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SubmitKYCInput } from './dto/submit-kyc.input';
 import { CreateWorkerSpecialtyInput, UpdateWorkerSpecialtyInput, AddMultipleSpecialtiesInput } from './dto/worker-specialty.input';
 import { WorkerSpecialtyType } from './dto/worker-specialty.type';
+import { Service } from './dto/service.type';
 
 @ObjectType('WorkerProfile')
 export class WorkerProfileResponse {
@@ -272,6 +273,24 @@ export class WorkerResolver {
     }
 
     return this.workerService.getWorkerSpecialtyById(worker.id, specialtyId);
+  }
+
+  @Query(() => [Service])
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('WORKER')
+  async getMyServices(
+    @CurrentUser() user: any
+  ): Promise<Service[]> {
+    // Get worker profile
+    const worker = await (this.prisma as any).workerProfile.findUnique({
+      where: { userId: user.sub }
+    });
+
+    if (!worker) {
+      throw new BadRequestException('Worker profile not found');
+    }
+
+    return this.workerService.getMyServices(worker.id);
   }
 }
 

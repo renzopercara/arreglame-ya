@@ -213,6 +213,7 @@ type Query {
   """
   calculateServicePrice(categoryId: String!, complexityFactor: Float! = 1): Float!
   estimateJob(input: EstimateJobInput!): JobEstimateResponse!
+  getMyServices: [Service!]!
   getMyWorkerSpecialties(includeInactive: Boolean! = false): [WorkerSpecialtyType!]!
   getNotifications(limit: Float): [Notification!]!
   getPublicWorkerProfile(workerId: String!): WorkerProfile
@@ -250,6 +251,18 @@ type Review {
   comment: String
   id: ID!
   rating: Int!
+}
+
+type Service {
+  createdAt: DateTime!
+  description: String
+  experienceYears: Int
+  iconName: String!
+  id: String!
+  isActive: Boolean!
+  name: String!
+  slug: String!
+  updatedAt: DateTime!
 }
 
 type ServiceCategory {
