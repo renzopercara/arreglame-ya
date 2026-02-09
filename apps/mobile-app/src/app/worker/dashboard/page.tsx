@@ -216,7 +216,7 @@ export default function WorkerDashboardPage() {
               Agrega los servicios que ofreces para empezar a recibir solicitudes.
             </p>
             <button
-              onClick={() => router.push('/profile')}
+              onClick={() => router.push('/worker/services')}
               className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors"
             >
               Agregar Servicios
