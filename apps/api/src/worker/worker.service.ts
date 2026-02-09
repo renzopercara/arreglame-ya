@@ -1,7 +1,7 @@
 
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateWorkerSpecialtyInput, UpdateWorkerSpecialtyInput } from './dto/worker-specialty.input';
+import { CreateWorkerSpecialtyInput, UpdateWorkerSpecialtyInput, ServiceSelectionInput } from './dto/worker-specialty.input';
 
 @Injectable()
 export class WorkerService {
@@ -236,6 +236,100 @@ export class WorkerService {
       createdAt: specialty.createdAt,
       updatedAt: specialty.updatedAt,
     }));
+  }
+
+  /**
+   * Sync professional services - adds new services and removes unselected ones
+   * This is the main method for managing the worker's service catalog
+   */
+  async syncProfessionalServices(workerId: string, services: ServiceSelectionInput[]) {
+    // Validate worker exists
+    const worker = await this.prisma.workerProfile.findUnique({
+      where: { id: workerId },
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker profile not found');
+    }
+
+    // Get current specialties
+    const currentSpecialties = await (this.prisma as any).workerSpecialty.findMany({
+      where: { workerId },
+    });
+
+    // Extract category IDs from input
+    const newCategoryIds = services.map(s => s.categoryId);
+    const currentCategoryIds = currentSpecialties.map((s: any) => s.categoryId);
+
+    // Find categories to add (in new but not in current)
+    const categoriesToAdd = services.filter(s => !currentCategoryIds.includes(s.categoryId));
+
+    // Find categories to remove (in current but not in new)
+    const categoriesToRemove = currentSpecialties.filter((s: any) => !newCategoryIds.includes(s.categoryId));
+
+    // Find categories to update (in both)
+    const categoriesToUpdate = services.filter(s => currentCategoryIds.includes(s.categoryId));
+
+    // Perform operations in a transaction
+    await (this.prisma as any).$transaction(async (tx: any) => {
+      // Add new specialties
+      for (const service of categoriesToAdd) {
+        // Validate category exists
+        const category = await tx.serviceCategory.findUnique({
+          where: { id: service.categoryId },
+        });
+
+        if (!category) {
+          throw new BadRequestException(`Service category ${service.categoryId} not found`);
+        }
+
+        // Prepare metadata
+        let metadata = null;
+        if (service.description) {
+          metadata = { description: service.description };
+        }
+
+        await tx.workerSpecialty.create({
+          data: {
+            workerId,
+            categoryId: service.categoryId,
+            experienceYears: service.experienceYears || 0,
+            metadata,
+            status: 'PENDING', // Default to PENDING for admin approval
+          },
+        });
+      }
+
+      // Update existing specialties
+      for (const service of categoriesToUpdate) {
+        const existing = currentSpecialties.find((s: any) => s.categoryId === service.categoryId);
+        
+        if (existing) {
+          const updateData: any = {
+            experienceYears: service.experienceYears || 0,
+          };
+
+          if (service.description) {
+            updateData.metadata = { description: service.description };
+          }
+
+          await tx.workerSpecialty.update({
+            where: { id: existing.id },
+            data: updateData,
+          });
+        }
+      }
+
+      // Remove unselected specialties
+      for (const specialty of categoriesToRemove) {
+        await tx.workerSpecialty.delete({
+          where: { id: specialty.id },
+        });
+      }
+    });
+
+    // Return updated list of services
+    return this.getMyServices(workerId);
   }
 }
 

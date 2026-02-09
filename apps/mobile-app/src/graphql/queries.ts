@@ -636,6 +636,22 @@ export const REMOVE_WORKER_SPECIALTY = gql`
   }
 `;
 
+export const SYNC_PROFESSIONAL_SERVICES = gql`
+  mutation SyncProfessionalServices($input: SyncProfessionalServicesInput!) {
+    syncProfessionalServices(input: $input) {
+      id
+      name
+      slug
+      description
+      iconName
+      isActive
+      experienceYears
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
 export const GET_MY_WORKER_SPECIALTIES = gql`
   query GetMyWorkerSpecialties($includeInactive: Boolean) {
     getMyWorkerSpecialties(includeInactive: $includeInactive) {

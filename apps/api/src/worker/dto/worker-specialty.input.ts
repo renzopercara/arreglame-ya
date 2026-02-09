@@ -55,3 +55,27 @@ export class AddMultipleSpecialtiesInput {
   @Field(() => [CreateWorkerSpecialtyInput])
   specialties: CreateWorkerSpecialtyInput[];
 }
+
+@InputType()
+export class ServiceSelectionInput {
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  categoryId: string;
+
+  @Field(() => Int, { defaultValue: 0 })
+  @IsInt()
+  @Min(0)
+  experienceYears: number = 0;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  description?: string; // Brief description of how the professional does this service
+}
+
+@InputType()
+export class SyncProfessionalServicesInput {
+  @Field(() => [ServiceSelectionInput])
+  services: ServiceSelectionInput[];
+}
