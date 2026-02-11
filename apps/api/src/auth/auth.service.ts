@@ -15,6 +15,15 @@ const loginAttempts = new Map<string, { count: number; lastAttempt: Date }>();
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+/**
+ * Maps UserRole to ActiveRole
+ * WORKER -> PROVIDER (for UI context)
+ * CLIENT -> CLIENT
+ */
+function mapUserRoleToActiveRole(role: UserRole): ActiveRole {
+  return role === UserRole.WORKER ? ActiveRole.PROVIDER : ActiveRole.CLIENT;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -156,8 +165,8 @@ export class AuthService {
 
     try {
       const user = await this.prisma.$transaction(async (tx) => {
-          // Map the UserRole to ActiveRole: WORKER -> PROVIDER, CLIENT -> CLIENT
-          const activeRole: ActiveRole = role === UserRole.WORKER ? ActiveRole.PROVIDER : ActiveRole.CLIENT;
+          // Map the UserRole to ActiveRole using helper function
+          const activeRole = mapUserRoleToActiveRole(role);
           
           const newUser = await tx.user.create({
               data: {

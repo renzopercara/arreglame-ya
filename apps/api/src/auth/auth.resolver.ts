@@ -1,4 +1,3 @@
-
 import { Resolver, Mutation, Args, Context, Query, ObjectType, Field, Int, Float } from '@nestjs/graphql';
 import { UseGuards, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -8,6 +7,15 @@ import { AuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole, ActiveRole } from '@prisma/client';
+
+/**
+ * Maps UserRole to LegalService target audience
+ * WORKER -> 'WORKER'
+ * CLIENT -> 'CLIENT'
+ */
+function mapUserRoleToAudience(role: UserRole): 'CLIENT' | 'WORKER' {
+  return role === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+}
 
 @ObjectType('UserInfo')
 export class UserInfoResponse {
@@ -152,7 +160,7 @@ export class AuthResolver {
     const fullUser = await this.loadUser(user.id);
     
     // Map UserRole to target audience for legal service
-    const targetAudience = fullUser.currentRole === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+    const targetAudience = mapUserRoleToAudience(fullUser.currentRole);
     const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, targetAudience);
 
     return {
@@ -170,7 +178,7 @@ export class AuthResolver {
 
     if (input.termsAccepted) {
        // Map UserRole to target audience for legal service
-       const targetAudience = input.role === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+       const targetAudience = mapUserRoleToAudience(input.role);
        const activeDoc = await this.legalService.getActiveDocument(targetAudience);
        if (activeDoc) {
            const ip = context?.req?.ip || '0.0.0.0';
@@ -182,7 +190,7 @@ export class AuthResolver {
     }
 
     const fullUser = await this.loadUser(user.id);
-    const targetAudience = input.role === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+    const targetAudience = mapUserRoleToAudience(input.role);
     const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, targetAudience);
 
     return {
@@ -208,7 +216,7 @@ export class AuthResolver {
     const fullUser = await this.loadUser(user.sub);
     if (!fullUser) return null;
 
-    const targetAudience = fullUser.currentRole === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+    const targetAudience = mapUserRoleToAudience(fullUser.currentRole);
     const hasAccepted = await this.legalService.hasAcceptedLatest(fullUser.id, targetAudience);
     return this.toUserInfo(fullUser, !hasAccepted);
   }
@@ -223,7 +231,7 @@ export class AuthResolver {
 
     const updatedUser = await this.authService.switchActiveRole(user.sub, activeRole);
     const fullUser = await this.loadUser(updatedUser.id);
-    const targetAudience = updatedUser.currentRole === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+    const targetAudience = mapUserRoleToAudience(updatedUser.currentRole);
     const hasAccepted = await this.legalService.hasAcceptedLatest(updatedUser.id, targetAudience);
 
     return this.toUserInfo(fullUser, !hasAccepted);
