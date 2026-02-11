@@ -38,7 +38,7 @@ This implementation refactors the Arreglame Ya platform to support a **multi-ide
 model User {
   roles       UserRole[]   // Multiple roles support
   currentRole UserRole     // Persistent primary role
-  activeRole  ActiveRole   // UI context (CLIENT/PROVIDER)
+  activeRole  ActiveRole   // UI context (CLIENT/WORKER)
   // ... other fields
 }
 ```
@@ -211,7 +211,7 @@ query {
 1. **Role Switching**:
    - Click role switcher button
    - Verify bottom sheet appears
-   - Switch between CLIENT and PROVIDER
+   - Switch between CLIENT and WORKER
    - Confirm navigation changes
    - Verify theme color changes
 

@@ -22,7 +22,7 @@
 
 ### 2. **Dual-Profile User System** 👤🔧
 - **Database Schema** (Prisma):
-  - Added `ActiveRole` enum: `CLIENT`, `PROVIDER`
+  - Added `ActiveRole` enum: `CLIENT`, `WORKER`
   - User model: `activeRole` field (defaults to CLIENT)
   - `CustomerProfile` model: separate profile for customer/buyer activities
   - Extended `WorkerProfile`: added `bio`, `trade`, `hourlyRate`, `availability`
@@ -44,7 +44,7 @@
 - **Behavior:**
   - **Not Logged In:** [Inicio, Buscar, Acceso]
   - **CLIENT Mode:** [Inicio, Buscar, Pedidos, Perfil]
-  - **PROVIDER Mode:** [Dashboard, Trabajos, Chat, Perfil]
+  - **WORKER Mode:** [Dashboard, Trabajos, Chat, Perfil]
 - Uses `ME_QUERY` to fetch user's `activeRole` and adapts navigation dynamically
 - Skeleton loader while fetching auth state
 
@@ -52,7 +52,7 @@
 - **File:** `apps/mobile-app/src/components/RoleToggle.tsx`
 - **Features:**
   - Prominent gradient card UI (blue-purple gradient)
-  - Toggle switch between CLIENT and PROVIDER modes
+  - Toggle switch between CLIENT and WORKER modes
   - Only shown to users with WORKER role (dual capabilities)
   - Optimistic UI with loading states
   - Toast notifications on role switch (via react-hot-toast)
@@ -106,7 +106,7 @@ User Registration → EventEmitter2 → 'user.registered' event → UserEventsLi
 ```
 1. User signs up as WORKER
 2. System creates: User + WorkerProfile + CustomerProfile
-3. User can switch between PROVIDER mode (offer services) and CLIENT mode (hire services)
+3. User can switch between WORKER mode (offer services) and CLIENT mode (hire services)
 4. BottomNav dynamically adapts to activeRole
 ```
 
@@ -167,7 +167,7 @@ Frontend: useNotifications hook polls every 30s → NotificationBell updates bad
 
 - [ ] Test user registration flow and welcome email
 - [ ] Verify SMTP configuration and email delivery
-- [ ] Test role switching (CLIENT ↔ PROVIDER)
+- [ ] Test role switching (CLIENT ↔ WORKER)
 - [ ] Verify BottomNav changes based on activeRole
 - [ ] Test notification creation, marking as read, deletion
 - [ ] Check notification bell badge updates
