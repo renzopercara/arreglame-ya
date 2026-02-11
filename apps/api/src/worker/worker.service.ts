@@ -252,6 +252,12 @@ export class WorkerService {
       throw new NotFoundException('Worker profile not found');
     }
 
+    // Validate services input - handle null/undefined case
+    if (!services || !Array.isArray(services)) {
+      // If no services provided, return current services without changes
+      return this.getMyServices(workerId);
+    }
+
     // Get current specialties
     // Note: Using 'as any' for Prisma models that aren't in the base type
     const currentSpecialties = await (this.prisma as any).workerSpecialty.findMany({
