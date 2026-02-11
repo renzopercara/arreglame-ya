@@ -153,6 +153,7 @@ type Mutation {
   markAllNotificationsAsRead: MutationResponse!
   markNotificationAsRead(notificationId: String!): Notification!
   register(input: RegisterInput!): AuthResponse!
+  registerDeviceToken(platform: String = "web", token: String!): Boolean!
   removeWorkerSpecialty(specialtyId: String!): GenericSuccessResponse!
   resendVerificationEmail(email: String!): GenericResponse!
   setWorkerStatus(status: String!): WorkerProfile!
@@ -160,8 +161,10 @@ type Mutation {
   submitKYC(input: SubmitKYCInput!): WorkerProfile!
   submitReview(input: JSON!): Review!
   switchActiveRole(activeRole: String!): UserInfo!
+  syncProfessionalServices(input: SyncProfessionalServicesInput!): [Service!]!
   updateWorkerLocation(lat: Float!, lng: Float!): UpdateLocationResponse!
   updateWorkerSpecialty(input: UpdateWorkerSpecialtyInput!): WorkerSpecialtyType!
+  updateWorkerStatus(status: String!): UserInfo!
   verifyEmail(token: String!): GenericResponse!
 }
 
@@ -256,7 +259,7 @@ type Review {
 type Service {
   createdAt: DateTime!
   description: String
-  experienceYears: Int
+  experienceYears: Float
   iconName: String!
   id: String!
   isActive: Boolean!
@@ -275,6 +278,12 @@ type ServiceCategory {
   id: ID!
   name: String!
   slug: String!
+}
+
+input ServiceSelectionInput {
+  categoryId: String!
+  description: String
+  experienceYears: Int!
 }
 
 """Service subcategories for different types of work"""
@@ -309,6 +318,11 @@ input SubmitKYCInput {
 
 type Subscription {
   jobUpdated(jobId: String!): Job!
+  notificationReceived: Notification!
+}
+
+input SyncProfessionalServicesInput {
+  services: [ServiceSelectionInput!]!
 }
 
 type UnreadCountResult {

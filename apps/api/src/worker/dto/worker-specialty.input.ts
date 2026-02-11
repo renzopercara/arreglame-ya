@@ -1,5 +1,6 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
-import { IsString, IsNotEmpty, IsInt, Min, IsOptional, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsString, IsNotEmpty, IsInt, Min, IsOptional, IsEnum, IsArray, ValidateNested } from 'class-validator';
 
 export enum SpecialtyStatusInput {
   DRAFT = 'DRAFT',
@@ -63,19 +64,22 @@ export class ServiceSelectionInput {
   @IsNotEmpty()
   categoryId: string;
 
-  @Field(() => Int, { defaultValue: 0 })
+  @Field(() => Int)
   @IsInt()
   @Min(0)
-  experienceYears: number = 0;
+  experienceYears: number;
 
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
-  description?: string; // Brief description of how the professional does this service
+  description?: string;
 }
 
 @InputType()
 export class SyncProfessionalServicesInput {
   @Field(() => [ServiceSelectionInput])
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ServiceSelectionInput)
   services: ServiceSelectionInput[];
 }

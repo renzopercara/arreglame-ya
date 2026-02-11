@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/app/providers";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@apollo/client/react";
-import { 
+import {
   ArrowLeft,
   CheckCircle2,
   Circle,
@@ -12,10 +12,10 @@ import {
   Save,
   AlertCircle,
 } from "lucide-react";
-import { 
-  GET_SERVICE_CATEGORIES, 
+import {
+  GET_SERVICE_CATEGORIES,
   GET_MY_SERVICES,
-  SYNC_PROFESSIONAL_SERVICES 
+  SYNC_PROFESSIONAL_SERVICES
 } from "@/graphql/queries";
 import { toast } from "sonner";
 
@@ -108,7 +108,7 @@ export default function WorkerServicesPage() {
         const category = categoriesData?.serviceCategories?.find(
           (cat: ServiceCategory) => cat.name === service.name || cat.slug === service.slug
         );
-        
+
         if (category) {
           newMap.set(category.id, {
             experienceYears: service.experienceYears || 0,
@@ -160,7 +160,7 @@ export default function WorkerServicesPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    
+
     // Convert selected services to input format
     const services = Array.from(selectedServices.entries()).map(([categoryId, data]) => ({
       categoryId,
@@ -202,7 +202,7 @@ export default function WorkerServicesPage() {
                 <p className="text-sm text-gray-500">Gestiona tu catálogo de servicios</p>
               </div>
             </div>
-            
+
             {hasChanges && (
               <div className="flex items-center gap-2 text-amber-600 text-sm">
                 <AlertCircle className="w-4 h-4" />
@@ -243,11 +243,10 @@ export default function WorkerServicesPage() {
                 return (
                   <div
                     key={category.id}
-                    className={`bg-white rounded-xl border-2 transition-all ${
-                      isSelected
+                    className={`bg-white rounded-xl border-2 transition-all ${isSelected
                         ? 'border-emerald-500 shadow-md'
                         : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                   >
                     {/* Service Header */}
                     <div className="p-4">
@@ -262,7 +261,7 @@ export default function WorkerServicesPage() {
                             <Circle className="w-6 h-6 text-gray-400" />
                           )}
                         </button>
-                        
+
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-gray-900">
                             {category.name}
@@ -331,31 +330,22 @@ export default function WorkerServicesPage() {
       </div>
 
       {/* Fixed Bottom Actions */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg">
-        <div className="max-w-4xl mx-auto flex gap-3">
+      <div className="fixed bottom-28 left-0 right-0 z-40 px-4">
+        <div className="max-w-md mx-auto flex gap-3 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-200 shadow-2xl">
           <button
             onClick={handleCancel}
             disabled={isSaving}
-            className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving || !hasChanges}
-            className="flex-1 px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-3 bg-emerald-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2"
           >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Guardando...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-5 h-5" />
-                <span>Guardar Cambios</span>
-              </>
-            )}
+            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            <span>Guardar</span>
           </button>
         </div>
       </div>
