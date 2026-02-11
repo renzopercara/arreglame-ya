@@ -220,7 +220,7 @@ export class WorkerService {
       id: specialty.id,
       name: specialty.category.name,
       slug: specialty.category.slug,
-      description: specialty.category.description,
+      description: specialty.metadata?.description ?? specialty.category.description,
       iconName: specialty.category.iconName,
       isActive: specialty.status === 'ACTIVE',
       status: specialty.status,
