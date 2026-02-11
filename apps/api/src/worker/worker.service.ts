@@ -223,6 +223,7 @@ export class WorkerService {
       description: specialty.category.description,
       iconName: specialty.category.iconName,
       isActive: specialty.status === 'ACTIVE',
+      status: specialty.status,
       experienceYears: specialty.experienceYears,
       createdAt: specialty.createdAt,
       updatedAt: specialty.updatedAt,

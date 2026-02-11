@@ -24,6 +24,9 @@ export class Service {
   @Field()
   isActive: boolean;
 
+  @Field()
+  status: string;
+
   @Field({ nullable: true })
   experienceYears?: number;
 
