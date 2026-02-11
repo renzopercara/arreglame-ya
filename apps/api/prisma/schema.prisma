@@ -92,7 +92,7 @@ enum PaymentProvider {
 
 enum ActiveRole {
   CLIENT
-  PROVIDER
+  WORKER
 }
 
 enum SpecialtyStatus {

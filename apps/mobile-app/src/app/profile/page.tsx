@@ -85,8 +85,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
     e.preventDefault();
     setError('');
 
-    // Map UI role (ActiveRole) to backend UserRole enum: PROVIDER -> WORKER, CLIENT -> CLIENT
-    const backendRole = role === ActiveRole.PROVIDER ? "WORKER" : "CLIENT";
+    // Map UI role (ActiveRole) to backend UserRole enum: WORKER -> WORKER, CLIENT -> CLIENT
+    const backendRole = role === ActiveRole.WORKER ? "WORKER" : "CLIENT";
 
     if (mode === "login") {
       // Login flow
@@ -241,9 +241,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
             </button>
             <button
               type="button"
-              onClick={() => setRole(ActiveRole.PROVIDER)}
+              onClick={() => setRole(ActiveRole.WORKER)}
               className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-[10px] font-black uppercase tracking-tight transition-all ${
-                role === ActiveRole.PROVIDER ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
+                role === ActiveRole.WORKER ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
               }`}
             >
               <UserCog size={14} /> Profesional
@@ -407,7 +407,7 @@ export default function ProfilePage() {
   // Authenticated state
   const firstName = user.name?.split(' ')[0] || 'Usuario';
   const mpConnected = !!user.mercadopagoCustomerId;
-  const isProvider = user.activeRole === 'PROVIDER';
+  const isProvider = user.activeRole === 'WORKER';
   const isClient = user.activeRole === 'CLIENT';
   
   // Debt limit warning
