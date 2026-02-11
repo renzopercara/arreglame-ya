@@ -353,7 +353,9 @@ export class JobsResolver {
     let services = [];
     try {
       services = await (this.prisma.serviceRequest as any).findMany({
-        where: {},
+        where: {
+          status: 'CREATED', // Only fetch available jobs
+        },
         include: {
           worker: {
             include: {
@@ -373,7 +375,13 @@ export class JobsResolver {
       });
     } catch (error) {
       // If query fails, return empty array gracefully for better UX
-      console.error('Error fetching nearby jobs:', error);
+      console.error('Error fetching nearby jobs:', {
+        error,
+        lat,
+        lng,
+        radius: radiusKm,
+        limit: maxResults,
+      });
       return [];
     }
 
