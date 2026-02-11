@@ -7,6 +7,7 @@ import { LoginInput, RegisterInput, BecomeWorkerInput } from './dto/auth.input';
 import { AuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserRole, ActiveRole } from '@prisma/client';
 
 @ObjectType('UserInfo')
 export class UserInfoResponse {
@@ -149,7 +150,10 @@ export class AuthResolver {
   async login(@Args('input', { type: () => LoginInput }) input: LoginInput): Promise<AuthResponse> {
     const { accessToken, user } = await this.authService.login(input.email, input.password, input.role);
     const fullUser = await this.loadUser(user.id);
-    const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, fullUser.currentRole as 'CLIENT' | 'WORKER');
+    
+    // Map UserRole to target audience for legal service
+    const targetAudience = fullUser.currentRole === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+    const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, targetAudience);
 
     return {
       accessToken,
@@ -165,7 +169,9 @@ export class AuthResolver {
     const { accessToken, user } = await this.authService.register(input.email, input.password, input.name, input.role);
 
     if (input.termsAccepted) {
-       const activeDoc = await this.legalService.getActiveDocument(input.role as 'CLIENT' | 'WORKER');
+       // Map UserRole to target audience for legal service
+       const targetAudience = input.role === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+       const activeDoc = await this.legalService.getActiveDocument(targetAudience);
        if (activeDoc) {
            const ip = context?.req?.ip || '0.0.0.0';
            await this.legalService.acceptTerms(user.id, activeDoc.id, { 
@@ -176,7 +182,8 @@ export class AuthResolver {
     }
 
     const fullUser = await this.loadUser(user.id);
-    const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, input.role as 'CLIENT' | 'WORKER');
+    const targetAudience = input.role === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+    const hasAccepted = await this.legalService.hasAcceptedLatest(user.id, targetAudience);
 
     return {
       accessToken,
@@ -201,7 +208,8 @@ export class AuthResolver {
     const fullUser = await this.loadUser(user.sub);
     if (!fullUser) return null;
 
-    const hasAccepted = await this.legalService.hasAcceptedLatest(fullUser.id, fullUser.currentRole as 'CLIENT' | 'WORKER');
+    const targetAudience = fullUser.currentRole === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+    const hasAccepted = await this.legalService.hasAcceptedLatest(fullUser.id, targetAudience);
     return this.toUserInfo(fullUser, !hasAccepted);
   }
 
@@ -209,13 +217,14 @@ export class AuthResolver {
   @UseGuards(AuthGuard)
   async switchActiveRole(
     @CurrentUser() user: any,
-    @Args('activeRole') activeRole: 'CLIENT' | 'PROVIDER',
+    @Args('activeRole', { type: () => ActiveRole }) activeRole: ActiveRole,
   ): Promise<UserInfoResponse> {
     if (!user?.sub) throw new UnauthorizedException('Usuario no autenticado');
 
     const updatedUser = await this.authService.switchActiveRole(user.sub, activeRole);
     const fullUser = await this.loadUser(updatedUser.id);
-    const hasAccepted = await this.legalService.hasAcceptedLatest(updatedUser.id, updatedUser.currentRole as 'CLIENT' | 'WORKER');
+    const targetAudience = updatedUser.currentRole === UserRole.WORKER ? 'WORKER' : 'CLIENT';
+    const hasAccepted = await this.legalService.hasAcceptedLatest(updatedUser.id, targetAudience);
 
     return this.toUserInfo(fullUser, !hasAccepted);
   }

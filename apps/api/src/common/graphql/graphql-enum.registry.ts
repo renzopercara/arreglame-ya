@@ -1,7 +1,9 @@
 import { registerEnumType } from '@nestjs/graphql';
 import { 
   ServiceSubcategory, 
-  DifficultyLevel 
+  DifficultyLevel,
+  UserRole,
+  ActiveRole
 } from '@prisma/client';
 
 /**
@@ -23,6 +25,18 @@ registerEnumType(ServiceSubcategory, {
 registerEnumType(DifficultyLevel, {
   name: 'DifficultyLevel',
   description: 'Difficulty levels for service estimation',
+});
+
+// Register UserRole enum
+registerEnumType(UserRole, {
+  name: 'UserRole',
+  description: 'User roles for authentication and authorization (CLIENT, WORKER, ADMIN)',
+});
+
+// Register ActiveRole enum
+registerEnumType(ActiveRole, {
+  name: 'ActiveRole',
+  description: 'Active UI context role (CLIENT or PROVIDER)',
 });
 
 /**
