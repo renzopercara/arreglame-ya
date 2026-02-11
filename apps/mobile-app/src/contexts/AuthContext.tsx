@@ -11,7 +11,7 @@ interface User {
   id: string;
   name: string;
   avatar?: string;
-  activeRole: 'CLIENT' | 'PROVIDER';
+  activeRole: 'CLIENT' | 'WORKER';
   roles: string[]; // El array que contiene los permisos
 }
 
@@ -29,7 +29,7 @@ const useAuth = () => ({
   user: {
     name: "Juan Pérez",
     activeRole: "CLIENT",
-    roles: ["CLIENT", "PROVIDER"], // Tiene ambos roles
+    roles: ["CLIENT", "WORKER"], // Tiene ambos roles
   } as User,
   isBootstrapping: false,
   switchRole: async (role: string) => console.log("Switched to", role)
@@ -45,11 +45,11 @@ export default function WelcomeHeader() {
   const [isSwitchingRole, setIsSwitchingRole] = useState(false);
 
   const firstName = user?.name?.split(' ')[0] || '';
-  const isProvider = user?.activeRole === 'PROVIDER';
+  const isProvider = user?.activeRole === 'WORKER';
   
   // FIX: Verificamos si tiene el perfil de trabajador en el array 'roles'
-  // Usamos 'PROVIDER' que es el identificador correcto en la base de datos
-  const hasWorkerProfile = user?.roles?.includes('PROVIDER');
+  // Usamos 'WORKER' que es el identificador correcto en la base de datos
+  const hasWorkerProfile = user?.roles?.includes('WORKER');
   
   // El switch se muestra si está autenticado y posee el rol de proveedor en su cuenta
   const canSwitchRole = isAuthenticated && hasWorkerProfile;
@@ -59,7 +59,7 @@ export default function WelcomeHeader() {
     
     setIsSwitchingRole(true);
     try {
-      const newRole = isProvider ? 'CLIENT' : 'PROVIDER';
+      const newRole = isProvider ? 'CLIENT' : 'WORKER';
       await switchRole(newRole);
     } catch (err) {
       console.error('Failed to switch role:', err);

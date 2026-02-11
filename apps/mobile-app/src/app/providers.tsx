@@ -99,7 +99,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string, role: string, termsAccepted: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
-  switchRole: (activeRole: 'CLIENT' | 'PROVIDER') => Promise<void>;
+  switchRole: (activeRole: 'CLIENT' | 'WORKER') => Promise<void>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -252,7 +252,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     await fetchMe();
   }, [fetchMe]);
 
-  const switchRole = useCallback(async (activeRole: 'CLIENT' | 'PROVIDER') => {
+  const switchRole = useCallback(async (activeRole: 'CLIENT' | 'WORKER') => {
     await switchRoleMutation({
       variables: { activeRole },
     });

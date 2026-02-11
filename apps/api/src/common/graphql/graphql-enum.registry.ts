@@ -36,7 +36,7 @@ registerEnumType(UserRole, {
 // Register ActiveRole enum
 registerEnumType(ActiveRole, {
   name: 'ActiveRole',
-  description: 'Active UI context role (CLIENT or PROVIDER)',
+  description: 'Active UI context role (CLIENT or WORKER)',
 });
 
 /**

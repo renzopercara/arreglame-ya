@@ -20,7 +20,7 @@ export default function BottomNav() {
   const { isAuthenticated, user, isBootstrapping, hasWorkerRole, switchRole } = useAuth();
   const [isSwitchingRole, setIsSwitchingRole] = useState(false);
 
-  const isWorkerMode = user?.activeRole === 'PROVIDER';
+  const isWorkerMode = user?.activeRole === 'WORKER';
   const themeColor = isWorkerMode ? 'green' : 'blue';
 
   // Quick role switch handler
@@ -38,9 +38,9 @@ export default function BottomNav() {
         await switchRole('CLIENT');
         router.push('/');
       } else {
-        // Switch to PROVIDER mode
+        // Switch to WORKER mode
         if (hasWorkerRole) {
-          await switchRole('PROVIDER');
+          await switchRole('WORKER');
           router.push('/worker/dashboard');
         } else {
           router.push('/worker/onboarding');
@@ -67,7 +67,7 @@ export default function BottomNav() {
       ];
     }
 
-    if (user.activeRole === 'PROVIDER') {
+    if (user.activeRole === 'WORKER') {
       return [
         { href: "/worker/dashboard", label: "Panel", icon: LayoutDashboard },
         { href: "/worker/jobs", label: "Trabajos", icon: Briefcase },

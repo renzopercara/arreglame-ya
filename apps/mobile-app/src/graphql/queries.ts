@@ -163,7 +163,7 @@ export const CREATE_TICKET = gql`
 `;
 
 export const LOGIN_MUTATION = gql`
-  mutation Login($email: String!, $password: String!, $role: String!) {
+  mutation Login($email: String!, $password: String!, $role: UserRole!) {
     login(input: { email: $email, password: $password, role: $role }) {
       accessToken
       user {
@@ -199,7 +199,7 @@ export const REGISTER_MUTATION = gql`
     $email: String!, 
     $password: String!, 
     $name: String!, 
-    $role: String!,
+    $role: UserRole!,
     $termsAccepted: Boolean,
     $termsVersion: String,
     $termsDate: String,
@@ -245,7 +245,7 @@ export const REGISTER_MUTATION = gql`
 `;
 
 export const SWITCH_ACTIVE_ROLE = gql`
-  mutation SwitchActiveRole($activeRole: String!) {
+  mutation SwitchActiveRole($activeRole: ActiveRole!) {
     switchActiveRole(activeRole: $activeRole) {
       id
       activeRole

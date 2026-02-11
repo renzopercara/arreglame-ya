@@ -25,19 +25,19 @@ export default function RoleSwitcher() {
     return null;
   }
 
-  const isProviderMode = user.activeRole === 'PROVIDER';
+  const isProviderMode = user.activeRole === 'WORKER';
   const currentColor = isProviderMode ? 'emerald' : 'blue';
 
-  const handleSwitch = async (targetRole: 'CLIENT' | 'PROVIDER') => {
+  const handleSwitch = async (targetRole: 'CLIENT' | 'WORKER') => {
     setShowMenu(false);
     setIsSwitching(true);
     
     try {
-      if (targetRole === 'PROVIDER') {
-        // Switch to PROVIDER mode
+      if (targetRole === 'WORKER') {
+        // Switch to WORKER mode
         if (hasWorkerRole) {
           // User already has WORKER role - instant switch
-          await switchRole('PROVIDER');
+          await switchRole('WORKER');
           router.push('/worker/dashboard');
         } else {
           // User doesn't have WORKER role - redirect to onboarding
@@ -132,7 +132,7 @@ export default function RoleSwitcher() {
               {/* Provider Mode Option */}
               {hasWorkerRole ? (
                 <button
-                  onClick={() => handleSwitch('PROVIDER')}
+                  onClick={() => handleSwitch('WORKER')}
                   className={`
                     flex items-center gap-3 p-3 rounded-xl transition-all
                     ${isProviderMode 
@@ -156,7 +156,7 @@ export default function RoleSwitcher() {
                 </button>
               ) : (
                 <button
-                  onClick={() => handleSwitch('PROVIDER')}
+                  onClick={() => handleSwitch('WORKER')}
                   className="flex items-center gap-3 p-3 rounded-xl transition-all bg-gradient-to-r from-emerald-50 to-emerald-100 border-2 border-emerald-200 text-emerald-900 hover:from-emerald-100 hover:to-emerald-200"
                 >
                   <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">

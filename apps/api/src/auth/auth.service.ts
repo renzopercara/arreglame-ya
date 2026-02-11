@@ -17,11 +17,11 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
  * Maps UserRole to ActiveRole
- * WORKER -> PROVIDER (for UI context)
+ * WORKER -> WORKER (for UI context)
  * CLIENT -> CLIENT
  */
 function mapUserRoleToActiveRole(role: UserRole): ActiveRole {
-  return role === UserRole.WORKER ? ActiveRole.PROVIDER : ActiveRole.CLIENT;
+  return role === UserRole.WORKER ? ActiveRole.WORKER : ActiveRole.CLIENT;
 }
 
 @Injectable()
@@ -357,7 +357,7 @@ export class AuthService {
         data: {
           roles: updatedRoles,
           currentRole: UserRole.WORKER,
-          activeRole: ActiveRole.PROVIDER,
+          activeRole: ActiveRole.WORKER,
         },
       });
 
@@ -389,7 +389,7 @@ export class AuthService {
       data: {
         roles: updatedRoles,
         currentRole: UserRole.WORKER,
-        activeRole: ActiveRole.PROVIDER,
+        activeRole: ActiveRole.WORKER,
       },
     });
 

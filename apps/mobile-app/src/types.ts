@@ -7,7 +7,7 @@ export enum UserRole {
 
 export enum ActiveRole {
   CLIENT = 'CLIENT',
-  PROVIDER = 'PROVIDER'
+  WORKER = 'WORKER'
 }
 
 export enum UserStatus {
