@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../providers';
+import { ActiveRole } from '../../types';
 import { 
   ArrowLeft, 
   Clock3, 
@@ -51,7 +52,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<"CLIENT" | "PROVIDER">("CLIENT");
+  const [role, setRole] = useState<ActiveRole>(ActiveRole.CLIENT);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState('');
 
@@ -74,7 +75,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
     setName('');
     setEmail('');
     setPassword('');
-    setRole('CLIENT');
+    setRole(ActiveRole.CLIENT);
     setTermsAccepted(false);
     setMode(initialMode);
     onClose();
@@ -84,6 +85,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
     e.preventDefault();
     setError('');
 
+    // Map UI role (ActiveRole) to backend UserRole enum: PROVIDER -> WORKER, CLIENT -> CLIENT
+    const backendRole = role === ActiveRole.PROVIDER ? "WORKER" : "CLIENT";
+
     if (mode === "login") {
       // Login flow
       if (!email || !password) {
@@ -92,7 +96,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
       }
 
       try {
-        await login(email, password, role);
+        await login(email, password, backendRole);
         toast.success('¡Bienvenido!');
         handleClose();
       } catch (err: unknown) {
@@ -113,7 +117,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
       }
 
       try {
-        await register(email, password, name, role, termsAccepted);
+        await register(email, password, name, backendRole, termsAccepted);
         toast.success('¡Cuenta creada exitosamente!');
         handleClose();
       } catch (err: unknown) {
@@ -228,18 +232,18 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: { isOpen: boolean
           <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100">
             <button
               type="button"
-              onClick={() => setRole("CLIENT")}
+              onClick={() => setRole(ActiveRole.CLIENT)}
               className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-[10px] font-black uppercase tracking-tight transition-all ${
-                role === "CLIENT" ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
+                role === ActiveRole.CLIENT ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
               }`}
             >
               <User size={14} /> Cliente
             </button>
             <button
               type="button"
-              onClick={() => setRole("PROVIDER")}
+              onClick={() => setRole(ActiveRole.PROVIDER)}
               className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-[10px] font-black uppercase tracking-tight transition-all ${
-                role === "PROVIDER" ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
+                role === ActiveRole.PROVIDER ? "bg-white text-indigo-600 shadow-sm border border-indigo-50" : "text-slate-400"
               }`}
             >
               <UserCog size={14} /> Profesional

@@ -5,6 +5,11 @@ export enum UserRole {
   ADMIN = 'ADMIN'
 }
 
+export enum ActiveRole {
+  CLIENT = 'CLIENT',
+  PROVIDER = 'PROVIDER'
+}
+
 export enum UserStatus {
   ANON = 'ANON',
   LOGGED_IN = 'LOGGED_IN',
