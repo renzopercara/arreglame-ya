@@ -21,7 +21,7 @@ export interface User {
   name: string;
   email?: string;
   role: string;
-  activeRole?: 'CLIENT' | 'PROVIDER';
+  activeRole?: 'CLIENT' | 'WORKER';
   status?: string;
   avatar?: string;
   rating?: number;

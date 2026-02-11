@@ -440,7 +440,7 @@ All components are designed mobile-first with:
 export default function ProfilePage() {
   const { user } = useAuth();
   const isClient = user.activeRole === 'CLIENT';
-  const isProvider = user.activeRole === 'PROVIDER';
+  const isProvider = user.activeRole === 'WORKER';
   const mpConnected = !!user.mercadopagoCustomerId;
 
   return (

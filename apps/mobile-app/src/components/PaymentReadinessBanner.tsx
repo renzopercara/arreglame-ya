@@ -10,14 +10,14 @@ import { ShieldCheck, CreditCard, Link as LinkIcon, AlertCircle } from "lucide-r
 export interface User {
   id: string;
   name: string;
-  activeRole: 'CLIENT' | 'PROVIDER';
+  activeRole: 'CLIENT' | 'WORKER';
   roles: string[];
 }
 
 // Mock de hooks para la previsualización
 const useAuth = () => ({
   isAuthenticated: true,
-  user: { activeRole: 'PROVIDER' } as User
+  user: { activeRole: 'WORKER' } as User
 });
 
 const usePaymentReadiness = () => ({
@@ -87,8 +87,8 @@ export default function PaymentReadinessBanner() {
     );
   }
 
-  // Caso: Proveedor sin Mercado Pago (Se usa PROVIDER en lugar de WORKER)
-  if (role === "PROVIDER" && !isMpConnected) {
+  // Caso: Profesional sin Mercado Pago conectado
+  if (role === "WORKER" && !isMpConnected) {
     return (
       <div className="flex items-center justify-between gap-4 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 backdrop-blur-sm">
         <div className="flex items-center gap-3">

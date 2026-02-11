@@ -25,7 +25,7 @@ interface SelectedSpecialty {
 /**
  * Worker Onboarding Page - Enhanced for Multiple Specialties
  * 
- * Allows CLIENT users to become WORKER/PROVIDER
+ * Allows CLIENT users to become WORKER
  * - Collects basic information
  * - Multi-select specialties with experience years
  * - Calls becomeWorker mutation

@@ -157,7 +157,7 @@ The profile page now renders different sections based on user role:
 // CLIENT sees:
 - Payment Methods Section (optional MP setup)
 
-// PROVIDER sees:
+// WORKER sees:
 - Collections Center (mandatory MP linking)
 - Wallet Balance (if MP connected)
 - Transaction History

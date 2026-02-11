@@ -28,7 +28,7 @@
 - Implemented `becomeWorker` mutation that:
   - Creates or updates WorkerProfile
   - Changes user role to WORKER
-  - Sets activeRole to PROVIDER
+  - Sets activeRole to WORKER
   - Does NOT delete CLIENT profile - preserves multi-role capability
 - Added `BecomeWorkerInput` DTO with validation
 
@@ -45,7 +45,7 @@
 2. Modal opens with 2-step wizard
 3. Step 1: Professional info (name, trade/specialty, bio)
 4. Step 2: Identity verification (optional selfie) + terms acceptance
-5. Submits → becomes WORKER → switches to PROVIDER mode → NO LOGOUT
+5. Submits → becomes WORKER → switches to WORKER mode → NO LOGOUT
 
 **Implementation**:
 - Created `RoleUpgradeModal` component with:
@@ -106,13 +106,13 @@
 - Created `RolesGuard` for role-based authorization
 - Created decorators:
   - `@RequireRoles('WORKER', 'ADMIN')` - checks user.role
-  - `@RequireActiveRole('PROVIDER')` - checks user.activeRole
+  - `@RequireActiveRole('WORKER')` - checks user.activeRole
 
 **Protected Mutations**:
-- `updateWorkerLocation` - requires WORKER + PROVIDER
-- `setWorkerStatus` - requires WORKER + PROVIDER
-- `startJob` - requires PROVIDER activeRole
-- `completeJob` - requires PROVIDER activeRole
+- `updateWorkerLocation` - requires WORKER + WORKER
+- `setWorkerStatus` - requires WORKER + WORKER
+- `startJob` - requires WORKER activeRole
+- `completeJob` - requires WORKER activeRole
 
 **Error Messages**:
 - Clear, user-friendly messages in Spanish
@@ -230,9 +230,9 @@ mutation {
 }
 # Expected error: "Esta acción requiere estar en modo Profesional"
 
-# Switch to PROVIDER mode, then should SUCCEED:
+# Switch to WORKER mode, then should SUCCEED:
 mutation {
-  switchActiveRole(activeRole: PROVIDER) {
+  switchActiveRole(activeRole: WORKER) {
     id
     activeRole
   }
@@ -268,7 +268,7 @@ mutation {
 ```
 User (one account)
 ├── role: CLIENT | WORKER
-├── activeRole: CLIENT | PROVIDER
+├── activeRole: CLIENT | WORKER
 ├── clientProfile (optional)
 ├── workerProfile (optional)
 └── JWT token contains role + activeRole

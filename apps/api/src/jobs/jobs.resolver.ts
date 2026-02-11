@@ -490,7 +490,7 @@ export class JobsResolver {
 
   @Mutation(() => Job)
   @UseGuards(AuthGuard, RolesGuard)
-  @RequireActiveRole('PROVIDER')
+  @RequireActiveRole('WORKER')
   async startJob(
     @Args('jobId') jobId: string,
     @Args('pin') pin: string,
@@ -524,7 +524,7 @@ export class JobsResolver {
 
   @Mutation(() => AuditResponse)
   @UseGuards(AuthGuard, RolesGuard)
-  @RequireActiveRole('PROVIDER')
+  @RequireActiveRole('WORKER')
   async completeJob(
     @Args('jobId') jobId: string,
     @Args('imageAfter') imageAfter: string,

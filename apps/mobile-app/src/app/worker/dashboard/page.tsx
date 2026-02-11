@@ -23,7 +23,7 @@ import { toast } from "sonner";
 /**
  * Worker Dashboard Page
  * 
- * Main dashboard for PROVIDER/WORKER role
+ * Main dashboard for WORKER role
  * Shows stats, pending jobs, service catalog, and quick actions
  */
 export default function WorkerDashboardPage() {

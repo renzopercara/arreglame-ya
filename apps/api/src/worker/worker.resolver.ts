@@ -82,7 +82,7 @@ export class WorkerResolver {
   @Mutation(() => UpdateLocationResponse)
   @UseGuards(AuthGuard, RolesGuard)
   @RequireRoles('WORKER')
-  @RequireActiveRole('PROVIDER')
+  @RequireActiveRole('WORKER')
   async updateWorkerLocation(
     @Args('lat') lat: number,
     @Args('lng') lng: number,
@@ -95,7 +95,7 @@ export class WorkerResolver {
   @Mutation(() => WorkerProfileResponse)
   @UseGuards(AuthGuard, RolesGuard)
   @RequireRoles('WORKER')
-  @RequireActiveRole('PROVIDER')
+  @RequireActiveRole('WORKER')
   async setWorkerStatus(
     @Args('status') status: string,
     @CurrentUser() user: any

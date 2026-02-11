@@ -10,7 +10,7 @@ import { useAuth } from "@/app/providers";
  * 
  * Features:
  * - Avatar display with role badge
- * - Visual distinction between CLIENT and PROVIDER modes
+ * - Visual distinction between CLIENT and WORKER modes
  * - Shows available roles
  * - Option to add professional profile
  */
