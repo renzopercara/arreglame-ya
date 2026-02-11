@@ -6,7 +6,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { UserRegisteredEvent } from './events/user-events.listener';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole, ActiveRole } from '@prisma/client';
 
 // Rate limiting store (in production, use Redis)
 // TODO: Replace with Redis for production deployment
@@ -14,6 +14,15 @@ import { Prisma } from '@prisma/client';
 const loginAttempts = new Map<string, { count: number; lastAttempt: Date }>();
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+/**
+ * Maps UserRole to ActiveRole
+ * WORKER -> PROVIDER (for UI context)
+ * CLIENT -> CLIENT
+ */
+function mapUserRoleToActiveRole(role: UserRole): ActiveRole {
+  return role === UserRole.WORKER ? ActiveRole.PROVIDER : ActiveRole.CLIENT;
+}
 
 @Injectable()
 export class AuthService {
@@ -78,11 +87,11 @@ export class AuthService {
     loginAttempts.delete(email);
   }
 
-  async login(email: string, password: string, role: string) {
+  async login(email: string, password: string, role: UserRole) {
     // Check rate limiting
     this.checkRateLimit(email);
 
-    const user = await (this.prisma as any).user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
@@ -134,7 +143,7 @@ export class AuthService {
     return { accessToken, user };
   }
 
-  async register(email: string, password: string, name: string, role: string) {
+  async register(email: string, password: string, name: string, role: UserRole) {
     // Validate password strength
     if (password.length < 8) {
       throw new BadRequestException('La contraseña debe tener al menos 8 caracteres');
@@ -155,16 +164,19 @@ export class AuthService {
     const emailVerificationToken = this.generateEmailVerificationToken();
 
     try {
-      const user = await (this.prisma as any).$transaction(async (tx: any) => {
+      const user = await this.prisma.$transaction(async (tx) => {
+          // Map the UserRole to ActiveRole using helper function
+          const activeRole = mapUserRoleToActiveRole(role);
+          
           const newUser = await tx.user.create({
               data: {
                   email,
                   passwordHash,
-                  roles: [role], // Initialize roles array with selected role
-                  currentRole: role,
-                  activeRole: role === 'WORKER' ? 'PROVIDER' : 'CLIENT',
-                  status: 'LOGGED_IN', // User can login, but email needs verification
-                  isEmailVerified: false, // Requires email verification
+                  roles: [role], // Use typed enum value
+                  currentRole: role, // Use typed enum value
+                  activeRole: activeRole, // Use mapped ActiveRole enum value
+                  status: 'LOGGED_IN',
+                  isEmailVerified: false,
                   emailVerificationToken,
               }
           });
@@ -174,11 +186,11 @@ export class AuthService {
               data: { userId: newUser.id, name }
           });
 
-          if (role === 'CLIENT') {
+          if (role === UserRole.CLIENT) {
               await tx.clientProfile.create({
                   data: { userId: newUser.id, name }
               });
-          } else if (role === 'WORKER') {
+          } else if (role === UserRole.WORKER) {
               await tx.workerProfile.create({
                   data: { 
                     userId: newUser.id, 
@@ -224,7 +236,7 @@ export class AuthService {
   }
 
   async verifyEmail(token: string) {
-    const user = await (this.prisma as any).user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { emailVerificationToken: token },
     });
 
@@ -232,7 +244,7 @@ export class AuthService {
       throw new BadRequestException('Token de verificación inválido o expirado');
     }
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: {
         isEmailVerified: true,
@@ -245,7 +257,7 @@ export class AuthService {
   }
 
   async resendVerificationEmail(email: string) {
-    const user = await (this.prisma as any).user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
@@ -259,13 +271,13 @@ export class AuthService {
 
     const emailVerificationToken = this.generateEmailVerificationToken();
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: { emailVerificationToken },
     });
 
     // Emit event to send verification email
-    const profile = await this.getProfileName(user.id, user.role);
+    const profile = await this.getProfileName(user.id, user.currentRole);
     this.eventEmitter.emit('user.registered', {
       email: user.email,
       name: profile?.name || 'Usuario',
@@ -275,14 +287,14 @@ export class AuthService {
     return { success: true, message: 'Email de verificación enviado' };
   }
 
-  private async getProfileName(userId: string, role: string): Promise<{ name: string } | null> {
-    if (role === 'CLIENT') {
-      return await (this.prisma as any).clientProfile.findUnique({
+  private async getProfileName(userId: string, role: UserRole): Promise<{ name: string } | null> {
+    if (role === UserRole.CLIENT) {
+      return await this.prisma.clientProfile.findUnique({
         where: { userId },
         select: { name: true },
       });
-    } else if (role === 'WORKER') {
-      return await (this.prisma as any).workerProfile.findUnique({
+    } else if (role === UserRole.WORKER) {
+      return await this.prisma.workerProfile.findUnique({
         where: { userId },
         select: { name: true },
       });
@@ -291,11 +303,11 @@ export class AuthService {
   }
 
   async findUserById(id: string) {
-    return (this.prisma as any).user.findUnique({ where: { id } });
+    return this.prisma.user.findUnique({ where: { id } });
   }
 
-  async switchActiveRole(userId: string, activeRole: 'CLIENT' | 'PROVIDER') {
-    return (this.prisma as any).user.update({
+  async switchActiveRole(userId: string, activeRole: ActiveRole) {
+    return this.prisma.user.update({
       where: { id: userId },
       data: { activeRole },
     });
@@ -312,7 +324,7 @@ export class AuthService {
     }
   ) {
     // Check if user exists
-    const user = await (this.prisma as any).user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { workerProfile: true, clientProfile: true },
     });
@@ -336,16 +348,16 @@ export class AuthService {
 
       // Update user to add WORKER role if not present, and set currentRole to WORKER
       const currentRoles = user.roles || [user.currentRole];
-      const updatedRoles = currentRoles.includes('WORKER') 
+      const updatedRoles = currentRoles.includes(UserRole.WORKER) 
         ? currentRoles 
-        : [...currentRoles, 'WORKER'];
+        : [...currentRoles, UserRole.WORKER];
 
       await this.prisma.user.update({
         where: { id: userId },
         data: {
           roles: updatedRoles,
-          currentRole: 'WORKER',
-          activeRole: 'PROVIDER',
+          currentRole: UserRole.WORKER,
+          activeRole: ActiveRole.PROVIDER,
         },
       });
 
@@ -368,16 +380,16 @@ export class AuthService {
 
     // Update user to add WORKER role and set currentRole to WORKER
     const currentRoles = user.roles || [user.currentRole];
-    const updatedRoles = currentRoles.includes('WORKER') 
+    const updatedRoles = currentRoles.includes(UserRole.WORKER) 
       ? currentRoles 
-      : [...currentRoles, 'WORKER'];
+      : [...currentRoles, UserRole.WORKER];
 
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         roles: updatedRoles,
-        currentRole: 'WORKER',
-        activeRole: 'PROVIDER',
+        currentRole: UserRole.WORKER,
+        activeRole: ActiveRole.PROVIDER,
       },
     });
 
