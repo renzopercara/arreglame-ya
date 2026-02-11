@@ -11,7 +11,8 @@ import {
   Star,
   TrendingUp,
   Clock,
-  Settings,
+  PencilLine,
+  Plus,
   CheckCircle,
   XCircle,
   Loader2,
@@ -187,13 +188,22 @@ export default function WorkerDashboardPage() {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-800">Mi Catálogo de Servicios</h2>
-          <button
-            onClick={() => router.push('/profile')}
-            className="p-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-            title="Configurar servicios"
-          >
-            <Settings className="w-4 h-4 text-slate-600" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push('/worker/services')}
+              className="p-2 bg-emerald-100 rounded-xl hover:bg-emerald-200 transition-colors"
+              title="Editar servicios"
+            >
+              <PencilLine className="w-4 h-4 text-emerald-600" />
+            </button>
+            <button
+              onClick={() => router.push('/worker/services')}
+              className="p-2 bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors"
+              title="Agregar servicio"
+            >
+              <Plus className="w-4 h-4 text-white" />
+            </button>
+          </div>
         </div>
 
         {/* Loading State */}
@@ -205,22 +215,24 @@ export default function WorkerDashboardPage() {
 
         {/* Empty State */}
         {!loadingServices && !hasServices && (
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 text-center">
-            <div className="p-3 bg-slate-100 rounded-full inline-flex mb-3">
-              <Settings className="w-6 h-6 text-slate-400" />
+          <div className="max-w-md mx-auto px-4">
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-8 text-center">
+              <div className="p-4 bg-slate-100 rounded-full inline-flex mb-4">
+                <Briefcase className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 mb-2">
+                Aún no configuraste servicios
+              </h3>
+              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+                Agrega los servicios que ofreces para empezar a recibir solicitudes de clientes.
+              </p>
+              <button
+                onClick={() => router.push('/worker/services')}
+                className="w-full py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-colors active:scale-95"
+              >
+                Configurar mi primer servicio
+              </button>
             </div>
-            <h3 className="text-sm font-bold text-slate-900 mb-1">
-              No tienes servicios configurados
-            </h3>
-            <p className="text-xs text-slate-600 mb-4">
-              Agrega los servicios que ofreces para empezar a recibir solicitudes.
-            </p>
-            <button
-              onClick={() => router.push('/worker/services')}
-              className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors"
-            >
-              Agregar Servicios
-            </button>
           </div>
         )}
 
@@ -232,47 +244,62 @@ export default function WorkerDashboardPage() {
                 ? optimisticUpdates[service.id] 
                 : service.isActive;
 
+              // Determine status for badge
+              const status = service.status || (isActive ? 'ACTIVE' : 'INACTIVE');
+              const statusConfig = {
+                ACTIVE: { color: 'emerald', bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Activo' },
+                PENDING: { color: 'amber', bg: 'bg-amber-100', text: 'text-amber-700', label: 'Pendiente' },
+                INACTIVE: { color: 'slate', bg: 'bg-slate-100', text: 'text-slate-700', label: 'Inactivo' },
+              }[status] || { color: 'slate', bg: 'bg-slate-100', text: 'text-slate-700', label: 'Inactivo' };
+
               return (
                 <div
                   key={service.id}
-                  className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center justify-between shadow-sm"
+                  className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm"
                 >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className={`p-2 rounded-xl ${isActive ? 'bg-emerald-100' : 'bg-slate-100'}`}>
-                      <span className="text-2xl">{getIconForService(service.iconName)}</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-bold text-slate-900">{service.name}</div>
-                      <div className="text-xs text-slate-500">
-                        {service.experienceYears > 0 
-                          ? `${service.experienceYears} año${service.experienceYears > 1 ? 's' : ''} de experiencia`
-                          : 'Sin experiencia registrada'}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className={`p-2 rounded-xl ${isActive ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+                        <span className="text-2xl">{getIconForService(service.iconName)}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="text-sm font-bold text-slate-900">{service.name}</div>
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${statusConfig.bg} ${statusConfig.text}`}>
+                            {statusConfig.label}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {service.experienceYears > 0 
+                            ? `${service.experienceYears} año${service.experienceYears > 1 ? 's' : ''} de experiencia`
+                            : 'Sin experiencia registrada'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Toggle Button */}
-                  <button
-                    onClick={() => handleServiceToggle(service.id, isActive)}
-                    className={`
-                      relative flex h-8 w-14 items-center rounded-full transition-all duration-300
-                      ${isActive 
-                        ? "bg-emerald-500" 
-                        : "bg-slate-300"}
-                    `}
-                    disabled={optimisticUpdates[service.id] !== undefined}
-                  >
-                    <span
+                    
+                    {/* Toggle Button */}
+                    <button
+                      onClick={() => handleServiceToggle(service.id, isActive)}
                       className={`
-                        absolute h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-300
-                        ${isActive ? "translate-x-7" : "translate-x-1"}
+                        relative flex h-8 w-14 items-center rounded-full transition-all duration-300
+                        ${isActive 
+                          ? "bg-emerald-500" 
+                          : "bg-slate-300"}
                       `}
+                      disabled={optimisticUpdates[service.id] !== undefined}
                     >
-                      {optimisticUpdates[service.id] !== undefined && (
-                        <Loader2 className="w-4 h-4 text-slate-400 animate-spin m-1" />
-                      )}
-                    </span>
-                  </button>
+                      <span
+                        className={`
+                          absolute h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-300
+                          ${isActive ? "translate-x-7" : "translate-x-1"}
+                        `}
+                      >
+                        {optimisticUpdates[service.id] !== undefined && (
+                          <Loader2 className="w-4 h-4 text-slate-400 animate-spin m-1" />
+                        )}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               );
             })}
