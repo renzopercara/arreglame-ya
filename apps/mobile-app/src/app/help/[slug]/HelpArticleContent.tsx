@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, ThumbsUp, ThumbsDown, Home, CheckCircle } from "lucide-react";
+import { ArrowLeft, ThumbsUp, ThumbsDown, Home, CheckCircle, MessageCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { helpArticles, helpCategories } from "@/data/help-content";
 
@@ -198,6 +198,23 @@ export default function HelpArticleContent({ slug }: { slug: string }) {
         >
           Volver al Centro de Ayuda
         </button>
+      </div>
+
+      {/* Sticky CTA */}
+      <div className="sticky bottom-4 bg-gradient-to-br from-emerald-600 to-green-700 rounded-2xl p-5 text-white shadow-xl shadow-emerald-200">
+        <h3 className="text-base font-black mb-2">¿Aún tienes dudas?</h3>
+        <p className="text-green-100 text-xs mb-4 leading-relaxed">
+          Nuestro equipo de soporte está listo para ayudarte con cualquier consulta.
+        </p>
+        <a
+          href="https://wa.me/5491123456789?text=Hola,%20necesito%20ayuda%20con%20Arreglame%20Ya"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-3 bg-white text-emerald-700 font-bold text-sm rounded-xl active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
+        >
+          <MessageCircle className="w-4 h-4" />
+          Contactar Soporte
+        </a>
       </div>
     </div>
   );

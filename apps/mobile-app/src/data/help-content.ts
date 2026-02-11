@@ -10,54 +10,255 @@ export const helpCategories: HelpCategory[] = [
   {
     id: 'primeros-pasos',
     name: 'Primeros Pasos',
-    description: 'Aprende a usar la plataforma',
+    description: 'Comienza a recibir trabajos',
     icon: 'Rocket',
     color: 'emerald',
-    articleCount: 3,
+    articleCount: 1,
   },
   {
-    id: 'cobros-pagos',
-    name: 'Cobros y Pagos',
-    description: 'Gestiona tu dinero',
-    icon: 'DollarSign',
+    id: 'ubicacion',
+    name: 'Ubicación',
+    description: 'Configura tu GPS',
+    icon: 'MapPin',
     color: 'blue',
-    articleCount: 4,
+    articleCount: 1,
   },
   {
-    id: 'gestion-servicios',
-    name: 'Gestión de Servicios',
-    description: 'Administra tu catálogo',
+    id: 'especialidades',
+    name: 'Especialidades',
+    description: 'Gestiona tus servicios',
     icon: 'Briefcase',
     color: 'purple',
-    articleCount: 3,
+    articleCount: 1,
   },
   {
-    id: 'seguridad-perfil',
-    name: 'Seguridad y Perfil',
-    description: 'Protege tu cuenta',
-    icon: 'Shield',
-    color: 'red',
-    articleCount: 3,
-  },
-  {
-    id: 'politicas-cancelacion',
-    name: 'Políticas de Cancelación',
-    description: 'Normas y procedimientos',
-    icon: 'FileText',
+    id: 'cobros',
+    name: 'Cobros',
+    description: 'Sistema de pagos',
+    icon: 'Wallet',
     color: 'amber',
-    articleCount: 2,
+    articleCount: 1,
+  },
+  {
+    id: 'verificacion',
+    name: 'Verificación',
+    description: 'Obtén tu sello KYC',
+    icon: 'ShieldCheck',
+    color: 'red',
+    articleCount: 1,
   },
 ];
 
 export const helpArticles: HelpArticle[] = [
   // Primeros Pasos
   {
+    id: 'comenzar-como-profesional',
+    slug: 'comenzar-como-profesional',
+    title: '¿Cómo empezar a recibir trabajos?',
+    excerpt: 'Para recibir solicitudes, asegúrate de tener tu perfil completo y al menos una especialidad activa.',
+    categoryId: 'primeros-pasos',
+    isFeatured: true,
+    content: `# ¿Cómo empezar a recibir trabajos?
+
+Para recibir solicitudes, asegúrate de tener tu perfil completo y al menos una especialidad activa. Nuestro equipo revisará tu perfil en un plazo de 24hs para darte de alta.
+
+## Pasos para comenzar
+
+1. **Completa tu perfil**: Asegúrate de que toda tu información esté actualizada
+2. **Agrega especialidades**: Añade al menos una especialidad desde tu catálogo de servicios
+3. **Activa tus servicios**: Marca tus servicios como activos para que los clientes puedan encontrarte
+4. **Espera la revisión**: Nuestro equipo revisará tu perfil en un plazo de 24 horas
+
+## Requisitos básicos
+
+- Foto de perfil profesional
+- Información de contacto completa
+- Al menos una especialidad activa
+- Disponibilidad configurada
+
+Una vez que tu perfil sea aprobado, comenzarás a recibir solicitudes de trabajo de clientes en tu área.`,
+  },
+  
+  // Ubicación
+  {
+    id: 'gestion-ubicacion',
+    slug: 'gestion-ubicacion',
+    title: 'Configurando tu ubicación',
+    excerpt: 'La app utiliza tu ubicación actual para mostrarte a clientes cercanos.',
+    categoryId: 'ubicacion',
+    isFeatured: true,
+    content: `# Configurando tu ubicación
+
+La app utiliza tu ubicación actual para mostrarte a clientes cercanos. Asegúrate de dar permisos de GPS para que tu perfil sea visible en el mapa de búsqueda.
+
+## Permisos de ubicación
+
+Para que los clientes puedan encontrarte, necesitas:
+
+1. **Activar GPS**: Habilita el GPS en tu dispositivo
+2. **Dar permisos**: Permite que la app acceda a tu ubicación
+3. **Mantener activo**: Mantén la ubicación activa mientras estés disponible
+
+## ¿Por qué es importante?
+
+- Los clientes buscan profesionales cercanos a su ubicación
+- Tu perfil aparecerá en el mapa de búsqueda
+- Recibirás más solicitudes de trabajo en tu zona
+- Los clientes pueden ver qué tan lejos estás
+
+## Privacidad
+
+Tu ubicación solo se comparte con clientes cuando:
+- Tienes servicios activos
+- Estás en modo ONLINE
+- Un cliente busca profesionales en tu área`,
+  },
+  
+  // Especialidades
+  {
+    id: 'especialidades-y-experiencia',
+    slug: 'especialidades-y-experiencia',
+    title: 'Especialidades y Experiencia',
+    excerpt: 'Puedes añadir múltiples servicios desde tu perfil.',
+    categoryId: 'especialidades',
+    isFeatured: true,
+    content: `# Especialidades y Experiencia
+
+Puedes añadir múltiples servicios desde tu perfil. Detallar tus años de experiencia ayuda a que los clientes te elijan sobre otros profesionales.
+
+## Agregar especialidades
+
+1. Ve a tu Panel Profesional
+2. Toca el botón "+" en "Mi Catálogo de Servicios"
+3. Selecciona la especialidad que deseas agregar
+4. Indica tus años de experiencia
+5. Guarda los cambios
+
+## La importancia de la experiencia
+
+Indicar tus años de experiencia:
+- Genera confianza en los clientes
+- Te diferencia de otros profesionales
+- Puede justificar mejores tarifas
+- Aumenta tus probabilidades de ser elegido
+
+## Consejos
+
+- **Sé honesto**: Indica tu experiencia real
+- **Múltiples servicios**: Agrega todas tus especialidades
+- **Actualiza regularmente**: Mantén tu experiencia al día
+- **Detalla tu expertise**: Cuanto más específico, mejor`,
+  },
+  
+  // Cobros
+  {
+    id: 'cobros-y-pagos',
+    slug: 'cobros-y-pagos',
+    title: 'Sistema de Cobros',
+    excerpt: 'Tus ganancias se verán reflejadas en tu balance.',
+    categoryId: 'cobros',
+    isFeatured: true,
+    content: `# Sistema de Cobros
+
+Tus ganancias se verán reflejadas en tu balance. Puedes configurar tus métodos de cobro desde la sección de configuración de cuenta.
+
+## Cómo funciona
+
+1. **Completas un trabajo**: El cliente confirma que el servicio fue completado
+2. **Pago procesado**: El dinero se acredita automáticamente a tu balance
+3. **Retira tus ganancias**: Configura tu método de cobro y solicita retiros
+
+## Configurar métodos de cobro
+
+Para recibir tus pagos:
+
+1. Ve a tu Perfil
+2. Selecciona "Configuración de Cuenta"
+3. Agrega tu información bancaria
+4. Verifica tus datos
+
+## Balance disponible
+
+Puedes ver tu balance actual en:
+- Panel Profesional (tarjeta "Balance")
+- Sección de Pagos en tu perfil
+
+## Retiros
+
+- **Mínimo**: $500 para solicitar retiro
+- **Tiempo de procesamiento**: 2-5 días hábiles
+- **Sin costo adicional**: Los retiros son gratuitos
+
+## Comisión de la plataforma
+
+Arreglame Ya cobra una comisión del 15% por cada trabajo completado, que incluye:
+- Uso de la plataforma
+- Procesamiento de pagos
+- Soporte técnico
+- Seguridad de transacciones`,
+  },
+  
+  // Verificación
+  {
+    id: 'verificacion-perfil',
+    slug: 'verificacion-perfil',
+    title: 'Sello de Verificación',
+    excerpt: 'Un perfil verificado (KYC) recibe hasta un 300% más de contactos.',
+    categoryId: 'verificacion',
+    isFeatured: true,
+    content: `# Sello de Verificación
+
+Un perfil verificado (KYC) recibe hasta un 300% más de contactos. Sube una foto de tu documento para obtener tu insignia.
+
+## ¿Por qué verificar tu perfil?
+
+Beneficios de la verificación:
+
+- **300% más contactos**: Los perfiles verificados son preferidos por los clientes
+- **Mayor confianza**: Los clientes confían más en profesionales verificados
+- **Acceso a pagos**: Necesario para recibir pagos por tus trabajos
+- **Mejor posicionamiento**: Apareces antes en los resultados de búsqueda
+
+## Proceso de verificación KYC
+
+1. Ve a tu Perfil
+2. Selecciona "Verificar Identidad"
+3. Sube una foto del frente de tu documento de identidad
+4. Sube una foto del reverso de tu documento
+5. Toma una selfie sosteniendo el documento
+6. Espera la aprobación (24-48 horas)
+
+## Documentos aceptados
+
+- DNI (Documento Nacional de Identidad)
+- Pasaporte
+- Licencia de conducir
+
+## Consejos para una verificación exitosa
+
+- Usa fotos claras y bien iluminadas
+- Asegúrate de que todos los datos sean legibles
+- Tu rostro debe ser visible en la selfie
+- El documento debe estar vigente
+
+## Estados de verificación
+
+- **PENDING_SUBMISSION**: Aún no has enviado documentos
+- **PENDING_REVIEW**: En revisión por nuestro equipo
+- **APPROVED**: ¡Verificación completa! Ya tienes tu insignia
+- **REJECTED**: Necesitas reenviar documentos
+
+Si tu verificación es rechazada, revisa que las fotos sean claras y que la información coincida.`,
+  },
+  
+  // Keep original articles for backward compatibility
+  {
     id: 'como-empezar',
     slug: 'como-empezar',
     title: '¿Cómo empezar en Arreglame Ya?',
     excerpt: 'Guía completa para dar tus primeros pasos como profesional',
     categoryId: 'primeros-pasos',
-    isFeatured: true,
+    isFeatured: false,
     content: `# ¿Cómo empezar en Arreglame Ya?
 
 Bienvenido a Arreglame Ya, la plataforma que conecta profesionales de servicios con clientes que los necesitan.
@@ -702,17 +903,17 @@ Si tu cuenta es suspendida:
 export const helpFAQs: HelpFAQ[] = [
   {
     id: 'faq-1',
-    question: '¿Cómo cobrar mi primer trabajo?',
-    articleSlug: 'como-cobrar-mi-primer-trabajo',
+    question: '¿Cómo empezar a recibir trabajos?',
+    articleSlug: 'comenzar-como-profesional',
   },
   {
     id: 'faq-2',
-    question: '¿Cómo empezar en la plataforma?',
-    articleSlug: 'como-empezar',
+    question: '¿Cómo configuro mi ubicación?',
+    articleSlug: 'gestion-ubicacion',
   },
   {
     id: 'faq-3',
-    question: '¿Cómo verificar mi identidad?',
-    articleSlug: 'verificacion-identidad',
+    question: '¿Cómo obtengo el sello de verificación?',
+    articleSlug: 'verificacion-perfil',
   },
 ];

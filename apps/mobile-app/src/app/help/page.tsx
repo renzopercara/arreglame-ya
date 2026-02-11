@@ -7,10 +7,10 @@ import {
   Search,
   ArrowLeft,
   Rocket,
-  DollarSign,
+  MapPin,
   Briefcase,
-  Shield,
-  FileText,
+  Wallet,
+  ShieldCheck,
   ChevronRight,
   MessageCircle,
   Mail,
@@ -42,10 +42,10 @@ export default function HelpCenterPage() {
   // Icon mapping
   const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
     Rocket,
-    DollarSign,
+    MapPin,
     Briefcase,
-    Shield,
-    FileText,
+    Wallet,
+    ShieldCheck,
   };
 
   // Color mapping for categories
