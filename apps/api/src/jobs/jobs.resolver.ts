@@ -347,7 +347,7 @@ export class JobsResolver {
     // Note: Using 'as any' for Prisma serviceRequest due to dynamic schema.
     // The ServiceRequest model includes these fields but Prisma's type inference
     // doesn't always capture them correctly with the current schema setup.
-    // 
+    //
     // UX Note: We safely fetch all services and filter out those without valid coordinates.
     // If no valid coordinates exist, the query returns an empty array gracefully.
     let services = [];
