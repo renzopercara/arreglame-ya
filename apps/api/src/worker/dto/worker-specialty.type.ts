@@ -1,4 +1,5 @@
 import { ObjectType, Field, Int } from '@nestjs/graphql';
+import GraphQLJSON from 'graphql-type-json';
 import { ServiceCategoryGraphQL } from '../../service-categories/service-category.model';
 
 @ObjectType()
@@ -18,8 +19,10 @@ export class WorkerSpecialtyType {
   @Field(() => Int)
   experienceYears: number;
 
-  @Field({ nullable: true })
-  metadata?: string;
+  @Field(() => GraphQLJSON, { nullable: true })
+  metadata?: {
+    description?: string;
+  };
 
   @Field()
   createdAt: Date;

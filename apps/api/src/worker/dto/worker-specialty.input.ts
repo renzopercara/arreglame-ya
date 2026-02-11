@@ -1,4 +1,5 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
+import GraphQLJSON from 'graphql-type-json';
 import { Type } from 'class-transformer';
 import { IsString, IsNotEmpty, IsInt, Min, IsOptional, IsEnum, IsArray, ValidateNested } from 'class-validator';
 
@@ -21,10 +22,11 @@ export class CreateWorkerSpecialtyInput {
   @Min(0)
   experienceYears: number = 0;
 
-  @Field({ nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   @IsOptional()
-  @IsString()
-  metadata?: string; // JSON string for certifications, specific skills, etc.
+  metadata?: {
+    description?: string;
+  };
 }
 
 @InputType()
@@ -40,10 +42,11 @@ export class UpdateWorkerSpecialtyInput {
   @Min(0)
   experienceYears?: number;
 
-  @Field({ nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   @IsOptional()
-  @IsString()
-  metadata?: string;
+  metadata?: {
+    description?: string;
+  };
 
   @Field({ nullable: true })
   @IsOptional()

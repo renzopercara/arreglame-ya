@@ -68,23 +68,13 @@ export class WorkerService {
       throw new BadRequestException('Worker already has this specialty');
     }
 
-    // Parse metadata if provided
-    let metadata = null;
-    if (input.metadata) {
-      try {
-        metadata = JSON.parse(input.metadata);
-      } catch (e) {
-        throw new BadRequestException('Invalid metadata JSON format');
-      }
-    }
-
     // Create specialty
     return (this.prisma as any).workerSpecialty.create({
       data: {
         workerId,
         categoryId: input.categoryId,
         experienceYears: input.experienceYears || 0,
-        metadata,
+        metadata: input.metadata || null,
         status: 'PENDING', // Default to PENDING for admin approval
       },
       include: {
@@ -125,7 +115,12 @@ export class WorkerService {
       throw new BadRequestException('This specialty does not belong to you');
     }
 
-    const updateData: any = {};
+    const updateData: {
+      experienceYears?: number;
+      status?: string;
+      metadata?: { description?: string } | null;
+    } = {};
+    
     if (input.experienceYears !== undefined) {
       updateData.experienceYears = input.experienceYears;
     }
@@ -133,11 +128,7 @@ export class WorkerService {
       updateData.status = input.status;
     }
     if (input.metadata !== undefined) {
-      try {
-        updateData.metadata = JSON.parse(input.metadata);
-      } catch (e) {
-        throw new BadRequestException('Invalid metadata JSON format');
-      }
+      updateData.metadata = input.metadata;
     }
 
     return (this.prisma as any).workerSpecialty.update({
