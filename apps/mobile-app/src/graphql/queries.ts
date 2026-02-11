@@ -709,6 +709,7 @@ export const GET_MY_SERVICES = gql`
       description
       iconName
       isActive
+      status
       experienceYears
       createdAt
       updatedAt
