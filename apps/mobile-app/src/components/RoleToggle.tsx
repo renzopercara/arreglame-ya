@@ -13,21 +13,21 @@ export default function RoleToggle() {
       id: string;
       name: string;
       role: string;
-      activeRole: 'CLIENT' | 'PROVIDER';
+      activeRole: 'CLIENT' | 'WORKER';
     };
   }>(ME_QUERY);
 
   const [switchRole, { loading: mutationLoading }] = useMutation<{
     switchActiveRole: {
       id: string;
-      activeRole: 'CLIENT' | 'PROVIDER';
+      activeRole: 'CLIENT' | 'WORKER';
     };
   }>(SWITCH_ACTIVE_ROLE, {
     refetchQueries: [{ query: ME_QUERY }],
     onCompleted: (data) => {
       const newRole = data.switchActiveRole.activeRole;
       toast.success(
-        `Cambiaste a modo ${newRole === 'CLIENT' ? 'Cliente' : 'Proveedor'}`,
+        `Cambiaste a modo ${newRole === 'CLIENT' ? 'Cliente' : 'Profesional'}`,
         {
           description: newRole === 'CLIENT' ? '👤 Busca y contrata servicios' : '🔧 Recibe y gestiona trabajos',
           duration: 3000,
@@ -52,7 +52,7 @@ export default function RoleToggle() {
 
   const handleToggle = () => {
     if (loading) return;
-    const newRole = isClient ? 'PROVIDER' : 'CLIENT';
+    const newRole = isClient ? 'WORKER' : 'CLIENT';
     switchRole({ variables: { activeRole: newRole } });
   };
 
@@ -90,7 +90,7 @@ export default function RoleToggle() {
         >
           <div className="flex items-center justify-center gap-2">
             <Briefcase className="w-5 h-5" />
-            <span>Proveedor</span>
+            <span>Profesional</span>
             {loading && !isClient && <Loader2 className="w-4 h-4 animate-spin" />}
           </div>
         </button>
@@ -99,7 +99,7 @@ export default function RoleToggle() {
       <p className="text-sm mt-4 text-white/80">
         {isClient
           ? '🛒 Estás navegando como cliente. Busca y contrata servicios.'
-          : '🔧 Estás en modo proveedor. Recibe y gestiona trabajos.'}
+          : '🔧 Estás en modo profesional. Recibe y gestiona trabajos.'}
       </p>
     </div>
   );

@@ -58,7 +58,7 @@ export class RolesGuard implements CanActivate {
     // Check if user has required active role
     if (requiredActiveRole && user.activeRole !== requiredActiveRole) {
       const modeNameMap: Record<string, string> = {
-        'PROVIDER': 'Profesional',
+        'WORKER': 'Profesional',
         'CLIENT': 'Cliente',
       };
       const friendlyMode = modeNameMap[requiredActiveRole] || requiredActiveRole;

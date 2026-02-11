@@ -160,7 +160,7 @@ model User {
   roles        UserRole[] // Multiple roles support (CLIENT, WORKER, ADMIN)
   currentRole  UserRole   @default(CLIENT) // Persistent current role for consistency
   status       UserStatus @default(LOGGED_IN)
-  activeRole   ActiveRole @default(CLIENT) // Active UI context (CLIENT or PROVIDER)
+  activeRole   ActiveRole @default(CLIENT) // Active UI context (CLIENT or WORKER)
 
   // Email Verification (Security)
   isEmailVerified        Boolean   @default(false)

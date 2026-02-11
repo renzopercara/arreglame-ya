@@ -41,7 +41,7 @@ function AuthContent() {
   useEffect(() => {
     if (isAuthenticated && user) {
       // Use activeRole for routing since it represents the current user context
-      // WORKER users have activeRole of PROVIDER when acting as service providers
+      // WORKER users have activeRole of WORKER when acting as service providers
       const targetPath = user.activeRole === 'CLIENT' 
         ? '/client/home' 
         : '/worker/dashboard';

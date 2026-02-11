@@ -29,7 +29,7 @@ const useAuth = () => ({
   user: {
     name: "Juan Pérez",
     activeRole: "CLIENT",
-    roles: ["CLIENT", "PROVIDER"], // Tiene ambos roles
+    roles: ["CLIENT", "WORKER"], // Tiene ambos roles
   } as User,
   isBootstrapping: false,
   switchRole: async (role: string) => console.log("Switched to", role)
@@ -109,7 +109,7 @@ export default function WelcomeHeader() {
             {isAuthenticated && user ? `Hola, ${firstName}` : 'Bienvenido'}
           </h1>
 
-          {/* Botón de cambio de rol: Solo si tiene perfil PROVIDER habilitado */}
+          {/* Botón de cambio de rol: Solo si tiene perfil de profesional habilitado */}
           {canSwitchRole && (
             <button
               onClick={handleSwitchRole}

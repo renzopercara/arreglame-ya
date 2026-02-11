@@ -520,7 +520,7 @@ export default function ProfilePage() {
         />
       )}
 
-      {/* PROVIDER: Collections Center & Wallet */}
+      {/* WORKER: Collections Center & Wallet */}
       {isProvider && (
         <CollectionsCenterSection 
           isMercadoPagoConnected={mpConnected}
@@ -531,7 +531,7 @@ export default function ProfilePage() {
         />
       )}
 
-      {/* PROVIDER: Transaction History */}
+      {/* WORKER: Transaction History */}
       {isProvider && (
         <>
           {transactionsError && (

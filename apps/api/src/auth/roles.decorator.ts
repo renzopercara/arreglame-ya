@@ -11,7 +11,7 @@ export const RequireRoles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles
 
 /**
  * Decorator to specify required active role for a resolver/mutation
- * Example: @RequireActiveRole('PROVIDER')
+ * Example: @RequireActiveRole('WORKER')
  */
-export const RequireActiveRole = (activeRole: 'CLIENT' | 'PROVIDER') => 
+export const RequireActiveRole = (activeRole: 'CLIENT' | 'WORKER') => 
   SetMetadata(ACTIVE_ROLE_KEY, activeRole);
