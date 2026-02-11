@@ -1,12 +1,15 @@
 -- AlterEnum: Change ActiveRole enum from PROVIDER to WORKER
 -- This migration renames the PROVIDER value to WORKER in the ActiveRole enum
 
--- Step 1: Update all existing records using PROVIDER to use WORKER temporarily via a string cast
-UPDATE "User" SET "activeRole" = 'CLIENT' WHERE "activeRole" = 'PROVIDER';
+-- Step 1: Add a temporary column to preserve original activeRole state
+ALTER TABLE "User" ADD COLUMN "activeRole_temp" TEXT;
+UPDATE "User" SET "activeRole_temp" = "activeRole"::text;
 
--- Step 2: Drop and recreate the enum type with the new value
+-- Step 2: Set all users to CLIENT temporarily (safe default)
+UPDATE "User" SET "activeRole" = 'CLIENT';
+
+-- Step 3: Drop and recreate the enum type with the new value
 -- Note: PostgreSQL doesn't support renaming enum values directly
--- We need to create a new enum and migrate
 
 -- Create new enum with WORKER instead of PROVIDER
 CREATE TYPE "ActiveRole_new" AS ENUM ('CLIENT', 'WORKER');
@@ -20,8 +23,18 @@ DROP TYPE "ActiveRole";
 -- Rename new enum to the original name
 ALTER TYPE "ActiveRole_new" RENAME TO "ActiveRole";
 
--- Step 3: Update records back - users who were PROVIDER (now set to CLIENT) should be WORKER
--- This query identifies users with WORKER role and sets their activeRole to WORKER
+-- Step 4: Restore activeRole based on temporary column
+-- Users who were in PROVIDER mode should be set to WORKER
 UPDATE "User" 
 SET "activeRole" = 'WORKER' 
-WHERE 'WORKER' = ANY("roles");
+WHERE "activeRole_temp" = 'PROVIDER';
+
+-- Users who were in CLIENT mode stay in CLIENT mode
+-- (This is already the default from Step 2, but being explicit)
+UPDATE "User" 
+SET "activeRole" = 'CLIENT' 
+WHERE "activeRole_temp" = 'CLIENT';
+
+-- Step 5: Clean up temporary column
+ALTER TABLE "User" DROP COLUMN "activeRole_temp";
+
