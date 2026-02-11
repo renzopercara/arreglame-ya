@@ -1,7 +1,7 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
 import GraphQLJSON from 'graphql-type-json';
 import { Type } from 'class-transformer';
-import { IsString, IsNotEmpty, IsInt, Min, IsOptional, IsEnum, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, Min, IsOptional, IsEnum, IsArray, ValidateNested, IsObject } from 'class-validator';
 
 export enum SpecialtyStatusInput {
   DRAFT = 'DRAFT',
@@ -24,6 +24,7 @@ export class CreateWorkerSpecialtyInput {
 
   @Field(() => GraphQLJSON, { nullable: true })
   @IsOptional()
+  @IsObject()
   metadata?: {
     description?: string;
   };
@@ -44,6 +45,7 @@ export class UpdateWorkerSpecialtyInput {
 
   @Field(() => GraphQLJSON, { nullable: true })
   @IsOptional()
+  @IsObject()
   metadata?: {
     description?: string;
   };

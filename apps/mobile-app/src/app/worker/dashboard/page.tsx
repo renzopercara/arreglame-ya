@@ -245,7 +245,7 @@ export default function WorkerDashboardPage() {
                 : service.isActive;
 
               // Determine status for badge
-              const status = service.status || (isActive ? 'ACTIVE' : 'INACTIVE');
+              const status = service.status ?? (isActive ? 'ACTIVE' : 'INACTIVE');
               const statusConfig = {
                 ACTIVE: { color: 'emerald', bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Activo' },
                 PENDING: { color: 'amber', bg: 'bg-amber-100', text: 'text-amber-700', label: 'Pendiente' },
