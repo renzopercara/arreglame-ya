@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { GET_MY_SERVICES, UPDATE_WORKER_SPECIALTY } from "@/graphql/queries";
 import { toast } from "sonner";
+import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 
 /**
  * Worker Dashboard Page
@@ -27,8 +28,9 @@ import { toast } from "sonner";
  * Shows stats, pending jobs, service catalog, and quick actions
  */
 export default function WorkerDashboardPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, hasClientRole } = useAuth();
   const router = useRouter();
+  const { isSwitchingRole, switchToClient } = useRoleSwitcher();
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, boolean>>({});
 
   // Fetch worker services
@@ -335,6 +337,23 @@ export default function WorkerDashboardPage() {
           </div>
         </button>
       </div>
+
+      {/* Role Switcher - Switch to Client Mode */}
+      {hasClientRole && (
+        <section className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] p-6 text-white shadow-xl shadow-indigo-200">
+          <h3 className="text-xl font-black mb-1">Panel de Cliente</h3>
+          <p className="text-indigo-100 text-xs mb-4 leading-relaxed">
+            Cambia a modo cliente para buscar y contratar servicios profesionales.
+          </p>
+          <button 
+            onClick={switchToClient}
+            disabled={isSwitchingRole}
+            className="w-full py-3.5 bg-white text-blue-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSwitchingRole ? 'CAMBIANDO...' : 'CAMBIAR A MODO CLIENTE'}
+          </button>
+        </section>
+      )}
 
       {/* Info Card */}
       <div className="bg-gradient-to-br from-emerald-600 to-green-700 rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-200">
