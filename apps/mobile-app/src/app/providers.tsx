@@ -144,6 +144,18 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   });
 
   const [switchRoleMutation, { loading: switchRoleLoading }] = useMutation<SwitchActiveRoleMutationResponse, SwitchActiveRoleMutationVariables>(SWITCH_ACTIVE_ROLE, {
+    onCompleted: (data) => {
+      // Immediately update local state with the returned user data
+      if (data?.switchActiveRole) {
+        setUser((prevUser) => prevUser ? {
+          ...prevUser,
+          activeRole: data.switchActiveRole.activeRole,
+          currentRole: data.switchActiveRole.currentRole,
+          role: data.switchActiveRole.role,
+          roles: data.switchActiveRole.roles,
+        } : null);
+      }
+    },
     onError: (error) => {
       console.error('Switch role mutation error:', error);
     }
@@ -257,7 +269,8 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       variables: { activeRole },
     });
 
-    // Refetch full user data after role switch
+    // The onCompleted callback will update state immediately
+    // Now refetch to ensure we have all updated user data
     await fetchMe();
     await client.resetStore();
   }, [switchRoleMutation, fetchMe]);

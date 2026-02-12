@@ -377,9 +377,15 @@ export class AuthService {
   }
 
   async switchActiveRole(userId: string, activeRole: ActiveRole) {
+    // Map ActiveRole to UserRole for consistency
+    const currentRole = activeRole === ActiveRole.WORKER ? UserRole.WORKER : UserRole.CLIENT;
+    
     return this.prisma.user.update({
       where: { id: userId },
-      data: { activeRole },
+      data: { 
+        activeRole,
+        currentRole, // Keep both fields in sync
+      },
     });
   }
 
