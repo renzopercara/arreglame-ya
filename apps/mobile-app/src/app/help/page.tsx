@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   ChevronRight,
   MessageCircle,
-  Mail,
 } from "lucide-react";
 import { helpCategories, helpArticles, helpFAQs } from "@/data/help-content";
 
@@ -230,30 +229,18 @@ export default function HelpCenterPage() {
 
           {/* Support CTA */}
           <div className="bg-gradient-to-br from-emerald-600 to-green-700 rounded-[2rem] p-6 text-white shadow-xl shadow-emerald-200">
-            <h3 className="text-lg font-black mb-1">¿No encuentras lo que buscas?</h3>
+            <h3 className="text-lg font-black mb-1">¿Necesitas asistencia técnica?</h3>
             <p className="text-green-100 text-xs mb-4 leading-relaxed">
-              Nuestro equipo de soporte está disponible para ayudarte.
+              Para garantizar la trazabilidad técnica, los reportes deben enviarse mediante el sistema de asistencia integrado en la plataforma.
             </p>
             
-            <div className="flex flex-col gap-2">
-              <a
-                href="https://wa.me/5491123456789?text=Hola,%20necesito%20ayuda%20con%20Arreglame%20Ya"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-3 bg-white text-emerald-700 font-bold text-sm rounded-xl active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
-              >
-                <MessageCircle className="w-4 h-4" />
-                Contactar por WhatsApp
-              </a>
-              
-              <a
-                href="mailto:soporte@arreglamaya.com?subject=Ayuda%20-%20Centro%20de%20Ayuda"
-                className="w-full py-3 bg-emerald-500 text-white font-bold text-sm rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <Mail className="w-4 h-4" />
-                Enviar Email
-              </a>
-            </div>
+            <button
+              onClick={() => router.push('/profile')}
+              className="w-full py-3 bg-white text-emerald-700 font-bold text-sm rounded-xl active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Reportar Error o Solicitar Soporte
+            </button>
           </div>
         </>
       )}

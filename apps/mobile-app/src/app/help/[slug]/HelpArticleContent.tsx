@@ -204,17 +204,15 @@ export default function HelpArticleContent({ slug }: { slug: string }) {
       <div className="sticky bottom-4 bg-gradient-to-br from-emerald-600 to-green-700 rounded-2xl p-5 text-white shadow-xl shadow-emerald-200">
         <h3 className="text-base font-black mb-2">¿Aún tienes dudas?</h3>
         <p className="text-green-100 text-xs mb-4 leading-relaxed">
-          Nuestro equipo de soporte está listo para ayudarte con cualquier consulta.
+          Para garantizar la trazabilidad técnica, los reportes deben enviarse mediante el sistema de asistencia integrado en la plataforma. No se atenderán consultas técnicas por vías externas.
         </p>
-        <a
-          href="https://wa.me/5491123456789?text=Hola,%20necesito%20ayuda%20con%20Arreglame%20Ya"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={() => router.push('/profile')}
           className="w-full py-3 bg-white text-emerald-700 font-bold text-sm rounded-xl active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
         >
           <MessageCircle className="w-4 h-4" />
-          Contactar Soporte
-        </a>
+          Reportar Error o Solicitar Soporte
+        </button>
       </div>
     </div>
   );
