@@ -67,7 +67,12 @@ export class RolesGuard implements CanActivate {
         select: { activeRole: true },
       });
 
-      const currentActiveRole = dbUser?.activeRole || user.activeRole;
+      // If user not found in database, their token is invalid - reject
+      if (!dbUser) {
+        throw new ForbiddenException('Usuario no encontrado o token inválido');
+      }
+
+      const currentActiveRole = dbUser.activeRole;
       
       if (currentActiveRole !== requiredActiveRole) {
         const modeNameMap: Record<string, string> = {

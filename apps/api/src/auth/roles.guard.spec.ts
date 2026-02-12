@@ -146,20 +146,17 @@ describe('RolesGuard - Active Role Validation', () => {
       expect(result).toBe(true);
     });
 
-    it('should fallback to JWT activeRole if database lookup fails', async () => {
+    it('should reject if user not found in database', async () => {
       const context = createMockContext(mockUser);
 
       jest.spyOn(reflector, 'getAllAndOverride')
         .mockReturnValueOnce(undefined)
         .mockReturnValueOnce('CLIENT');
 
-      // Database lookup returns null (user not found or error)
+      // Database lookup returns null (user deleted or token invalid)
       jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(null);
 
-      const result = await guard.canActivate(context);
-
-      expect(result).toBe(true);
-      expect(prismaService.user.findUnique).toHaveBeenCalled();
+      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
     });
   });
 

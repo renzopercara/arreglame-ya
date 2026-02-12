@@ -265,7 +265,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   }, [fetchMe]);
 
   const switchRole = useCallback(async (activeRole: 'CLIENT' | 'WORKER') => {
-    const { data } = await switchRoleMutation({
+    await switchRoleMutation({
       variables: { activeRole },
     });
 
