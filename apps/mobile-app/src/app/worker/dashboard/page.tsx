@@ -54,7 +54,8 @@ export default function WorkerDashboardPage() {
   React.useEffect(() => {
     if (!isAuthenticated) {
       router.push('/auth');
-    } else if (user?.role !== 'WORKER' && user?.role !== 'ADMIN') {
+    } else if (user?.role !== 'WORKER' && user?.role !== 'ADMIN') {      
+      
       router.push('/');
     }
   }, [isAuthenticated, user, router]);
@@ -192,16 +193,9 @@ export default function WorkerDashboardPage() {
             <button
               onClick={() => router.push('/worker/services')}
               className="p-2 bg-emerald-100 rounded-xl hover:bg-emerald-200 transition-colors"
-              title="Editar servicios"
+              title="Agregar/Editar servicios"
             >
               <PencilLine className="w-4 h-4 text-emerald-600" />
-            </button>
-            <button
-              onClick={() => router.push('/worker/services')}
-              className="p-2 bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors"
-              title="Agregar servicio"
-            >
-              <Plus className="w-4 h-4 text-white" />
             </button>
           </div>
         </div>
