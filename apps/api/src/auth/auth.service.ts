@@ -1,5 +1,5 @@
 
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -26,6 +26,8 @@ function mapUserRoleToActiveRole(role: UserRole): ActiveRole {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -93,6 +95,11 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: {
+        clientProfile: true,
+        workerProfile: true,
+        customerProfile: true,
+      },
     });
 
     // Generic error message for security (don't reveal if user exists)
@@ -105,6 +112,7 @@ export class AuthService {
       throw new UnauthorizedException(genericError);
     }
 
+    // ✅ Step 1: Validate password BEFORE role checks
     const passwordMatch = await this.comparePasswords(password, user.passwordHash);
 
     if (!passwordMatch) {
@@ -114,16 +122,26 @@ export class AuthService {
       throw new UnauthorizedException(genericError);
     }
 
-    // Check if user has the requested role in their roles array
-    if (!user.roles || !user.roles.includes(role)) {
-      this.recordFailedAttempt(email);
-      throw new UnauthorizedException(`Este usuario no tiene el rol de ${role}`);
+    // ✅ Step 2: Auto-provision role if not present
+    let updatedUser = user;
+    const currentRoles = user.roles || [];
+    
+    if (!currentRoles.includes(role)) {
+      // 🔒 Security: Block auto-assignment of administrative roles
+      if (role === UserRole.ADMIN) {
+        this.recordFailedAttempt(email);
+        throw new UnauthorizedException('No tienes permisos para acceder a este rol');
+      }
+
+      // Auto-provision CLIENT or WORKER role
+      updatedUser = await this.autoProvisionRole(user, role);
+      this.logger.log(`Role ${role} auto-assigned to user ${user.id}`);
     }
 
     // Check if email is verified (for financial operations later)
     // Note: We allow login even without verification, but block financial operations
-    if (!user.isEmailVerified) {
-      console.log(`User ${email} logged in without email verification`);
+    if (!updatedUser.isEmailVerified) {
+      this.logger.log(`User ${email} logged in without email verification`);
     }
 
     // Clear failed attempts on successful login
@@ -131,16 +149,68 @@ export class AuthService {
 
     // JWT Payload seguro - includes roles array and currentRole
     const payload = { 
-      sub: user.id, 
-      email: user.email, 
-      roles: user.roles,
-      currentRole: user.currentRole,
-      activeRole: user.activeRole,
-      isEmailVerified: user.isEmailVerified 
+      sub: updatedUser.id, 
+      email: updatedUser.email, 
+      roles: updatedUser.roles,
+      currentRole: role, // Set to the requested role
+      activeRole: mapUserRoleToActiveRole(role),
+      isEmailVerified: updatedUser.isEmailVerified 
     };
     const accessToken = await this.jwtService.signAsync(payload);
 
-    return { accessToken, user };
+    return { accessToken, user: updatedUser };
+  }
+
+  /**
+   * Auto-provisions a new role (CLIENT or WORKER) for an existing user
+   * Creates the corresponding profile if it doesn't exist
+   * Uses transaction for atomicity
+   */
+  private async autoProvisionRole(user: any, role: UserRole) {
+    return await this.prisma.$transaction(async (tx) => {
+      // Add role to user's roles array
+      const updatedRoles = [...(user.roles || []), role];
+      const activeRole = mapUserRoleToActiveRole(role);
+
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          roles: updatedRoles,
+          currentRole: role,
+          activeRole: activeRole,
+        },
+        include: {
+          clientProfile: true,
+          workerProfile: true,
+          customerProfile: true,
+        },
+      });
+
+      // Create corresponding profile if it doesn't exist (idempotency check)
+      if (role === UserRole.CLIENT && !user.clientProfile) {
+        // Get name from workerProfile or customerProfile if available
+        const name = user.workerProfile?.name || user.customerProfile?.name || 'Usuario';
+        await tx.clientProfile.create({
+          data: {
+            userId: user.id,
+            name: name,
+          },
+        });
+      } else if (role === UserRole.WORKER && !user.workerProfile) {
+        // Get name from clientProfile or customerProfile if available
+        const name = user.clientProfile?.name || user.customerProfile?.name || 'Usuario';
+        await tx.workerProfile.create({
+          data: {
+            userId: user.id,
+            name: name,
+            kycStatus: 'PENDING_SUBMISSION',
+            isKycVerified: false,
+          },
+        });
+      }
+
+      return updatedUser;
+    });
   }
 
   async register(email: string, password: string, name: string, role: UserRole) {
