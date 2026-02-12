@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, ThumbsUp, ThumbsDown, Home, CheckCircle } from "lucide-react";
+import { ArrowLeft, ThumbsUp, ThumbsDown, Home, CheckCircle, MessageCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { helpArticles, helpCategories } from "@/data/help-content";
 
@@ -197,6 +197,21 @@ export default function HelpArticleContent({ slug }: { slug: string }) {
           className="w-full py-3.5 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 transition-colors active:scale-95"
         >
           Volver al Centro de Ayuda
+        </button>
+      </div>
+
+      {/* Sticky CTA */}
+      <div className="sticky bottom-4 bg-gradient-to-br from-emerald-600 to-green-700 rounded-2xl p-5 text-white shadow-xl shadow-emerald-200">
+        <h3 className="text-base font-black mb-2">¿Aún tienes dudas?</h3>
+        <p className="text-green-100 text-xs mb-4 leading-relaxed">
+          Para garantizar la trazabilidad técnica, los reportes deben enviarse mediante el sistema de asistencia integrado en la plataforma. No se atenderán consultas técnicas por vías externas.
+        </p>
+        <button
+          onClick={() => router.push('/profile')}
+          className="w-full py-3 bg-white text-emerald-700 font-bold text-sm rounded-xl active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
+        >
+          <MessageCircle className="w-4 h-4" />
+          Reportar Error o Solicitar Soporte
         </button>
       </div>
     </div>
