@@ -432,4 +432,89 @@ describe('AuthService - Auto-provisioning', () => {
       });
     });
   });
+
+  describe('Role Switching (switchActiveRole)', () => {
+    it('should update both activeRole and currentRole when switching to WORKER', async () => {
+      const userId = 'user-123';
+      const updatedUser = {
+        ...mockUser,
+        activeRole: 'WORKER' as const,
+        currentRole: UserRole.WORKER,
+      };
+
+      jest.spyOn(prismaService.user, 'update').mockResolvedValue(updatedUser as any);
+
+      const result = await authService.switchActiveRole(userId, 'WORKER' as any);
+
+      expect(result).toBeDefined();
+      expect(result.activeRole).toBe('WORKER');
+      expect(result.currentRole).toBe(UserRole.WORKER);
+
+      // Verify update was called with both fields
+      expect(prismaService.user.update).toHaveBeenCalledWith({
+        where: { id: userId },
+        data: {
+          activeRole: 'WORKER',
+          currentRole: UserRole.WORKER,
+        },
+      });
+    });
+
+    it('should update both activeRole and currentRole when switching to CLIENT', async () => {
+      const userId = 'user-123';
+      const updatedUser = {
+        ...mockUser,
+        activeRole: 'CLIENT' as const,
+        currentRole: UserRole.CLIENT,
+        roles: [UserRole.WORKER, UserRole.CLIENT],
+      };
+
+      jest.spyOn(prismaService.user, 'update').mockResolvedValue(updatedUser as any);
+
+      const result = await authService.switchActiveRole(userId, 'CLIENT' as any);
+
+      expect(result).toBeDefined();
+      expect(result.activeRole).toBe('CLIENT');
+      expect(result.currentRole).toBe(UserRole.CLIENT);
+
+      // Verify update was called with both fields
+      expect(prismaService.user.update).toHaveBeenCalledWith({
+        where: { id: userId },
+        data: {
+          activeRole: 'CLIENT',
+          currentRole: UserRole.CLIENT,
+        },
+      });
+    });
+
+    it('should maintain consistency between activeRole and currentRole', async () => {
+      const userId = 'user-123';
+      
+      // Test WORKER switch
+      const workerUser = {
+        ...mockUser,
+        activeRole: 'WORKER' as const,
+        currentRole: UserRole.WORKER,
+      };
+
+      jest.spyOn(prismaService.user, 'update').mockResolvedValueOnce(workerUser as any);
+
+      const workerResult = await authService.switchActiveRole(userId, 'WORKER' as any);
+      expect(workerResult.activeRole).toBe('WORKER');
+      expect(workerResult.currentRole).toBe(UserRole.WORKER);
+
+      // Test CLIENT switch
+      const clientUser = {
+        ...mockUser,
+        activeRole: 'CLIENT' as const,
+        currentRole: UserRole.CLIENT,
+      };
+
+      jest.spyOn(prismaService.user, 'update').mockResolvedValueOnce(clientUser as any);
+
+      const clientResult = await authService.switchActiveRole(userId, 'CLIENT' as any);
+      expect(clientResult.activeRole).toBe('CLIENT');
+      expect(clientResult.currentRole).toBe(UserRole.CLIENT);
+    });
+  });
 });
