@@ -7,6 +7,7 @@ import { GET_SERVICE_CATEGORIES } from "../graphql/queries";
 import useServices from "@/hooks/useServices";
 import { useLocationContext } from "@/contexts/LocationContext";
 import { useAuth } from "@/app/providers";
+import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import { getLucideIcon } from "../lib/icons";
 import { ServiceCategory } from "../types/category";
 import { 
@@ -119,7 +120,10 @@ export default function HomePage() {
   const router = useRouter();
   const { status: locStatus, latitude, longitude, cityName } = useLocationContext();
   const { isAuthenticated, user, hasWorkerRole } = useAuth();
+  const { isSwitchingRole, switchToWorker, switchToClient } = useRoleSwitcher();
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  
+  const isWorkerMode = user?.activeRole === 'WORKER';
   
   // Fetch dynamic categories
   const { 
@@ -344,7 +348,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {isAuthenticated && !hasWorkerRole && (
+      {isAuthenticated && !hasWorkerRole && !isWorkerMode && (
         <section className="mt-4 p-6 bg-gradient-to-br from-emerald-600 to-green-700 rounded-[2.5rem] text-white shadow-xl shadow-green-200">
           <h3 className="text-xl font-black mb-1">¿Quieres trabajar?</h3>
           <p className="text-green-100 text-xs mb-4 leading-relaxed">
@@ -359,17 +363,34 @@ export default function HomePage() {
         </section>
       )}
 
-      {isAuthenticated && hasWorkerRole && (
+      {isAuthenticated && hasWorkerRole && !isWorkerMode && (
         <section className="mt-4 p-6 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-[2.5rem] text-white shadow-xl shadow-purple-200">
           <h3 className="text-xl font-black mb-1">Panel Profesional</h3>
           <p className="text-purple-100 text-xs mb-4 leading-relaxed">
             Gestiona tus servicios y trabajos desde tu panel de control.
           </p>
           <button 
-            onClick={() => router.push("/worker/dashboard")}
-            className="w-full py-3.5 bg-white text-purple-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg"
+            onClick={switchToWorker}
+            disabled={isSwitchingRole}
+            className="w-full py-3.5 bg-white text-purple-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            IR A MI PANEL
+            {isSwitchingRole ? 'CAMBIANDO...' : 'IR A MI PANEL'}
+          </button>
+        </section>
+      )}
+
+      {isAuthenticated && isWorkerMode && (
+        <section className="mt-4 p-6 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] text-white shadow-xl shadow-indigo-200">
+          <h3 className="text-xl font-black mb-1">Panel de Cliente</h3>
+          <p className="text-indigo-100 text-xs mb-4 leading-relaxed">
+            Vuelve al modo cliente para buscar y contratar servicios.
+          </p>
+          <button 
+            onClick={switchToClient}
+            disabled={isSwitchingRole}
+            className="w-full py-3.5 bg-white text-blue-700 font-black text-sm rounded-2xl active:scale-95 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSwitchingRole ? 'CAMBIANDO...' : 'IR A MODO CLIENTE'}
           </button>
         </section>
       )}

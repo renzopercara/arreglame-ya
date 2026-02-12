@@ -1,24 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Briefcase, ClipboardList, Home, LayoutDashboard, MessageSquare, Search, UserIcon, ArrowLeftRight } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Briefcase, ClipboardList, Home, LayoutDashboard, MessageSquare, Search, UserIcon, ArrowLeftRight, LucideIcon } from "lucide-react";
 import { useAuth } from "@/app/providers";
+import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 
 
 
 interface NavItem {
   href: string;
   label: string;
-  icon: any;
+  icon: LucideIcon;
 }
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { isAuthenticated, user, isBootstrapping, hasWorkerRole, switchRole } = useAuth();
-  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
+  const { isAuthenticated, user, isBootstrapping } = useAuth();
+  const { isSwitchingRole, switchToWorker, switchToClient } = useRoleSwitcher();
 
   const isWorkerMode = user?.activeRole === 'WORKER';
   const themeColor = isWorkerMode ? 'green' : 'blue';
@@ -30,26 +30,10 @@ export default function BottomNav() {
     
     if (!user) return;
     
-    setIsSwitchingRole(true);
-    
-    try {
-      if (isWorkerMode) {
-        // Switch to CLIENT mode
-        await switchRole('CLIENT');
-        router.push('/');
-      } else {
-        // Switch to WORKER mode
-        if (hasWorkerRole) {
-          await switchRole('WORKER');
-          router.push('/worker/dashboard');
-        } else {
-          router.push('/worker/onboarding');
-        }
-      }
-    } catch (error) {
-      console.error('Failed to switch role:', error);
-    } finally {
-      setIsSwitchingRole(false);
+    if (isWorkerMode) {
+      await switchToClient();
+    } else {
+      await switchToWorker();
     }
   };
 
