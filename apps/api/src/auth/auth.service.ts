@@ -1,5 +1,5 @@
 
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -26,6 +26,8 @@ function mapUserRoleToActiveRole(role: UserRole): ActiveRole {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -96,6 +98,7 @@ export class AuthService {
       include: {
         clientProfile: true,
         workerProfile: true,
+        customerProfile: true,
       },
     });
 
@@ -132,13 +135,13 @@ export class AuthService {
 
       // Auto-provision CLIENT or WORKER role
       updatedUser = await this.autoProvisionRole(user, role);
-      console.log(`Role ${role} auto-assigned to user ${user.id}`);
+      this.logger.log(`Role ${role} auto-assigned to user ${user.id}`);
     }
 
     // Check if email is verified (for financial operations later)
     // Note: We allow login even without verification, but block financial operations
     if (!updatedUser.isEmailVerified) {
-      console.log(`User ${email} logged in without email verification`);
+      this.logger.log(`User ${email} logged in without email verification`);
     }
 
     // Clear failed attempts on successful login
@@ -179,6 +182,7 @@ export class AuthService {
         include: {
           clientProfile: true,
           workerProfile: true,
+          customerProfile: true,
         },
       });
 

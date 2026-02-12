@@ -71,7 +71,13 @@ describe('AuthService - Auto-provisioning', () => {
       updatedAt: new Date(),
     },
     clientProfile: null,
-    customerProfile: null,
+    customerProfile: {
+      id: 'customer-123',
+      userId: 'user-123',
+      name: 'Test Worker',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
   };
 
   beforeEach(async () => {
