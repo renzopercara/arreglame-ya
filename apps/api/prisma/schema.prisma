@@ -41,6 +41,11 @@ enum JobStatus {
   DISPUTED
   UNDER_REVIEW
   RESOLVED
+  // Enterprise states for DDD workflow
+  PENDING
+  ANALYZING
+  OFFERING
+  EXPIRED
 }
 
 enum KYCStatus {
@@ -211,6 +216,8 @@ model WorkerProfile {
   latitude           Float?
   longitude          Float?
   lastLocationUpdate DateTime?
+  lastActiveAt       DateTime? // Track worker activity for assignment
+  cityId             String? // For multi-city support
   reputationPoints   Int          @default(0)
   currentPlan        String       @default("STARTER")
   acceptanceRate     Float        @default(1.0)
@@ -244,6 +251,8 @@ model WorkerProfile {
   @@index([userId])
   @@index([status])
   @@index([currentPlan])
+  @@index([cityId]) // For multi-city queries
+  @@index([lastActiveAt]) // For worker availability
 }
 
 model ClientProfile {
@@ -387,7 +396,7 @@ model ExtrasMultiplier {
 
 model ServiceRequest {
   id            String    @id @default(uuid())
-  status        JobStatus @default(CREATED)
+  status        JobStatus @default(PENDING)
   paymentStatus String    @default("PENDING")
 
   subcategory       ServiceSubcategory?
@@ -401,6 +410,7 @@ model ServiceRequest {
   longitude         Float
   address           String?
   city              String?
+  cityId            String? // For multi-city sharding preparation
   coverageRadius    Float    @default(15.0)
   description       String?
   squareMeters      Float
@@ -411,21 +421,40 @@ model ServiceRequest {
   estimatedHours    Float
   aiReasoning       String?
 
-  // Estructura de precio recomendada
+  // Enterprise pricing fields
   price            Json // { total, workerNet, platformFee, taxes, currency }
   priceWorkerNet   Decimal? @db.Decimal(10, 2)
   pricePlatformFee Decimal? @db.Decimal(10, 2)
+  totalAmount      Decimal? @db.Decimal(10, 2) // Total amount for the service
+  workerPayout     Decimal? @db.Decimal(10, 2) // Amount to be paid to worker
+  platformCommission Decimal? @db.Decimal(10, 2) // Platform commission
 
-  pin              String          @default("0000")
+  // Verification and security
+  pin                String          @default("0000")
+  verificationCode   String?         // 4-digit verification code for starting work
+  
+  // Extra time handling
   extraTimeStatus  ExtraTimeStatus @default(NONE)
   extraTimeMinutes Int?
   extraTimeReason  String?
+  
+  // Payment tracking
   paidAt           DateTime?
 
-  createdAt         DateTime  @default(now())
-  startedAt         DateTime?
-  completedAt       DateTime?
-  warrantyExpiresAt DateTime?
+  // Enterprise workflow fields
+  version              Int      @default(1) // Optimistic locking
+  assignmentAttempts   Int      @default(0) // Track reassignment attempts
+  idempotencyKey       String?  @unique // Idempotency for create operations
+  
+  // Timing fields
+  createdAt            DateTime  @default(now())
+  startedAt            DateTime?
+  completedAt          DateTime?
+  scheduledAt          DateTime? // When service is scheduled to start
+  workerTimeoutAt      DateTime? // When current worker offer expires
+  disputeDeadlineAt    DateTime? // Deadline for disputes after completion
+  payoutReleasedAt     DateTime? // When payout was released to worker
+  warrantyExpiresAt    DateTime?
 
   // Relations
   client          ClientProfile    @relation("ClientServiceRequests", fields: [clientId], references: [id], onDelete: Restrict)
@@ -444,6 +473,9 @@ model ServiceRequest {
   @@index([workerId])
   @@index([serviceCategoryId])
   @@index([createdAt])
+  @@index([workerTimeoutAt]) // For cron job efficiency
+  @@index([cityId]) // For multi-city queries
+  @@index([scheduledAt]) // For scheduled jobs
   @@map("service_requests")
 }
 
@@ -821,4 +853,39 @@ model PaymentProviderLog {
   @@index([transactionId])
   @@index([processedAt])
   @@map("payment_provider_logs")
+}
+
+// ============================================
+// ENTERPRISE ARCHITECTURE - CONFIGURATION & EVENTS
+// ============================================
+
+// System Configuration (Key-Value store for business rules)
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  type      String   @default("STRING") // STRING, INT, FLOAT, BOOLEAN, JSON
+  description String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@map("system_config")
+}
+
+// Outbox Pattern for Event-Driven Architecture
+model OutboxEvent {
+  id          String   @id @default(uuid())
+  aggregateId String // ID of the aggregate root (e.g., ServiceRequest ID)
+  type        String // Event type (e.g., "ServiceRequestCreated", "WorkerAssigned")
+  payload     Json // Event payload as JSON
+  processed   Boolean  @default(false) // Whether event has been published
+  createdAt   DateTime @default(now())
+  processedAt DateTime? // When event was processed
+
+  @@index([processed])
+  @@index([aggregateId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("outbox_events")
 }

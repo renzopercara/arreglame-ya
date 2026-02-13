@@ -13,6 +13,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { BillingModule } from './billing/billing.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ServiceCategoriesModule } from './service-categories/service-categories.module';
+import { EnterpriseServicesModule } from './enterprise/enterprise-services.module';
 import GraphQLJSON from 'graphql-type-json';
 import { join } from 'path';
 
@@ -29,6 +30,7 @@ import { join } from 'path';
     BillingModule,
     WebhooksModule,
     ServiceCategoriesModule,
+    EnterpriseServicesModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       // EXPLICIT DRIVER - Never rely on defaults in production
       driver: ApolloDriver,
