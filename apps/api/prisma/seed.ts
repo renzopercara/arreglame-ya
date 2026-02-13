@@ -266,6 +266,56 @@ async function main() {
     console.log(`✅ Formula: ${result.subcategory}`);
   }
 
+  // ===== SEED SYSTEM CONFIG =====
+  console.log('⚙️  Seeding system configuration...');
+  const systemConfigs = [
+    {
+      key: 'cancelation_window_hours',
+      value: '24',
+      type: 'INT',
+      description: 'Hours before scheduled time for free cancellation',
+    },
+    {
+      key: 'penalty_fee_percentage',
+      value: '0.30',
+      type: 'FLOAT',
+      description: 'Penalty fee percentage for late cancellations (30%)',
+    },
+    {
+      key: 'commission_percentage',
+      value: '0.25',
+      type: 'FLOAT',
+      description: 'Platform commission percentage (25%)',
+    },
+    {
+      key: 'worker_timeout_minutes',
+      value: '15',
+      type: 'INT',
+      description: 'Minutes for worker to accept an offer',
+    },
+    {
+      key: 'auto_release_hours',
+      value: '72',
+      type: 'INT',
+      description: 'Hours after completion to auto-release payout',
+    },
+    {
+      key: 'max_assignment_attempts',
+      value: '3',
+      type: 'INT',
+      description: 'Maximum worker assignment attempts before expiring request',
+    },
+  ];
+
+  for (const config of systemConfigs) {
+    const result = await prisma.systemConfig.upsert({
+      where: { key: config.key },
+      update: config,
+      create: config,
+    });
+    console.log(`✅ Config: ${result.key} = ${result.value}`);
+  }
+
   console.log('✨ Database seed completed successfully!');
 }
 
