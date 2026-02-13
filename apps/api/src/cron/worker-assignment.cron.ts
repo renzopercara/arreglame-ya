@@ -5,6 +5,7 @@ import { IServiceRequestRepository } from '../infrastructure/persistence/service
 import { PrismaServiceRequestRepository } from '../infrastructure/persistence/prisma-service-request.repository';
 import { WorkerFinderService } from '../infrastructure/assignment/worker-finder.service';
 import { Location } from '../domain/value-objects/location.vo';
+import { ServiceRequestEntity } from '../domain/entities/service-request.entity';
 
 /**
  * Worker Assignment Cron Job
@@ -71,7 +72,7 @@ export class WorkerAssignmentCron {
   /**
    * Handle a single expired request
    */
-  private async handleExpiredRequest(request: any): Promise<void> {
+  private async handleExpiredRequest(request: ServiceRequestEntity): Promise<void> {
     this.logger.log(
       `Processing expired request ${request.id} (attempt ${request.assignmentAttempts})`,
     );

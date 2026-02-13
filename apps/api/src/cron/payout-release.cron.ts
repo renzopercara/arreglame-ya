@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { IServiceRequestRepository } from '../infrastructure/persistence/service-request.repository.interface';
 import { PrismaServiceRequestRepository } from '../infrastructure/persistence/prisma-service-request.repository';
+import { ServiceRequestEntity } from '../domain/entities/service-request.entity';
 
 /**
  * Payout Release Cron Job
@@ -73,7 +74,7 @@ export class PayoutReleaseCron {
   /**
    * Release payout for a single request
    */
-  private async releasePayoutForRequest(request: any): Promise<void> {
+  private async releasePayoutForRequest(request: ServiceRequestEntity): Promise<void> {
     this.logger.log(`Releasing payout for request ${request.id}`);
 
     // Release payout (domain logic handles validation)

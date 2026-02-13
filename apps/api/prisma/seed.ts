@@ -270,7 +270,7 @@ async function main() {
   console.log('⚙️  Seeding system configuration...');
   const systemConfigs = [
     {
-      key: 'cancelation_window_hours',
+      key: 'cancellation_window_hours',
       value: '24',
       type: 'INT',
       description: 'Hours before scheduled time for free cancellation',

@@ -1,3 +1,5 @@
+import { randomInt } from 'crypto';
+
 /**
  * StartVerificationCode Value Object
  * Immutable 4-digit code for service start verification
@@ -10,7 +12,8 @@ export class StartVerificationCode {
   }
 
   static generate(): StartVerificationCode {
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    // Use cryptographically secure random number generator
+    const code = randomInt(1000, 10000).toString();
     return new StartVerificationCode(code);
   }
 

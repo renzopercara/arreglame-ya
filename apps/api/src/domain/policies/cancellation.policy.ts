@@ -11,7 +11,7 @@ export class CancellationPolicy {
   private readonly logger = new Logger(CancellationPolicy.name);
 
   constructor(
-    private readonly cancelationWindowHours: number = 24,
+    private readonly cancellationWindowHours: number = 24,
     private readonly penaltyFeePercentage: number = 0.3, // 30%
     private readonly inProgressPenaltyPercentage: number = 0.5, // 50%
   ) {}
@@ -44,9 +44,9 @@ export class CancellationPolicy {
         (scheduledAt.getTime() - now.getTime()) / (1000 * 60 * 60);
 
       // Free cancellation if enough notice given
-      if (hoursUntilScheduled > this.cancelationWindowHours) {
+      if (hoursUntilScheduled > this.cancellationWindowHours) {
         this.logger.log(
-          `Free cancellation: ${hoursUntilScheduled.toFixed(1)}h notice (> ${this.cancelationWindowHours}h required)`,
+          `Free cancellation: ${hoursUntilScheduled.toFixed(1)}h notice (> ${this.cancellationWindowHours}h required)`,
         );
         return new CommissionBreakdown(
           Money.zero(totalAmount.currency),
@@ -57,7 +57,7 @@ export class CancellationPolicy {
 
       // Within cancellation window - apply penalty
       this.logger.log(
-        `Late cancellation: ${hoursUntilScheduled.toFixed(1)}h notice (< ${this.cancelationWindowHours}h required)`,
+        `Late cancellation: ${hoursUntilScheduled.toFixed(1)}h notice (< ${this.cancellationWindowHours}h required)`,
       );
       return this.applyPenalty(
         totalAmount,
@@ -118,7 +118,7 @@ export class CancellationPolicy {
     if (scheduledAt) {
       const hoursUntilScheduled =
         (scheduledAt.getTime() - now.getTime()) / (1000 * 60 * 60);
-      return hoursUntilScheduled > this.cancelationWindowHours;
+      return hoursUntilScheduled > this.cancellationWindowHours;
     }
 
     // Early stages - free cancellation
