@@ -14,5 +14,24 @@ BEGIN;
 -- Update ServiceRequest default status to use new PENDING value
 ALTER TABLE "service_requests" ALTER COLUMN "status" SET DEFAULT 'PENDING';
 
--- Create any additional indexes or constraints if needed
--- (placeholder for future structural changes)
+-- Add enterprise workflow fields to service_requests table
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "cityId" TEXT;
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "totalAmount" DECIMAL(10,2);
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "workerPayout" DECIMAL(10,2);
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "platformCommission" DECIMAL(10,2);
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "verificationCode" TEXT;
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "assignmentAttempts" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "idempotencyKey" TEXT;
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "scheduledAt" TIMESTAMP(3);
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "workerTimeoutAt" TIMESTAMP(3);
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "disputeDeadlineAt" TIMESTAMP(3);
+ALTER TABLE "service_requests" ADD COLUMN IF NOT EXISTS "payoutReleasedAt" TIMESTAMP(3);
+
+-- Create indexes for enterprise workflow fields
+CREATE INDEX IF NOT EXISTS "service_requests_workerTimeoutAt_idx" ON "service_requests"("workerTimeoutAt");
+CREATE INDEX IF NOT EXISTS "service_requests_cityId_idx" ON "service_requests"("cityId");
+CREATE INDEX IF NOT EXISTS "service_requests_scheduledAt_idx" ON "service_requests"("scheduledAt");
+
+-- Create unique constraint for idempotencyKey
+CREATE UNIQUE INDEX IF NOT EXISTS "service_requests_idempotencyKey_key" ON "service_requests"("idempotencyKey");
