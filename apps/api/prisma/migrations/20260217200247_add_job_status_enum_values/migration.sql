@@ -1,4 +1,9 @@
 -- Fix for PostgreSQL Error 55P04 (Enum Transaction Lock)
+-- 
+-- IMPORTANT: Prisma wraps all migrations in an implicit BEGIN/COMMIT transaction.
+-- This COMMIT closes that implicit transaction to allow ENUM values to be persisted
+-- to the system catalog before they are used in subsequent ALTER TABLE statements.
+-- 
 -- Close Prisma's implicit transaction to persist ENUM values before using them
 COMMIT;
 
@@ -35,3 +40,6 @@ CREATE INDEX IF NOT EXISTS "service_requests_scheduledAt_idx" ON "service_reques
 
 -- Create unique constraint for idempotencyKey
 CREATE UNIQUE INDEX IF NOT EXISTS "service_requests_idempotencyKey_key" ON "service_requests"("idempotencyKey");
+
+-- Commit the transaction to finalize structural changes
+COMMIT;
