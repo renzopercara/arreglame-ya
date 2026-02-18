@@ -409,18 +409,37 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    // If worker profile already exists, update it
-    if (user.workerProfile) {
-      const updatedProfile = await this.prisma.workerProfile.update({
-        where: { userId },
-        data: {
-          name: input.name,
-          bio: input.bio,
-          trade: input.trade,
-          selfie: input.selfieImage,
-          kycStatus: 'PENDING_SUBMISSION',
-        },
-      });
+    let updatedUser: any;
+
+    // Use transaction to ensure atomicity
+    await this.prisma.$transaction(async (tx) => {
+      // If worker profile already exists, update it
+      if (user.workerProfile) {
+        await tx.workerProfile.update({
+          where: { userId },
+          data: {
+            name: input.name,
+            bio: input.bio,
+            trade: input.trade,
+            selfie: input.selfieImage,
+            kycStatus: 'PENDING_SUBMISSION',
+          },
+        });
+      } else {
+        // Create new worker profile
+        await tx.workerProfile.create({
+          data: {
+            userId,
+            name: input.name,
+            bio: input.bio,
+            trade: input.trade,
+            selfie: input.selfieImage,
+            kycStatus: 'PENDING_SUBMISSION',
+            isKycVerified: false,
+            status: 'OFFLINE',
+          },
+        });
+      }
 
       // Update user to add WORKER role if not present, and set currentRole to WORKER
       const currentRoles = user.roles || [user.currentRole];
@@ -428,47 +447,32 @@ export class AuthService {
         ? currentRoles 
         : [...currentRoles, UserRole.WORKER];
 
-      await this.prisma.user.update({
+      updatedUser = await tx.user.update({
         where: { id: userId },
         data: {
           roles: updatedRoles,
           currentRole: UserRole.WORKER,
           activeRole: ActiveRole.WORKER,
         },
+        include: {
+          workerProfile: true,
+          clientProfile: true,
+          customerProfile: true,
+        },
       });
-
-      return updatedProfile;
-    }
-
-    // Create new worker profile
-    const workerProfile = await this.prisma.workerProfile.create({
-      data: {
-        userId,
-        name: input.name,
-        bio: input.bio,
-        trade: input.trade,
-        selfie: input.selfieImage,
-        kycStatus: 'PENDING_SUBMISSION',
-        isKycVerified: false,
-        status: 'OFFLINE',
-      },
     });
 
-    // Update user to add WORKER role and set currentRole to WORKER
-    const currentRoles = user.roles || [user.currentRole];
-    const updatedRoles = currentRoles.includes(UserRole.WORKER) 
-      ? currentRoles 
-      : [...currentRoles, UserRole.WORKER];
+    // Generate new JWT with updated roles
+    const payload = { 
+      sub: updatedUser.id, 
+      email: updatedUser.email, 
+      roles: updatedUser.roles,
+      currentRole: UserRole.WORKER,
+      activeRole: ActiveRole.WORKER,
+      isEmailVerified: updatedUser.isEmailVerified 
+    };
+    const accessToken = await this.jwtService.signAsync(payload);
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        roles: updatedRoles,
-        currentRole: UserRole.WORKER,
-        activeRole: ActiveRole.WORKER,
-      },
-    });
-
-    return workerProfile;
+    return { accessToken, user: updatedUser };
   }
 }
