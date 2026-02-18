@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SubmitKYCInput } from './dto/submit-kyc.input';
 import { CreateWorkerSpecialtyInput, UpdateWorkerSpecialtyInput, AddMultipleSpecialtiesInput, SyncProfessionalServicesInput } from './dto/worker-specialty.input';
 import { WorkerSpecialtyType } from './dto/worker-specialty.type';
+import { AddMultipleWorkerSpecialtiesPayload } from './dto/add-multiple-specialties-payload.type';
 import { Service } from './dto/service.type';
 
 @ObjectType('WorkerProfile')
@@ -180,23 +181,45 @@ export class WorkerResolver {
     return this.workerService.addSpecialty(worker.id, input);
   }
 
-  @Mutation(() => [WorkerSpecialtyType])
+  @Mutation(() => AddMultipleWorkerSpecialtiesPayload)
   @UseGuards(AuthGuard, RolesGuard)
   @RequireRoles('WORKER')
   async addMultipleWorkerSpecialties(
     @Args('input', { type: () => AddMultipleSpecialtiesInput }) input: AddMultipleSpecialtiesInput,
     @CurrentUser() user: any
-  ): Promise<any> {
-    // Get worker profile
-    const worker = await (this.prisma as any).workerProfile.findUnique({
-      where: { userId: user.sub }
-    });
+  ): Promise<AddMultipleWorkerSpecialtiesPayload> {
+    try {
+      // Get worker profile
+      const worker = await (this.prisma as any).workerProfile.findUnique({
+        where: { userId: user.sub }
+      });
 
-    if (!worker) {
-      throw new BadRequestException('Worker profile not found');
+      if (!worker) {
+        return {
+          success: false,
+          specialties: [],
+          categoryId: null,
+          error: 'Worker profile not found'
+        };
+      }
+
+      const specialties = await this.workerService.addMultipleSpecialties(worker.id, input.specialties);
+      
+      return {
+        success: true,
+        specialties,
+        categoryId: input.specialties.length > 0 ? input.specialties[0].categoryId : null,
+        error: null
+      };
+    } catch (error) {
+      console.error('Error adding multiple specialties:', error);
+      return {
+        success: false,
+        specialties: [],
+        categoryId: null,
+        error: error.message || 'An error occurred while adding specialties'
+      };
     }
-
-    return this.workerService.addMultipleSpecialties(worker.id, input.specialties);
   }
 
   @Mutation(() => WorkerSpecialtyType)

@@ -12,6 +12,13 @@ input AddMultipleSpecialtiesInput {
   specialties: [CreateWorkerSpecialtyInput!]!
 }
 
+type AddMultipleWorkerSpecialtiesPayload {
+  categoryId: String
+  error: String
+  specialties: [WorkerSpecialtyType!]!
+  success: Boolean!
+}
+
 type AuditResponse {
   approved: Boolean!
   confidence: Float!
@@ -146,7 +153,7 @@ input LoginInput {
 
 type Mutation {
   acceptLatestTerms(documentId: String!, userId: String!): Boolean!
-  addMultipleWorkerSpecialties(input: AddMultipleSpecialtiesInput!): [WorkerSpecialtyType!]!
+  addMultipleWorkerSpecialties(input: AddMultipleSpecialtiesInput!): AddMultipleWorkerSpecialtiesPayload!
   addWorkerSpecialty(input: CreateWorkerSpecialtyInput!): WorkerSpecialtyType!
   arriveAtJob(jobId: String!, lat: Float!, lng: Float!, workerId: String!): Boolean!
   becomeWorker(input: BecomeWorkerInput!): UserInfo!
