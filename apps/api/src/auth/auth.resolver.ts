@@ -237,13 +237,13 @@ export class AuthResolver {
     return this.toUserInfo(fullUser, !hasAccepted);
   }
 
-  @Mutation(() => UserInfoResponse)
+  @Mutation(() => AuthResponse)
   @UseGuards(AuthGuard)
   async becomeWorker(
     @CurrentUser() user: any,
     @Context() context: any,
     @Args('input', { type: () => BecomeWorkerInput }) input: BecomeWorkerInput,
-  ): Promise<UserInfoResponse> {
+  ): Promise<AuthResponse> {
     if (!user?.sub) throw new UnauthorizedException('Usuario no autenticado');
 
     if (!input.termsAccepted) {
@@ -260,8 +260,8 @@ export class AuthResolver {
       }
     }
 
-    // Create or update worker profile
-    await this.authService.becomeWorker(user.sub, {
+    // Create or update worker profile and get new JWT token
+    const { accessToken, user: updatedUser } = await this.authService.becomeWorker(user.sub, {
       name: input.name,
       bio: input.bio,
       trade: input.trade,
@@ -269,11 +269,14 @@ export class AuthResolver {
       selfieImage: input.selfieImage,
     });
 
-    // Load updated user
-    const fullUser = await this.loadUser(user.sub);
-    const hasAccepted = await this.legalService.hasAcceptedLatest(user.sub, 'WORKER');
+    // Load full user data
+    const fullUser = await this.loadUser(updatedUser.id);
+    const hasAccepted = await this.legalService.hasAcceptedLatest(updatedUser.id, 'WORKER');
 
-    return this.toUserInfo(fullUser, !hasAccepted);
+    return {
+      accessToken,
+      user: this.toUserInfo(fullUser, !hasAccepted),
+    };
   }
 
   @Mutation(() => UserInfoResponse)

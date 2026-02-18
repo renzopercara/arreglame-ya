@@ -517,4 +517,184 @@ describe('AuthService - Auto-provisioning', () => {
       expect(clientResult.currentRole).toBe(UserRole.CLIENT);
     });
   });
+
+  describe('BecomeWorker JWT Generation', () => {
+    it('should issue new JWT with WORKER role when CLIENT becomes WORKER', async () => {
+      const clientUser = {
+        ...mockUser,
+        email: 'client@example.com',
+        roles: [UserRole.CLIENT],
+        currentRole: UserRole.CLIENT,
+        activeRole: 'CLIENT' as const,
+        workerProfile: null,
+        clientProfile: {
+          id: 'client-123',
+          userId: 'user-123',
+          name: 'Test Client',
+        },
+      };
+
+      const updatedUserWithWorkerRole = {
+        ...clientUser,
+        roles: [UserRole.CLIENT, UserRole.WORKER],
+        currentRole: UserRole.WORKER,
+        activeRole: 'WORKER' as const,
+        workerProfile: {
+          id: 'new-worker-123',
+          userId: 'user-123',
+          name: 'Test Client',
+          kycStatus: 'PENDING_SUBMISSION',
+          isKycVerified: false,
+        },
+      };
+
+      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(clientUser as any);
+
+      const mockWorkerCreate = jest.fn().mockResolvedValue(updatedUserWithWorkerRole.workerProfile);
+      const mockUserUpdate = jest.fn().mockResolvedValue(updatedUserWithWorkerRole);
+      
+      jest.spyOn(prismaService, '$transaction').mockImplementation(async (callback: any) => {
+        const mockTx = {
+          workerProfile: {
+            create: mockWorkerCreate,
+          },
+          user: {
+            update: mockUserUpdate,
+          },
+        };
+        return callback(mockTx);
+      });
+
+      const result = await authService.becomeWorker('user-123', {
+        name: 'Test Client',
+        bio: 'Test bio',
+      });
+
+      // Verify JWT was issued
+      expect(result).toBeDefined();
+      expect(result.accessToken).toBe('mock-jwt-token');
+      expect(result.user).toBeDefined();
+      expect(result.user.roles).toContain(UserRole.WORKER);
+
+      // Verify JWT payload contains updated roles
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: 'user-123',
+          email: 'client@example.com',
+          roles: [UserRole.CLIENT, UserRole.WORKER],
+          currentRole: UserRole.WORKER,
+          activeRole: 'WORKER',
+        })
+      );
+
+      // Verify worker profile was created
+      expect(mockWorkerCreate).toHaveBeenCalled();
+      
+      // Verify user roles were updated atomically in transaction
+      expect(mockUserUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'user-123' },
+          data: expect.objectContaining({
+            roles: [UserRole.CLIENT, UserRole.WORKER],
+            currentRole: UserRole.WORKER,
+            activeRole: 'WORKER',
+          }),
+        })
+      );
+    });
+
+    it('should issue new JWT when updating existing worker profile', async () => {
+      const existingWorkerUser = {
+        ...mockUser,
+        email: 'worker@example.com',
+        roles: [UserRole.WORKER],
+        currentRole: UserRole.WORKER,
+        activeRole: 'WORKER' as const,
+        workerProfile: {
+          id: 'existing-worker-123',
+          userId: 'user-123',
+          name: 'Old Name',
+        },
+      };
+
+      const updatedUser = {
+        ...existingWorkerUser,
+        workerProfile: {
+          id: 'existing-worker-123',
+          userId: 'user-123',
+          name: 'New Name',
+        },
+      };
+
+      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(existingWorkerUser as any);
+
+      const mockWorkerUpdate = jest.fn().mockResolvedValue(updatedUser.workerProfile);
+      const mockUserUpdate = jest.fn().mockResolvedValue(updatedUser);
+      
+      jest.spyOn(prismaService, '$transaction').mockImplementation(async (callback: any) => {
+        const mockTx = {
+          workerProfile: {
+            update: mockWorkerUpdate,
+          },
+          user: {
+            update: mockUserUpdate,
+          },
+        };
+        return callback(mockTx);
+      });
+
+      const result = await authService.becomeWorker('user-123', {
+        name: 'New Name',
+        bio: 'Updated bio',
+      });
+
+      // Verify JWT was issued even though profile already existed
+      expect(result).toBeDefined();
+      expect(result.accessToken).toBe('mock-jwt-token');
+      expect(result.user).toBeDefined();
+
+      // Verify JWT contains correct data
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: 'user-123',
+          email: 'worker@example.com',
+          roles: [UserRole.WORKER],
+          currentRole: UserRole.WORKER,
+          activeRole: 'WORKER',
+        })
+      );
+    });
+
+    it('should use transaction for atomic role upgrade and profile creation', async () => {
+      const clientUser = {
+        ...mockUser,
+        roles: [UserRole.CLIENT],
+        currentRole: UserRole.CLIENT,
+        workerProfile: null,
+      };
+
+      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(clientUser as any);
+      
+      const transactionSpy = jest.spyOn(prismaService, '$transaction');
+      transactionSpy.mockImplementation(async (callback: any) => {
+        const mockTx = {
+          workerProfile: { create: jest.fn() },
+          user: { 
+            update: jest.fn().mockResolvedValue({
+              ...clientUser,
+              roles: [UserRole.CLIENT, UserRole.WORKER],
+            }) 
+          },
+        };
+        return callback(mockTx);
+      });
+
+      await authService.becomeWorker('user-123', {
+        name: 'Test',
+      });
+
+      // Verify transaction was used for atomicity
+      expect(transactionSpy).toHaveBeenCalled();
+    });
+  });
 });
