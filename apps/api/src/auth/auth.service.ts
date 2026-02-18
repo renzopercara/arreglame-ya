@@ -409,7 +409,16 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    let updatedUser: any;
+    // Type for the transaction result
+    type UserWithProfiles = Prisma.UserGetPayload<{
+      include: {
+        workerProfile: true;
+        clientProfile: true;
+        customerProfile: true;
+      };
+    }>;
+
+    let updatedUser: UserWithProfiles;
 
     // Use transaction to ensure atomicity
     await this.prisma.$transaction(async (tx) => {
