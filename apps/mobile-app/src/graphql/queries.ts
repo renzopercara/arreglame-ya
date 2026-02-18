@@ -597,11 +597,22 @@ export const ADD_MULTIPLE_WORKER_SPECIALTIES = gql`
   mutation AddMultipleWorkerSpecialties($input: AddMultipleSpecialtiesInput!) {
     addMultipleWorkerSpecialties(input: $input) {
       success
-      specialty {
+      specialties {
         id
+        workerId
         categoryId
         status
         experienceYears
+        metadata
+        createdAt
+        updatedAt
+        category {
+          id
+          slug
+          name
+          iconName
+          description
+        }
       }
       categoryId
       error
