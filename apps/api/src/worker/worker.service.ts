@@ -89,13 +89,10 @@ export class WorkerService {
     for (const specialty of specialties) {
       try {
         const created = await this.addSpecialty(workerId, specialty);
-        results.push({ success: true, specialty: created });
+        results.push(created);
       } catch (error) {
-        results.push({ 
-          success: false, 
-          categoryId: specialty.categoryId, 
-          error: error.message 
-        });
+        // Log error but continue with other specialties
+        console.error(`Error adding specialty ${specialty.categoryId}:`, error.message);
       }
     }
     

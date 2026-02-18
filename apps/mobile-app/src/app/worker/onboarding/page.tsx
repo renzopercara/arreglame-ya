@@ -119,7 +119,7 @@ export default function WorkerOnboardingPage() {
       });
 
       // Then add specialties
-      await addSpecialtiesMutation({
+      const { data: specialtiesData } = await addSpecialtiesMutation({
         variables: {
           input: {
             specialties: selectedSpecialties.map(s => ({
@@ -130,6 +130,14 @@ export default function WorkerOnboardingPage() {
           }
         }
       });
+
+      // Handle specialty addition response
+      if (!specialtiesData?.addMultipleWorkerSpecialties?.success) {
+        const error = specialtiesData?.addMultipleWorkerSpecialties?.error || "Error al agregar especialidades";
+        toast.error(error);
+        setIsSubmitting(false);
+        return;
+      }
 
       // Refetch user data to update the context
       await refetchUser();
