@@ -29,7 +29,7 @@ const useAuth = () => ({
   user: {
     name: "Juan Pérez",
     activeRole: "CLIENT",
-    roles: ["CLIENT", "WORKER"], // Tiene ambos roles
+    roles: ["CLIENT", "WORKER"],
   } as User,
   isBootstrapping: false,
   switchRole: async (role: string) => console.log("Switched to", role)
@@ -86,21 +86,15 @@ export default function WelcomeHeader() {
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <p className={`text-xs font-bold flex items-center gap-1.5 tracking-wide uppercase ${
-              isProvider ? 'text-indigo-600' : 'text-blue-600'
-            }`}>
+            <p className={`text-xs font-bold flex items-center gap-1.5 tracking-wide uppercase text-indigo-600`}>
               <Sparkles className="w-3.5 h-3.5" />
-              {isProvider ? 'Panel Profesional' : 'Explorar'}
+              Panel Profesional
             </p>
             
             {/* Badge de Rol actual */}
             {isAuthenticated && user && (
-              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter border ${
-                isProvider 
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-                  : 'bg-blue-50 text-blue-700 border-blue-100'
-              }`}>
-                {isProvider ? 'Trabajador' : 'Cliente'}
+              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter border bg-indigo-50 text-indigo-700 border-indigo-100`}>
+                Trabajador
               </span>
             )}
           </div>
@@ -114,11 +108,7 @@ export default function WelcomeHeader() {
             <button
               onClick={handleSwitchRole}
               disabled={isSwitchingRole}
-              className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm border ${
-                isProvider
-                  ? 'bg-white text-blue-600 border-blue-100 hover:bg-blue-50'
-                  : 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50'
-              } disabled:opacity-50 active:scale-95`}
+              className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm border bg-white text-blue-600 border-blue-100 hover:bg-blue-50 disabled:opacity-50 active:scale-95`}
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
               {isSwitchingRole 

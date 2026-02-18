@@ -95,6 +95,36 @@ async function main() {
       estimatedHours: 1.0,
       active: true,
     },
+    {
+      slug: 'limpieza',
+      name: 'Limpieza',
+      iconName: 'Sparkles',
+      description: 'Limpieza de hogares y oficinas',
+      basePrice: 4000,
+      hourlyRate: 3000,
+      estimatedHours: 2.0,
+      active: true,
+    },
+    {
+      slug: 'fletes',
+      name: 'Fletes',
+      iconName: 'Truck',
+      description: 'Transporte y pequeñas mudanzas',
+      basePrice: 8000,
+      hourlyRate: 5000,
+      estimatedHours: 2.0,
+      active: true,
+    },
+    {
+      slug: 'ensamblado',
+      name: 'Armado de Muebles',
+      iconName: 'Layout',
+      description: 'Armado de muebles modulares',
+      basePrice: 5000,
+      hourlyRate: 3500,
+      estimatedHours: 1.5,
+      active: true,
+    },
   ];
 
   const categoryMap: Record<string, string> = {};
@@ -248,6 +278,37 @@ async function main() {
       serviceCategoryId: categoryMap['plomeria'],
       baseTimeFormula: '0.75 * (m.units || 1)',
       defaultMetadata: { units: 1 },
+      active: true,
+    },
+    // LIMPIEZA
+    {
+      subcategory: ServiceSubcategory.HOUSE_CLEANING, // Asegúrate que existan en tu Enum
+      serviceCategoryId: categoryMap['limpieza'],
+      baseTimeFormula: '(m.rooms || 1) * 1.5 + (m.bathrooms || 1) * 0.5',
+      defaultMetadata: { rooms: 1, bathrooms: 1 },
+      active: true,
+    },
+    {
+      subcategory: ServiceSubcategory.OFFICE_CLEANING,
+      serviceCategoryId: categoryMap['limpieza'],
+      baseTimeFormula: '(m.squareMeters || 50) / 25',
+      defaultMetadata: { squareMeters: 50 },
+      active: true,
+    },
+    // FLETES
+    {
+      subcategory: ServiceSubcategory.SMALL_FLETE,
+      serviceCategoryId: categoryMap['fletes'],
+      baseTimeFormula: '1 + (m.distanceKm || 5) / 10',
+      defaultMetadata: { distanceKm: 5 },
+      active: true,
+    },
+    // ARMADO DE MUEBLES (Muy predecible)
+    {
+      subcategory: ServiceSubcategory.FURNITURE_ASSEMBLY,
+      serviceCategoryId: categoryMap['ensamblado'],
+      baseTimeFormula: '(m.largeItems || 0) * 2 + (m.mediumItems || 0) * 1 + (m.smallItems || 1) * 0.5',
+      defaultMetadata: { largeItems: 0, mediumItems: 0, smallItems: 1 },
       active: true,
     },
   ];

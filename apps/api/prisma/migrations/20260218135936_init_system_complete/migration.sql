@@ -11,7 +11,7 @@ CREATE TYPE "UserStatus" AS ENUM ('ANON', 'LOGGED_IN', 'BLOCKED', 'DEBTOR');
 CREATE TYPE "WorkerStatus" AS ENUM ('ONLINE', 'PAUSED', 'OFFLINE', 'ON_JOB');
 
 -- CreateEnum
-CREATE TYPE "JobStatus" AS ENUM ('CREATED', 'ACCEPTED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_CLIENT_APPROVAL', 'COMPLETED', 'CANCELLED', 'DISPUTED', 'UNDER_REVIEW', 'RESOLVED');
+CREATE TYPE "JobStatus" AS ENUM ('CREATED', 'ACCEPTED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_CLIENT_APPROVAL', 'COMPLETED', 'CANCELLED', 'DISPUTED', 'UNDER_REVIEW', 'RESOLVED', 'PENDING', 'ANALYZING', 'OFFERING', 'EXPIRED');
 
 -- CreateEnum
 CREATE TYPE "KYCStatus" AS ENUM ('PENDING_SUBMISSION', 'PENDING_REVIEW', 'APPROVED', 'REJECTED');
@@ -26,10 +26,19 @@ CREATE TYPE "TargetAudience" AS ENUM ('WORKER', 'CLIENT');
 CREATE TYPE "TransactionType" AS ENUM ('ESCROW_ALLOCATION', 'ESCROW_RELEASE', 'WITHDRAWAL', 'REFUND', 'PAYOUT', 'DISPUTE_REFUND');
 
 -- CreateEnum
-CREATE TYPE "TransactionStatus" AS ENUM ('PENDING', 'COMPLETED', 'CANCELLED', 'FAILED');
+CREATE TYPE "TransactionStatus" AS ENUM ('PENDING', 'COMPLETED', 'CANCELLED', 'FAILED', 'AUTHORIZED', 'PAID', 'REFUNDED');
 
 -- CreateEnum
-CREATE TYPE "ActiveRole" AS ENUM ('CLIENT', 'PROVIDER');
+CREATE TYPE "PaymentMethod" AS ENUM ('MP', 'CASH');
+
+-- CreateEnum
+CREATE TYPE "PaymentProvider" AS ENUM ('MERCADOPAGO');
+
+-- CreateEnum
+CREATE TYPE "ActiveRole" AS ENUM ('CLIENT', 'WORKER');
+
+-- CreateEnum
+CREATE TYPE "SpecialtyStatus" AS ENUM ('DRAFT', 'PENDING', 'ACTIVE', 'REJECTED');
 
 -- CreateEnum
 CREATE TYPE "ServiceCategoryEnum" AS ENUM ('MAINTENANCE', 'PAINTING', 'HVAC', 'ELECTRICAL', 'PLUMBING');
@@ -45,7 +54,8 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
-    "role" "UserRole" NOT NULL DEFAULT 'CLIENT',
+    "roles" "UserRole"[],
+    "currentRole" "UserRole" NOT NULL DEFAULT 'CLIENT',
     "status" "UserStatus" NOT NULL DEFAULT 'LOGGED_IN',
     "activeRole" "ActiveRole" NOT NULL DEFAULT 'CLIENT',
     "isEmailVerified" BOOLEAN NOT NULL DEFAULT false,
@@ -74,6 +84,8 @@ CREATE TABLE "WorkerProfile" (
     "latitude" DOUBLE PRECISION,
     "longitude" DOUBLE PRECISION,
     "lastLocationUpdate" TIMESTAMP(3),
+    "lastActiveAt" TIMESTAMP(3),
+    "cityId" TEXT,
     "reputationPoints" INTEGER NOT NULL DEFAULT 0,
     "currentPlan" TEXT NOT NULL DEFAULT 'STARTER',
     "acceptanceRate" DOUBLE PRECISION NOT NULL DEFAULT 1.0,
@@ -146,6 +158,20 @@ CREATE TABLE "service_categories" (
 );
 
 -- CreateTable
+CREATE TABLE "worker_specialties" (
+    "id" TEXT NOT NULL,
+    "workerId" TEXT NOT NULL,
+    "categoryId" TEXT NOT NULL,
+    "status" "SpecialtyStatus" NOT NULL DEFAULT 'PENDING',
+    "experienceYears" INTEGER NOT NULL DEFAULT 0,
+    "metadata" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "worker_specialties_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "service_formulas" (
     "id" TEXT NOT NULL,
     "subcategory" "ServiceSubcategory" NOT NULL,
@@ -186,7 +212,7 @@ CREATE TABLE "ExtrasMultiplier" (
 -- CreateTable
 CREATE TABLE "service_requests" (
     "id" TEXT NOT NULL,
-    "status" "JobStatus" NOT NULL DEFAULT 'CREATED',
+    "status" "JobStatus" NOT NULL DEFAULT 'PENDING',
     "paymentStatus" TEXT NOT NULL DEFAULT 'PENDING',
     "subcategory" "ServiceSubcategory",
     "metadata" JSONB,
@@ -198,6 +224,7 @@ CREATE TABLE "service_requests" (
     "longitude" DOUBLE PRECISION NOT NULL,
     "address" TEXT,
     "city" TEXT,
+    "cityId" TEXT,
     "coverageRadius" DOUBLE PRECISION NOT NULL DEFAULT 15.0,
     "description" TEXT,
     "squareMeters" DOUBLE PRECISION NOT NULL,
@@ -210,14 +237,25 @@ CREATE TABLE "service_requests" (
     "price" JSONB NOT NULL,
     "priceWorkerNet" DECIMAL(10,2),
     "pricePlatformFee" DECIMAL(10,2),
+    "totalAmount" DECIMAL(10,2),
+    "workerPayout" DECIMAL(10,2),
+    "platformCommission" DECIMAL(10,2),
     "pin" TEXT NOT NULL DEFAULT '0000',
+    "verificationCode" TEXT,
     "extraTimeStatus" "ExtraTimeStatus" NOT NULL DEFAULT 'NONE',
     "extraTimeMinutes" INTEGER,
     "extraTimeReason" TEXT,
     "paidAt" TIMESTAMP(3),
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "assignmentAttempts" INTEGER NOT NULL DEFAULT 0,
+    "idempotencyKey" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "startedAt" TIMESTAMP(3),
     "completedAt" TIMESTAMP(3),
+    "scheduledAt" TIMESTAMP(3),
+    "workerTimeoutAt" TIMESTAMP(3),
+    "disputeDeadlineAt" TIMESTAMP(3),
+    "payoutReleasedAt" TIMESTAMP(3),
     "warrantyExpiresAt" TIMESTAMP(3),
 
     CONSTRAINT "service_requests_pkey" PRIMARY KEY ("id")
@@ -243,6 +281,9 @@ CREATE TABLE "Wallet" (
     "userId" TEXT NOT NULL,
     "balancePending" DECIMAL(14,2) NOT NULL DEFAULT 0,
     "balanceAvailable" DECIMAL(14,2) NOT NULL DEFAULT 0,
+    "currentBalance" INTEGER NOT NULL DEFAULT 0,
+    "debtLimit" INTEGER NOT NULL DEFAULT -50000,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -297,6 +338,7 @@ CREATE TABLE "ChatMessage" (
 CREATE TABLE "Review" (
     "id" TEXT NOT NULL,
     "jobId" TEXT NOT NULL,
+    "categoryId" TEXT,
     "rating" INTEGER NOT NULL,
     "comment" TEXT,
     "authorId" TEXT NOT NULL,
@@ -405,6 +447,103 @@ CREATE TABLE "Notification" (
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "DeviceToken" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "platform" TEXT NOT NULL,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "DeviceToken_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "payment_transactions" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "professionalId" TEXT,
+    "walletId" TEXT,
+    "status" "TransactionStatus" NOT NULL DEFAULT 'PENDING',
+    "paymentMethod" "PaymentMethod" NOT NULL,
+    "amountTotal" INTEGER NOT NULL,
+    "externalReference" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "payment_transactions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "transaction_snapshots" (
+    "id" TEXT NOT NULL,
+    "transactionId" TEXT NOT NULL,
+    "platformFeePercent" INTEGER NOT NULL,
+    "serviceTaxPercent" INTEGER NOT NULL,
+    "platformAmount" INTEGER NOT NULL,
+    "professionalAmount" INTEGER NOT NULL,
+    "metadata" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "transaction_snapshots_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ledger_entries" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "transactionId" TEXT,
+    "walletId" TEXT,
+    "debit" INTEGER NOT NULL DEFAULT 0,
+    "credit" INTEGER NOT NULL DEFAULT 0,
+    "balanceAfter" INTEGER NOT NULL,
+    "description" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ledger_entries_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "payment_provider_logs" (
+    "id" TEXT NOT NULL,
+    "transactionId" TEXT,
+    "provider" "PaymentProvider" NOT NULL,
+    "eventId" TEXT NOT NULL,
+    "eventType" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "processedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "payment_provider_logs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "system_config" (
+    "id" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "type" TEXT NOT NULL DEFAULT 'STRING',
+    "description" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "system_config_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "outbox_events" (
+    "id" TEXT NOT NULL,
+    "aggregateId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "processed" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "processedAt" TIMESTAMP(3),
+
+    CONSTRAINT "outbox_events_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -418,6 +557,9 @@ CREATE INDEX "User_status_idx" ON "User"("status");
 CREATE INDEX "User_activeRole_idx" ON "User"("activeRole");
 
 -- CreateIndex
+CREATE INDEX "User_currentRole_idx" ON "User"("currentRole");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "WorkerProfile_userId_key" ON "WorkerProfile"("userId");
 
 -- CreateIndex
@@ -428,6 +570,12 @@ CREATE INDEX "WorkerProfile_status_idx" ON "WorkerProfile"("status");
 
 -- CreateIndex
 CREATE INDEX "WorkerProfile_currentPlan_idx" ON "WorkerProfile"("currentPlan");
+
+-- CreateIndex
+CREATE INDEX "WorkerProfile_cityId_idx" ON "WorkerProfile"("cityId");
+
+-- CreateIndex
+CREATE INDEX "WorkerProfile_lastActiveAt_idx" ON "WorkerProfile"("lastActiveAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ClientProfile_userId_key" ON "ClientProfile"("userId");
@@ -452,6 +600,18 @@ CREATE INDEX "service_categories_slug_idx" ON "service_categories"("slug");
 
 -- CreateIndex
 CREATE INDEX "service_categories_active_idx" ON "service_categories"("active");
+
+-- CreateIndex
+CREATE INDEX "worker_specialties_workerId_idx" ON "worker_specialties"("workerId");
+
+-- CreateIndex
+CREATE INDEX "worker_specialties_categoryId_idx" ON "worker_specialties"("categoryId");
+
+-- CreateIndex
+CREATE INDEX "worker_specialties_status_idx" ON "worker_specialties"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "worker_specialties_workerId_categoryId_key" ON "worker_specialties"("workerId", "categoryId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "service_formulas_subcategory_key" ON "service_formulas"("subcategory");
@@ -481,6 +641,9 @@ CREATE INDEX "ExtrasMultiplier_code_idx" ON "ExtrasMultiplier"("code");
 CREATE INDEX "ExtrasMultiplier_active_idx" ON "ExtrasMultiplier"("active");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "service_requests_idempotencyKey_key" ON "service_requests"("idempotencyKey");
+
+-- CreateIndex
 CREATE INDEX "service_requests_status_idx" ON "service_requests"("status");
 
 -- CreateIndex
@@ -499,6 +662,15 @@ CREATE INDEX "service_requests_serviceCategoryId_idx" ON "service_requests"("ser
 CREATE INDEX "service_requests_createdAt_idx" ON "service_requests"("createdAt");
 
 -- CreateIndex
+CREATE INDEX "service_requests_workerTimeoutAt_idx" ON "service_requests"("workerTimeoutAt");
+
+-- CreateIndex
+CREATE INDEX "service_requests_cityId_idx" ON "service_requests"("cityId");
+
+-- CreateIndex
+CREATE INDEX "service_requests_scheduledAt_idx" ON "service_requests"("scheduledAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Dispute_serviceRequestId_key" ON "Dispute"("serviceRequestId");
 
 -- CreateIndex
@@ -512,6 +684,9 @@ CREATE INDEX "Wallet_userId_idx" ON "Wallet"("userId");
 
 -- CreateIndex
 CREATE INDEX "Wallet_updatedAt_idx" ON "Wallet"("updatedAt");
+
+-- CreateIndex
+CREATE INDEX "Wallet_status_idx" ON "Wallet"("status");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Transaction_idempotencyKey_key" ON "Transaction"("idempotencyKey");
@@ -563,6 +738,9 @@ CREATE INDEX "Review_authorId_idx" ON "Review"("authorId");
 
 -- CreateIndex
 CREATE INDEX "Review_targetId_idx" ON "Review"("targetId");
+
+-- CreateIndex
+CREATE INDEX "Review_categoryId_idx" ON "Review"("categoryId");
 
 -- CreateIndex
 CREATE INDEX "SupportTicket_jobId_idx" ON "SupportTicket"("jobId");
@@ -621,6 +799,84 @@ CREATE INDEX "Notification_read_idx" ON "Notification"("read");
 -- CreateIndex
 CREATE INDEX "Notification_createdAt_idx" ON "Notification"("createdAt");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "DeviceToken_token_key" ON "DeviceToken"("token");
+
+-- CreateIndex
+CREATE INDEX "DeviceToken_userId_idx" ON "DeviceToken"("userId");
+
+-- CreateIndex
+CREATE INDEX "DeviceToken_token_idx" ON "DeviceToken"("token");
+
+-- CreateIndex
+CREATE INDEX "DeviceToken_active_idx" ON "DeviceToken"("active");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payment_transactions_externalReference_key" ON "payment_transactions"("externalReference");
+
+-- CreateIndex
+CREATE INDEX "payment_transactions_userId_idx" ON "payment_transactions"("userId");
+
+-- CreateIndex
+CREATE INDEX "payment_transactions_professionalId_idx" ON "payment_transactions"("professionalId");
+
+-- CreateIndex
+CREATE INDEX "payment_transactions_status_idx" ON "payment_transactions"("status");
+
+-- CreateIndex
+CREATE INDEX "payment_transactions_externalReference_idx" ON "payment_transactions"("externalReference");
+
+-- CreateIndex
+CREATE INDEX "payment_transactions_createdAt_idx" ON "payment_transactions"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "transaction_snapshots_transactionId_key" ON "transaction_snapshots"("transactionId");
+
+-- CreateIndex
+CREATE INDEX "transaction_snapshots_transactionId_idx" ON "transaction_snapshots"("transactionId");
+
+-- CreateIndex
+CREATE INDEX "ledger_entries_accountId_idx" ON "ledger_entries"("accountId");
+
+-- CreateIndex
+CREATE INDEX "ledger_entries_transactionId_idx" ON "ledger_entries"("transactionId");
+
+-- CreateIndex
+CREATE INDEX "ledger_entries_walletId_idx" ON "ledger_entries"("walletId");
+
+-- CreateIndex
+CREATE INDEX "ledger_entries_createdAt_idx" ON "ledger_entries"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payment_provider_logs_eventId_key" ON "payment_provider_logs"("eventId");
+
+-- CreateIndex
+CREATE INDEX "payment_provider_logs_eventId_idx" ON "payment_provider_logs"("eventId");
+
+-- CreateIndex
+CREATE INDEX "payment_provider_logs_transactionId_idx" ON "payment_provider_logs"("transactionId");
+
+-- CreateIndex
+CREATE INDEX "payment_provider_logs_processedAt_idx" ON "payment_provider_logs"("processedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "system_config_key_key" ON "system_config"("key");
+
+-- CreateIndex
+CREATE INDEX "system_config_key_idx" ON "system_config"("key");
+
+-- CreateIndex
+CREATE INDEX "outbox_events_processed_idx" ON "outbox_events"("processed");
+
+-- CreateIndex
+CREATE INDEX "outbox_events_aggregateId_idx" ON "outbox_events"("aggregateId");
+
+-- CreateIndex
+CREATE INDEX "outbox_events_type_idx" ON "outbox_events"("type");
+
+-- CreateIndex
+CREATE INDEX "outbox_events_createdAt_idx" ON "outbox_events"("createdAt");
+
 -- AddForeignKey
 ALTER TABLE "WorkerProfile" ADD CONSTRAINT "WorkerProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -629,6 +885,12 @@ ALTER TABLE "ClientProfile" ADD CONSTRAINT "ClientProfile_userId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "CustomerProfile" ADD CONSTRAINT "CustomerProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "worker_specialties" ADD CONSTRAINT "worker_specialties_workerId_fkey" FOREIGN KEY ("workerId") REFERENCES "WorkerProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "worker_specialties" ADD CONSTRAINT "worker_specialties_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "service_categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "service_formulas" ADD CONSTRAINT "service_formulas_serviceCategoryId_fkey" FOREIGN KEY ("serviceCategoryId") REFERENCES "service_categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -673,6 +935,9 @@ ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_receiverId_fkey" FOREIGN K
 ALTER TABLE "Review" ADD CONSTRAINT "Review_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "service_requests"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Review" ADD CONSTRAINT "Review_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "service_categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Review" ADD CONSTRAINT "Review_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "WorkerProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -689,3 +954,24 @@ ALTER TABLE "UserConsent" ADD CONSTRAINT "UserConsent_documentId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DeviceToken" ADD CONSTRAINT "DeviceToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payment_transactions" ADD CONSTRAINT "payment_transactions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payment_transactions" ADD CONSTRAINT "payment_transactions_walletId_fkey" FOREIGN KEY ("walletId") REFERENCES "Wallet"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transaction_snapshots" ADD CONSTRAINT "transaction_snapshots_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "payment_transactions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "payment_transactions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_walletId_fkey" FOREIGN KEY ("walletId") REFERENCES "Wallet"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payment_provider_logs" ADD CONSTRAINT "payment_provider_logs_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "payment_transactions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
