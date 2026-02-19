@@ -7,13 +7,11 @@ import {
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { ROLES_KEY, ACTIVE_ROLE_KEY } from './roles.decorator';
-import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,14 +38,11 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Usuario no autenticado');
     }
 
-    // Check if user has required role(s) - now supports multiple roles
+    // Check if user has required role(s) - AuthGuard hydrates fresh roles from DB
     if (requiredRoles) {
-      // User can have multiple roles, check if they have at least one required role
-      const userRoles: string[] = Array.isArray(user.roles)
-        ? [...new Set(user.roles as string[])]
-        : [user.currentRole ?? user.role].filter((r): r is string => typeof r === 'string');
+      const userRoles: string[] = Array.isArray(user.roles) ? [...user.roles] : [];
       const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
-      
+
       if (!hasRequiredRole) {
         const roleNameMap: Record<string, string> = {
           'WORKER': 'Profesional',
@@ -61,22 +56,9 @@ export class RolesGuard implements CanActivate {
       }
     }
 
-    // Check if user has required active role
-    // Fetch from database to ensure we have the latest activeRole after role switching
+    // Check active role - AuthGuard hydrates fresh activeRole from DB
     if (requiredActiveRole) {
-      const dbUser = await this.prisma.user.findUnique({
-        where: { id: user.sub },
-        select: { activeRole: true },
-      });
-
-      // If user not found in database, their token is invalid - reject
-      if (!dbUser) {
-        throw new ForbiddenException('Usuario no encontrado o token inválido');
-      }
-
-      const currentActiveRole = dbUser.activeRole;
-      
-      if (currentActiveRole !== requiredActiveRole) {
+      if (user.activeRole !== requiredActiveRole) {
         const modeNameMap: Record<string, string> = {
           'WORKER': 'Profesional',
           'CLIENT': 'Cliente',

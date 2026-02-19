@@ -1,29 +1,26 @@
 /**
- * Roles Guard - Role Switching Tests
- * 
- * Tests that the RolesGuard correctly validates activeRole by fetching
- * the latest value from the database, ensuring role switches are immediately effective.
+ * Roles Guard Tests
+ *
+ * The RolesGuard reads roles and activeRole directly from request.user,
+ * which is hydrated with fresh DB data by AuthGuard on every request.
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { RolesGuard } from './roles.guard';
 import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../prisma/prisma.service';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { ACTIVE_ROLE_KEY } from './roles.decorator';
 
-describe('RolesGuard - Active Role Validation', () => {
+describe('RolesGuard', () => {
   let guard: RolesGuard;
   let reflector: Reflector;
-  let prismaService: PrismaService;
 
   const mockUser = {
     sub: 'user-123',
     email: 'test@example.com',
     roles: ['WORKER', 'CLIENT'],
     currentRole: 'CLIENT',
-    activeRole: 'CLIENT', // JWT has stale CLIENT role
+    activeRole: 'CLIENT',
   };
 
   beforeEach(async () => {
@@ -36,20 +33,11 @@ describe('RolesGuard - Active Role Validation', () => {
             getAllAndOverride: jest.fn(),
           },
         },
-        {
-          provide: PrismaService,
-          useValue: {
-            user: {
-              findUnique: jest.fn(),
-            },
-          },
-        },
       ],
     }).compile();
 
     guard = module.get<RolesGuard>(RolesGuard);
     reflector = module.get<Reflector>(Reflector);
-    prismaService = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -68,7 +56,6 @@ describe('RolesGuard - Active Role Validation', () => {
       getType: jest.fn(() => 'graphql'),
     } as unknown as ExecutionContext;
 
-    // Mock GqlExecutionContext.create to return a context with our user
     jest.spyOn(GqlExecutionContext, 'create').mockReturnValue({
       getContext: jest.fn().mockReturnValue({
         req: { user },
@@ -88,130 +75,72 @@ describe('RolesGuard - Active Role Validation', () => {
     return mockExecutionContext;
   };
 
-  describe('Active Role Database Lookup', () => {
-    it('should fetch activeRole from database when JWT has stale data', async () => {
+  describe('No roles required', () => {
+    it('should allow access when no roles are required', async () => {
       const context = createMockContext(mockUser);
 
-      // Reflector returns WORKER as required role (but JWT has CLIENT)
       jest.spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValueOnce(undefined) // No required roles
-        .mockReturnValueOnce('WORKER'); // Required active role
-
-      // Database has updated activeRole = WORKER (user switched roles)
-      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue({
-        id: 'user-123',
-        activeRole: 'WORKER',
-      } as any);
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce(undefined);
 
       const result = await guard.canActivate(context);
 
       expect(result).toBe(true);
-      expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { id: 'user-123' },
-        select: { activeRole: true },
-      });
     });
+  });
 
-    it('should reject when database activeRole does not match required role', async () => {
-      const context = createMockContext(mockUser);
+  describe('Active Role Validation (from request.user hydrated by AuthGuard)', () => {
+    it('should allow access when user.activeRole matches required active role', async () => {
+      const userWithWorkerActive = { ...mockUser, activeRole: 'WORKER' };
+      const context = createMockContext(userWithWorkerActive);
 
       jest.spyOn(reflector, 'getAllAndOverride')
         .mockReturnValueOnce(undefined)
         .mockReturnValueOnce('WORKER');
 
-      // Database still has activeRole = CLIENT (role switch not completed)
-      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue({
-        id: 'user-123',
-        activeRole: 'CLIENT',
-      } as any);
-
-      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should allow access when database activeRole matches required role', async () => {
-      const context = createMockContext(mockUser);
-
-      jest.spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValueOnce(undefined)
-        .mockReturnValueOnce('CLIENT');
-
-      // Database has activeRole = CLIENT
-      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue({
-        id: 'user-123',
-        activeRole: 'CLIENT',
-      } as any);
-
       const result = await guard.canActivate(context);
 
       expect(result).toBe(true);
     });
 
-    it('should reject if user not found in database', async () => {
-      const context = createMockContext(mockUser);
+    it('should reject when user.activeRole does not match required active role', async () => {
+      const context = createMockContext(mockUser); // activeRole: 'CLIENT'
+
+      jest.spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce('WORKER');
+
+      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow access when user.activeRole matches CLIENT requirement', async () => {
+      const context = createMockContext(mockUser); // activeRole: 'CLIENT'
 
       jest.spyOn(reflector, 'getAllAndOverride')
         .mockReturnValueOnce(undefined)
         .mockReturnValueOnce('CLIENT');
 
-      // Database lookup returns null (user deleted or token invalid)
-      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(null);
-
-      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
-    });
-  });
-
-  describe('No Active Role Required', () => {
-    it('should allow access without database lookup when no activeRole is required', async () => {
-      const context = createMockContext(mockUser);
-
-      jest.spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValueOnce(undefined) // No required roles
-        .mockReturnValueOnce(undefined); // No required active role
-
       const result = await guard.canActivate(context);
 
       expect(result).toBe(true);
-      expect(prismaService.user.findUnique).not.toHaveBeenCalled();
     });
   });
 
   describe('Role Array Validation', () => {
-    it('should validate user roles array when required roles specified', async () => {
+    it('should allow access when user has one of the required roles', async () => {
       const context = createMockContext(mockUser);
 
       jest.spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValueOnce(['WORKER', 'CLIENT']) // Required roles
-        .mockReturnValueOnce(undefined); // No active role requirement
+        .mockReturnValueOnce(['WORKER', 'CLIENT'])
+        .mockReturnValueOnce(undefined);
 
       const result = await guard.canActivate(context);
 
       expect(result).toBe(true);
-      expect(prismaService.user.findUnique).not.toHaveBeenCalled();
     });
 
-    it('should reject when user does not have required role', async () => {
-      const userWithoutWorkerRole = {
-        ...mockUser,
-        roles: ['CLIENT'],
-      };
-
-      const context = createMockContext(userWithoutWorkerRole);
-
-      jest.spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValueOnce(['WORKER']) // Required roles
-        .mockReturnValueOnce(undefined);
-
-      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should fall back to currentRole when user.roles is undefined', async () => {
-      const userWithUndefinedRoles = {
-        ...mockUser,
-        roles: undefined,
-        currentRole: 'WORKER',
-      };
-
-      const context = createMockContext(userWithUndefinedRoles);
+    it('should allow access for WORKER role when user has both CLIENT and WORKER', async () => {
+      const context = createMockContext(mockUser);
 
       jest.spyOn(reflector, 'getAllAndOverride')
         .mockReturnValueOnce(['WORKER'])
@@ -222,64 +151,53 @@ describe('RolesGuard - Active Role Validation', () => {
       expect(result).toBe(true);
     });
 
-    it('should fall back to role when user.roles is undefined and currentRole is absent', async () => {
-      const userWithRoleOnly = {
-        sub: 'user-456',
-        email: 'other@example.com',
-        roles: undefined,
-        currentRole: undefined,
-        role: 'CLIENT',
-      };
+    it('should reject when user does not have the required role', async () => {
+      const userWithoutWorkerRole = { ...mockUser, roles: ['CLIENT'] };
+      const context = createMockContext(userWithoutWorkerRole);
 
-      const context = createMockContext(userWithRoleOnly);
+      jest.spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValueOnce(['WORKER'])
+        .mockReturnValueOnce(undefined);
+
+      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should deny access when user.roles is not an array (legacy data)', async () => {
+      const userWithStringRoles = { ...mockUser, roles: 'CLIENT' as any };
+      const context = createMockContext(userWithStringRoles);
 
       jest.spyOn(reflector, 'getAllAndOverride')
         .mockReturnValueOnce(['CLIENT'])
         .mockReturnValueOnce(undefined);
 
-      const result = await guard.canActivate(context);
-
-      expect(result).toBe(true);
+      // Non-array roles are treated as empty - access denied
+      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
     });
 
-    it('should handle legacy string roles gracefully and deny access', async () => {
-      const userWithStringRoles = {
-        ...mockUser,
-        roles: 'CLIENT' as any, // legacy string stored instead of array
-      };
-
-      const context = createMockContext(userWithStringRoles);
+    it('should deny access when user.roles is undefined', async () => {
+      const userWithNoRoles = { ...mockUser, roles: undefined };
+      const context = createMockContext(userWithNoRoles);
 
       jest.spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValueOnce(['WORKER'])
+        .mockReturnValueOnce(['CLIENT'])
         .mockReturnValueOnce(undefined);
 
       await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
     });
 
-    it('should ignore legacy string roles and use currentRole as fallback', async () => {
-      const userWithStringRolesMatchingRequired = {
-        ...mockUser,
-        roles: 'WORKER' as any, // legacy string that happens to match required role
-        currentRole: 'CLIENT', // only CLIENT in currentRole
-      };
+    it('should deny access when user.roles is null', async () => {
+      const userWithNullRoles = { ...mockUser, roles: null as any };
+      const context = createMockContext(userWithNullRoles);
 
-      const context = createMockContext(userWithStringRolesMatchingRequired);
-
-      // Requires WORKER, but string roles are not parsed - falls back to currentRole CLIENT
       jest.spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValueOnce(['WORKER'])
+        .mockReturnValueOnce(['CLIENT'])
         .mockReturnValueOnce(undefined);
 
       await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
     });
 
-    it('should deduplicate roles when roles array contains duplicates', async () => {
-      const userWithDuplicateRoles = {
-        ...mockUser,
-        roles: ['WORKER', 'WORKER', 'CLIENT'],
-      };
-
+    it('should allow access with duplicate roles in array', async () => {
+      const userWithDuplicateRoles = { ...mockUser, roles: ['WORKER', 'WORKER', 'CLIENT'] };
       const context = createMockContext(userWithDuplicateRoles);
 
       jest.spyOn(reflector, 'getAllAndOverride')
@@ -292,3 +210,4 @@ describe('RolesGuard - Active Role Validation', () => {
     });
   });
 });
+

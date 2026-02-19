@@ -27,22 +27,38 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Token no proporcionado');
     }
 
+    // Verify signature and expiration
+    let payload: Record<string, unknown>;
     try {
-      // Verificar firma y expiraciÃƒ³n
-      const payload = await this.jwtService.verifyAsync(token, {
+      payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_SECRET || 'CHANGE_THIS_SECRET_IN_PROD'
       });
-      
-      // Inyectar usuario en el request context
-      request['user'] = payload;
-      
-      // Validar que el usuario siga existiendo en DB (opcional para extra seguridad)
-      // const user = await (this.prisma as any).user.findUnique({ where: { id: payload.sub } });
-      // if (!user) throw new UnauthorizedException('Usuario inexistente');
-
-    } catch (e) {
-      throw new UnauthorizedException('Token invÃƒ¡lido o expirado');
+    } catch {
+      throw new UnauthorizedException('Token inválido o expirado');
     }
+
+    if (typeof payload.sub !== 'string' || !payload.sub) {
+      throw new UnauthorizedException('Token inválido o expirado');
+    }
+
+    // Hydrate request.user with fresh data from DB so roles are never stale
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { roles: true, currentRole: true, activeRole: true, isEmailVerified: true },
+    });
+
+    if (!dbUser) {
+      throw new UnauthorizedException('Usuario inexistente');
+    }
+
+    // Merge JWT payload with fresh DB fields; DB values take precedence for authorization
+    request['user'] = {
+      ...payload,
+      roles: dbUser.roles,
+      currentRole: dbUser.currentRole,
+      activeRole: dbUser.activeRole,
+      isEmailVerified: dbUser.isEmailVerified,
+    };
     return true;
   }
 
