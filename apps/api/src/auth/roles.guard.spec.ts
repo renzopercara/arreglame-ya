@@ -203,5 +203,92 @@ describe('RolesGuard - Active Role Validation', () => {
 
       await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
     });
+
+    it('should fall back to currentRole when user.roles is undefined', async () => {
+      const userWithUndefinedRoles = {
+        ...mockUser,
+        roles: undefined,
+        currentRole: 'WORKER',
+      };
+
+      const context = createMockContext(userWithUndefinedRoles);
+
+      jest.spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValueOnce(['WORKER'])
+        .mockReturnValueOnce(undefined);
+
+      const result = await guard.canActivate(context);
+
+      expect(result).toBe(true);
+    });
+
+    it('should fall back to role when user.roles is undefined and currentRole is absent', async () => {
+      const userWithRoleOnly = {
+        sub: 'user-456',
+        email: 'other@example.com',
+        roles: undefined,
+        currentRole: undefined,
+        role: 'CLIENT',
+      };
+
+      const context = createMockContext(userWithRoleOnly);
+
+      jest.spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValueOnce(['CLIENT'])
+        .mockReturnValueOnce(undefined);
+
+      const result = await guard.canActivate(context);
+
+      expect(result).toBe(true);
+    });
+
+    it('should handle legacy string roles gracefully and deny access', async () => {
+      const userWithStringRoles = {
+        ...mockUser,
+        roles: 'CLIENT' as any, // legacy string stored instead of array
+      };
+
+      const context = createMockContext(userWithStringRoles);
+
+      jest.spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValueOnce(['WORKER'])
+        .mockReturnValueOnce(undefined);
+
+      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should ignore legacy string roles and use currentRole as fallback', async () => {
+      const userWithStringRolesMatchingRequired = {
+        ...mockUser,
+        roles: 'WORKER' as any, // legacy string that happens to match required role
+        currentRole: 'CLIENT', // only CLIENT in currentRole
+      };
+
+      const context = createMockContext(userWithStringRolesMatchingRequired);
+
+      // Requires WORKER, but string roles are not parsed - falls back to currentRole CLIENT
+      jest.spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValueOnce(['WORKER'])
+        .mockReturnValueOnce(undefined);
+
+      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should deduplicate roles when roles array contains duplicates', async () => {
+      const userWithDuplicateRoles = {
+        ...mockUser,
+        roles: ['WORKER', 'WORKER', 'CLIENT'],
+      };
+
+      const context = createMockContext(userWithDuplicateRoles);
+
+      jest.spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValueOnce(['WORKER'])
+        .mockReturnValueOnce(undefined);
+
+      const result = await guard.canActivate(context);
+
+      expect(result).toBe(true);
+    });
   });
 });

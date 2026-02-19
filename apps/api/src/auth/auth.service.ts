@@ -450,11 +450,10 @@ export class AuthService {
         });
       }
 
-      // Update user to add WORKER role if not present, and set currentRole to WORKER
-      const currentRoles = user.roles || [user.currentRole];
-      const updatedRoles = currentRoles.includes(UserRole.WORKER) 
-        ? currentRoles 
-        : [...currentRoles, UserRole.WORKER];
+      // Update user to add WORKER role additively using Set to prevent duplicates
+      const updatedRolesSet = new Set(user.roles ?? []);
+      updatedRolesSet.add(UserRole.WORKER);
+      const updatedRoles = Array.from(updatedRolesSet);
 
       updatedUser = await tx.user.update({
         where: { id: userId },

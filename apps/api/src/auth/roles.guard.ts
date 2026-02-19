@@ -43,7 +43,9 @@ export class RolesGuard implements CanActivate {
     // Check if user has required role(s) - now supports multiple roles
     if (requiredRoles) {
       // User can have multiple roles, check if they have at least one required role
-      const userRoles = user.roles || [user.currentRole || user.role];
+      const userRoles: string[] = Array.isArray(user.roles)
+        ? [...new Set(user.roles as string[])]
+        : [user.currentRole ?? user.role].filter((r): r is string => typeof r === 'string');
       const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
       
       if (!hasRequiredRole) {
