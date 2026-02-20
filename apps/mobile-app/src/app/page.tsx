@@ -10,6 +10,7 @@ import { useAuth } from "@/app/providers";
 import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import { getLucideIcon } from "../lib/icons";
 import { ServiceCategory } from "../types/category";
+import EmptyState from "@/components/EmptyState";
 import { 
   Map as MapIcon, 
   List, 
@@ -20,6 +21,7 @@ import {
   ChevronRight,
   AlertCircle,
   Loader2,
+  Plus,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -104,14 +106,6 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const EmptyState = ({ message }: { message: string }) => (
-  <div className="flex flex-col items-center justify-center py-12 px-4">
-    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-8 w-full max-w-sm text-center">
-      <p className="text-sm text-slate-600 font-medium">{message}</p>
-    </div>
-  </div>
-);
-
 /* -------------------------------------------------------------------------- */
 /* MAIN COMPONENT                                                             */
 /* -------------------------------------------------------------------------- */
@@ -154,8 +148,12 @@ export default function HomePage() {
     rating: typeof s.rating === 'number' ? s.rating : undefined,
   }));
 
+  // Client mode = authenticated + not in worker mode
+  const isClientMode = isAuthenticated && !isWorkerMode;
+  const showFab = isClientMode && typedServices.length > 0;
+
   return (
-    <div className="flex flex-col gap-6 max-w-md mx-auto bg-gray-50 min-h-screen">
+    <div className="flex flex-col gap-6 max-w-md mx-auto bg-gray-50 min-h-screen pb-24">
       {/* Header */}
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-black text-slate-900">¡Hola! 👋</h1>
@@ -200,7 +198,9 @@ export default function HomePage() {
         ) : categoriesLoading ? (
           <LoadingSpinner />
         ) : categories.length === 0 ? (
-          <EmptyState message="No hay categorías disponibles" />
+          <div className="py-2 px-1">
+            <p className="text-sm text-slate-400">No hay categorías disponibles</p>
+          </div>
         ) : (
           <div className="grid grid-cols-4 gap-3">
             {categories.slice(0, 4).map((cat: ServiceCategory) => {
@@ -217,7 +217,11 @@ export default function HomePage() {
               const color = colors[colorIndex];
               
               return (
-                <button key={cat.id} className="flex flex-col items-center gap-2">
+                <button
+                  key={cat.id}
+                  className="flex flex-col items-center gap-2"
+                  onClick={() => router.push(`/services/create`)}
+                >
                   <div className={`w-full aspect-square rounded-2xl flex items-center justify-center ${color} shadow-sm active:scale-90 transition-transform`}>
                     <Icon size={24} />
                   </div>
@@ -265,7 +269,9 @@ export default function HomePage() {
           </div>
         ) : (
           <>
-            <h2 className="text-lg font-bold text-slate-800">Servicios Destacados</h2>
+            <h2 className="text-lg font-bold text-slate-800">
+              {isClientMode ? "Mis solicitudes recientes" : "Servicios Destacados"}
+            </h2>
             
             {servicesError ? (
               <ErrorMessage 
@@ -275,7 +281,20 @@ export default function HomePage() {
             ) : servicesLoading ? (
               <LoadingSpinner />
             ) : typedServices.length === 0 ? (
-              <EmptyState message="No hay servicios disponibles en tu zona" />
+              isClientMode ? (
+                /* CLIENT empty state – guides creation */
+                <EmptyState
+                  title="¿Necesitas ayuda con algo?"
+                  subtitle="Crea tu primera solicitud de trabajo ahora mismo."
+                  ctaLabel="Solicitar Servicio"
+                  onCta={() => router.push("/services/create")}
+                />
+              ) : (
+                <EmptyState
+                  title="Sin servicios disponibles"
+                  subtitle="No hay servicios disponibles en tu zona por el momento."
+                />
+              )
             ) : (
               <div className="flex flex-col gap-4">
                 {typedServices.map((service) => (
@@ -393,6 +412,18 @@ export default function HomePage() {
             {isSwitchingRole ? 'CAMBIANDO...' : 'IR A MODO CLIENTE'}
           </button>
         </section>
+      )}
+
+      {/* FAB – shown bottom-right when client has existing services */}
+      {showFab && (
+        <button
+          onClick={() => router.push("/services/create")}
+          aria-label="Solicitar Servicio"
+          className="fixed bottom-24 right-4 z-50 flex items-center gap-2 bg-blue-600 text-white px-5 py-3.5 rounded-full shadow-xl shadow-blue-300 active:scale-95 transition-all font-bold text-sm"
+        >
+          <Plus size={20} />
+          Solicitar Servicio
+        </button>
       )}
     </div>
   );
