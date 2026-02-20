@@ -409,6 +409,9 @@ model ServiceRequest {
   difficultyLevel   DifficultyLevel     @default(MEDIUM)
   serviceCategoryId String?
 
+  // Multi-tenant support
+  tenantId          String?
+
   clientId          String
   workerId          String?
   latitude          Float
@@ -433,6 +436,13 @@ model ServiceRequest {
   totalAmount      Decimal? @db.Decimal(10, 2) // Total amount for the service
   workerPayout     Decimal? @db.Decimal(10, 2) // Amount to be paid to worker
   platformCommission Decimal? @db.Decimal(10, 2) // Platform commission
+
+  // Pricing snapshot – backend calculated, never from frontend
+  estimatedBasePrice     Decimal? @db.Decimal(10, 2)
+  estimatedVariablePrice Decimal? @db.Decimal(10, 2)
+  estimatedFinalPrice    Decimal? @db.Decimal(10, 2)
+  pricingVersion         String?
+  pricingMetadata        Json?
 
   // Verification and security
   pin                String          @default("0000")
@@ -481,6 +491,8 @@ model ServiceRequest {
   @@index([workerTimeoutAt]) // For cron job efficiency
   @@index([cityId]) // For multi-city queries
   @@index([scheduledAt]) // For scheduled jobs
+  @@index([tenantId, status]) // Multi-tenant queries
+  @@index([latitude, longitude]) // Geo proximity queries
   @@map("service_requests")
 }
 
