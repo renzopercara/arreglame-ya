@@ -23,6 +23,23 @@ export class ServiceCategoriesResolver {
   }
 
   /**
+   * Query: serviceCategoriesNearby
+   * Returns active categories that have workers available within the given radius.
+   * Falls back to all active categories when no nearby workers are found.
+   */
+  @Query(() => [ServiceCategoryGraphQL], {
+    name: 'serviceCategoriesNearby',
+    description: 'Get active service categories with workers available near the given coordinates',
+  })
+  async getServiceCategoriesNearby(
+    @Args('latitude', { type: () => Float }) latitude: number,
+    @Args('longitude', { type: () => Float }) longitude: number,
+    @Args('radiusKm', { type: () => Float, defaultValue: 15 }) radiusKm: number,
+  ): Promise<ServiceCategoryGraphQL[]> {
+    return this.serviceCategoriesService.getActiveCategoriesNearby(latitude, longitude, radiusKm);
+  }
+
+  /**
    * Query: calculateServicePrice
    * Calculate estimated price for a service category with complexity factor
    */

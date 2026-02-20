@@ -366,6 +366,24 @@ async function main() {
       type: 'INT',
       description: 'Maximum worker assignment attempts before expiring request',
     },
+    {
+      key: 'PRICE_INCREMENT_PERCENTAGE',
+      value: '10',
+      type: 'INT',
+      description: 'Percentage added each time a client chooses to incentivize their request',
+    },
+    {
+      key: 'MAX_INCREMENT_COUNT',
+      value: '3',
+      type: 'INT',
+      description: 'Maximum number of times a client can increment the price for a single request',
+    },
+    {
+      key: 'SERVICE_EXPIRATION_HOURS',
+      value: '24',
+      type: 'INT',
+      description: 'Hours before an unassigned service request transitions to EXPIRED status',
+    },
   ];
 
   for (const config of systemConfigs) {
