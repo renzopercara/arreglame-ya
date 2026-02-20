@@ -22,6 +22,8 @@ function SearchContent() {
   const urlCategory = searchParams.get("category");
   
   const [inputValue, setInputValue] = useState(urlQuery);
+  // selectedCategory drives the GraphQL query directly (state-first, not URL-first)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(urlCategory);
   const debouncedQuery = useDebounce(inputValue, 300);
   
   useEffect(() => {
@@ -38,8 +40,9 @@ function SearchContent() {
     setInputValue(urlQuery);
   }, [urlQuery]);
   
+  // GraphQL query is driven by React state (selectedCategory), not URL params
   const { services, loading, error, refetch } = useServices({
-    category: urlCategory,
+    category: selectedCategory,
     query: urlQuery,
     location: cityName,
     latitude,
@@ -48,6 +51,9 @@ function SearchContent() {
   });
 
   const handleCategorySelect = (categoryId: string | null) => {
+    // Update React state first – triggers GraphQL refetch without RSC navigation
+    setSelectedCategory(categoryId);
+    // Sync URL for bookmarking/SEO without causing an RSC re-render chain
     const params = new URLSearchParams(searchParams.toString());
     if (categoryId) {
       params.set("category", categoryId);
@@ -59,6 +65,7 @@ function SearchContent() {
 
   const handleClearFilters = () => {
     setInputValue("");
+    setSelectedCategory(null);
     router.replace("/search", { scroll: false });
   };
 
@@ -87,7 +94,7 @@ function SearchContent() {
         
         <CategoryGrid 
           onSelect={handleCategorySelect} 
-          activeId={urlCategory} 
+          activeId={selectedCategory} 
         />
       </header>
 
