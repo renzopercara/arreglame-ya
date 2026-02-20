@@ -279,7 +279,7 @@ export class JobsResolver {
       whereClause.city = { equals: location, mode: 'insensitive' };
     }
     if (category) {
-      whereClause.category = category;
+      whereClause.serviceCategoryId = category;
     }
     if (query) {
       whereClause.description = { contains: query, mode: 'insensitive' };
