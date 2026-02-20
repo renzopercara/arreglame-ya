@@ -6,6 +6,19 @@ import { ENTRE_RIOS_CITIES, DEFAULT_CITY, findCityByName, City } from "@/constan
 
 export type LocationStatus = "loading" | "gps" | "manual" | "error";
 
+export interface NominatimResult {
+  display_name: string;
+  lat: string;
+  lon: string;
+  address: {
+    city?: string;
+    town?: string;
+    village?: string;
+    state?: string;
+    country?: string;
+  };
+}
+
 interface LocationContextValue {
   status: LocationStatus;
   latitude?: number;
@@ -15,6 +28,8 @@ interface LocationContextValue {
   address?: GeoAddress;
   error?: string;
   setManualCity: (cityName: string) => void;
+  setManualCoords: (lat: number, lng: number, label?: string) => void;
+  searchAddress: (query: string) => Promise<NominatimResult[]>;
   refreshLocation: () => void;
 }
 
@@ -22,6 +37,25 @@ const LocationContext = createContext<LocationContextValue | undefined>(undefine
 
 interface LocationProviderProps {
   children: ReactNode;
+}
+
+/**
+ * Forward geocoding via Nominatim OSM API.
+ * Returns an array of search results (max 5).
+ */
+async function nominatimSearch(query: string): Promise<NominatimResult[]> {
+  if (!query || query.trim().length < 3) return [];
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`;
+    const response = await fetch(url, {
+      // User-Agent is required by Nominatim's usage policy
+      headers: { "User-Agent": "ArreglameYa/1.0 (soporte@arreglameya.com)" },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  } catch {
+    return [];
+  }
 }
 
 export function LocationProvider({ children }: LocationProviderProps) {
@@ -112,6 +146,20 @@ export function LocationProvider({ children }: LocationProviderProps) {
     }
   }, []);
 
+  /** Set location by coordinates with an optional display label */
+  const setManualCoords = useCallback((lat: number, lng: number, label?: string) => {
+    setLatitude(lat);
+    setLongitude(lng);
+    setStatus("manual");
+    setError(undefined);
+    if (label) {
+      setCityName(label);
+    }
+  }, []);
+
+  /** Forward geocoding search via Nominatim */
+  const searchAddress = useCallback(nominatimSearch, []);
+
   const refreshLocation = useCallback(() => {
     tryGPSLocation();
   }, [tryGPSLocation]);
@@ -125,6 +173,8 @@ export function LocationProvider({ children }: LocationProviderProps) {
     address,
     error,
     setManualCity,
+    setManualCoords,
+    searchAddress,
     refreshLocation,
   };
 

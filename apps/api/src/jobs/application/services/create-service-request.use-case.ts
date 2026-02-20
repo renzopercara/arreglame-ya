@@ -138,6 +138,10 @@ export class CreateServiceRequestUseCase {
           tenantId: input.tenantId,
           serviceCategoryId: input.serviceCategoryId,
         },
+        // Incentive pricing fields – basePrice is immutable snapshot of original price
+        basePrice: pricingResult.finalAmount,
+        extraIncrement: 0,
+        incrementCount: 0,
         // Legacy price JSON (kept for backward compatibility)
         price: {
           total: pricingResult.finalAmount,

@@ -1,4 +1,3 @@
-
 import { Module } from '@nestjs/common';
 import { JobsResolver } from './jobs.resolver';
 import { ServiceRequestResolver } from './service-request.resolver';
@@ -14,6 +13,7 @@ import { PubSubModule } from '../common/pubsub.module';
 import { PricingEngine } from './application/pricing/pricing-engine';
 import { LawnMowingPricingStrategy } from './application/pricing/strategies/lawn-mowing.strategy';
 import { CreateServiceRequestUseCase } from './application/services/create-service-request.use-case';
+import { IncrementServicePriceUseCase } from './application/services/increment-service-price.use-case';
 
 @Module({
   imports: [ConfigModule, ReputationModule, PubSubModule, BillingModule],
@@ -28,6 +28,7 @@ import { CreateServiceRequestUseCase } from './application/services/create-servi
     LawnMowingPricingStrategy,
     PricingEngine,
     CreateServiceRequestUseCase,
+    IncrementServicePriceUseCase,
   ],
 })
 export class JobsModule {}

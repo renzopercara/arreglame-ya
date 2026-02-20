@@ -9,6 +9,7 @@ import {
   Float,
   InputType,
   ID,
+  Int,
 } from '@nestjs/graphql';
 import { UseGuards, BadRequestException } from '@nestjs/common';
 import GraphQLJSON from 'graphql-type-json';
@@ -24,6 +25,7 @@ import {
   CreateServiceRequestUseCase,
   CreateServiceRequestInput,
 } from './application/services/create-service-request.use-case';
+import { IncrementServicePriceUseCase } from './application/services/increment-service-price.use-case';
 
 // ============================================
 // GraphQL INPUT TYPES
@@ -162,6 +164,27 @@ export class ServiceRequestResponse {
   createdAt: Date;
 }
 
+@ObjectType()
+export class IncrementServicePriceResponse {
+  @Field(() => ID)
+  id: string;
+
+  @Field(() => Float)
+  estimatedFinalPrice: number;
+
+  @Field(() => Float)
+  extraIncrement: number;
+
+  @Field(() => Int)
+  incrementCount: number;
+
+  @Field(() => Int)
+  maxIncrementCount: number;
+
+  @Field()
+  canIncrementAgain: boolean;
+}
+
 // ============================================
 // RESOLVER
 // ============================================
@@ -171,6 +194,7 @@ export class ServiceRequestResolver {
   constructor(
     private readonly pricingEngine: PricingEngine,
     private readonly createServiceRequestUseCase: CreateServiceRequestUseCase,
+    private readonly incrementServicePriceUseCase: IncrementServicePriceUseCase,
   ) {}
 
   /**
@@ -261,6 +285,29 @@ export class ServiceRequestResolver {
       pricingMetadata: result.pricingMetadata,
       createdAt: result.createdAt,
     };
+  }
+
+  /**
+   * incrementServicePrice
+   *
+   * Allows a client to boost the offer price for their pending service request.
+   * Reads the increment percentage from system_config (DB-driven).
+   * Validates ownership and increment limits before persisting.
+   * Emits an event consumed by the notifications service to alert nearby workers.
+   */
+  @Mutation(() => IncrementServicePriceResponse)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireActiveRole('CLIENT')
+  async incrementServicePrice(
+    @Args('serviceRequestId') serviceRequestId: string,
+    @Context() ctx: any,
+  ): Promise<IncrementServicePriceResponse> {
+    const userId: string = ctx.req.user.sub;
+
+    return this.incrementServicePriceUseCase.execute({
+      requestingUserId: userId,
+      serviceRequestId,
+    });
   }
 
   private parseDifficultyLevel(value: string): DifficultyLevel {

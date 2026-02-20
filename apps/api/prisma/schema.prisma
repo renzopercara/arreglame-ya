@@ -444,6 +444,11 @@ model ServiceRequest {
   pricingVersion         String?
   pricingMetadata        Json?
 
+  // Incentive pricing – client can boost price to attract workers faster
+  basePrice      Decimal  @default(0) @db.Decimal(10, 2) // Original calculated price (immutable snapshot)
+  extraIncrement Decimal  @default(0) @db.Decimal(10, 2) // Accumulated incentive amount added by client
+  incrementCount Int      @default(0) // Number of times price was incremented
+
   // Verification and security
   pin                String          @default("0000")
   verificationCode   String?         // 4-digit verification code for starting work
