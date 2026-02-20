@@ -1,6 +1,18 @@
 
 import { gql } from '@apollo/client';
 
+// Shared fragment for service card fields
+export const SERVICE_CARD_FIELDS = gql`
+  fragment ServiceCardFields on Job {
+    id
+    title
+    provider
+    price
+    category
+    imageUrl
+  }
+`;
+
 // SERVICE CATEGORIES
 export const GET_SERVICE_CATEGORIES = gql`
   query GetServiceCategories {
@@ -14,6 +26,16 @@ export const GET_SERVICE_CATEGORIES = gql`
       hourlyRate
       estimatedHours
       active
+    }
+  }
+`;
+
+// Services filtered by category – GraphQL-backed, no URL dependency
+export const GET_SERVICES_BY_CATEGORY = gql`
+  ${SERVICE_CARD_FIELDS}
+  query GetServicesByCategory($categoryId: String) {
+    getServices(category: $categoryId) {
+      ...ServiceCardFields
     }
   }
 `;
