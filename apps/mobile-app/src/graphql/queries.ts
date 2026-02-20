@@ -795,3 +795,44 @@ export const UPDATE_WORKER_STATUS = gql`
     }
   }
 `;
+
+// ============================================
+// SERVICE REQUEST CREATION (CLIENT HUB)
+// ============================================
+
+export const PREVIEW_SERVICE_PRICE = gql`
+  query PreviewServicePrice($input: PreviewServicePriceInput!) {
+    previewServicePrice(input: $input) {
+      baseAmount
+      variableAmount
+      adjustments {
+        label
+        amount
+      }
+      finalAmount
+      pricingVersion
+      currency
+    }
+  }
+`;
+
+export const CREATE_SERVICE_REQUEST = gql`
+  mutation CreateServiceRequest($input: CreateServiceRequestGqlInput!) {
+    createServiceRequest(input: $input) {
+      id
+      status
+      tenantId
+      clientId
+      serviceCategoryId
+      latitude
+      longitude
+      squareMeters
+      difficultyLevel
+      estimatedBasePrice
+      estimatedVariablePrice
+      estimatedFinalPrice
+      pricingVersion
+      createdAt
+    }
+  }
+`;
