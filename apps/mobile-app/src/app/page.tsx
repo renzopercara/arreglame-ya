@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
-import { GET_SERVICE_CATEGORIES } from "../graphql/queries";
+import { GET_SERVICE_CATEGORIES, GET_SERVICE_CATEGORIES_NEARBY } from "../graphql/queries";
 import useServices from "@/hooks/useServices";
-import { useLocationContext } from "@/contexts/LocationContext";
+import { useLocationContext, NominatimResult } from "@/contexts/LocationContext";
 import { useAuth } from "@/app/providers";
 import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import { getLucideIcon } from "../lib/icons";
@@ -22,6 +22,7 @@ import {
   AlertCircle,
   Loader2,
   Plus,
+  X,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -112,24 +113,38 @@ const LoadingSpinner = () => (
 
 export default function HomePage() {
   const router = useRouter();
-  const { status: locStatus, latitude, longitude, cityName } = useLocationContext();
+  const { status: locStatus, latitude, longitude, cityName, searchAddress, setManualCoords } = useLocationContext();
   const { isAuthenticated, user, hasWorkerRole } = useAuth();
   const { isSwitchingRole, switchToWorker, switchToClient } = useRoleSwitcher();
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationResults, setLocationResults] = useState<NominatimResult[]>([]);
+  const [locationSearching, setLocationSearching] = useState(false);
+  const [showLocationResults, setShowLocationResults] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const isWorkerMode = user?.activeRole === 'WORKER';
   
-  // Fetch dynamic categories
+  // Fetch dynamic categories – prefer nearby categories when location is available
   const { 
     data: categoriesData, 
     loading: categoriesLoading,
     error: categoriesError,
     refetch: refetchCategories,
-  } = useQuery(GET_SERVICE_CATEGORIES, {
-    fetchPolicy: 'cache-and-network',
-  });
+  } = useQuery(
+    latitude && longitude ? GET_SERVICE_CATEGORIES_NEARBY : GET_SERVICE_CATEGORIES,
+    {
+      variables: latitude && longitude
+        ? { latitude, longitude, radiusKm: 15 }
+        : undefined,
+      fetchPolicy: 'cache-and-network',
+    }
+  );
   
-  const categories: ServiceCategory[] = categoriesData?.serviceCategories || [];
+  const categories: ServiceCategory[] = 
+    (latitude && longitude
+      ? (categoriesData as any)?.serviceCategoriesNearby
+      : (categoriesData as any)?.serviceCategories) || [];
   
   // Fetch services
   const { services, loading: servicesLoading, error: servicesError, refetch: refetchServices } = useServices({
@@ -152,6 +167,40 @@ export default function HomePage() {
   const isClientMode = isAuthenticated && !isWorkerMode;
   const showFab = isClientMode && typedServices.length > 0;
 
+  // Debounced Nominatim search
+  const handleLocationInput = useCallback((value: string) => {
+    setLocationQuery(value);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!value.trim()) {
+      setLocationResults([]);
+      setShowLocationResults(false);
+      return;
+    }
+    setLocationSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      const results = await searchAddress(value);
+      setLocationResults(results);
+      setShowLocationResults(results.length > 0);
+      setLocationSearching(false);
+    }, 500);
+  }, [searchAddress]);
+
+  const handleSelectLocation = useCallback((result: NominatimResult) => {
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    const label = result.address.city || result.address.town || result.address.village || result.display_name.split(',')[0] || result.display_name;
+    setManualCoords(lat, lng, label);
+    setLocationQuery(label || "");
+    setLocationResults([]);
+    setShowLocationResults(false);
+  }, [setManualCoords]);
+
+  const clearLocationSearch = useCallback(() => {
+    setLocationQuery("");
+    setLocationResults([]);
+    setShowLocationResults(false);
+  }, []);
+
   return (
     <div className="flex flex-col gap-6 max-w-md mx-auto bg-gray-50 min-h-screen pb-24">
       {/* Header */}
@@ -160,16 +209,49 @@ export default function HomePage() {
         <p className="text-slate-500 text-sm font-medium">¿En qué podemos ayudarte hoy?</p>
       </header>
 
-      {/* Selector de Ubicación */}
-      <div className="flex items-center gap-2 p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
-        <div className="p-2 bg-green-100 text-green-600 rounded-xl">
-          <MapPin size={20} />
+      {/* Selector de Ubicación con búsqueda OSM */}
+      <div className="relative">
+        <div className="flex items-center gap-2 p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
+          <div className="p-2 bg-green-100 text-green-600 rounded-xl">
+            <MapPin size={20} />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tu ubicación</p>
+            <input
+              type="text"
+              value={locationQuery || cityName || ""}
+              onChange={(e) => handleLocationInput(e.target.value)}
+              onFocus={() => locationResults.length > 0 && setShowLocationResults(true)}
+              placeholder="Buscar dirección..."
+              className="text-sm font-bold text-slate-700 bg-transparent focus:outline-none w-full"
+            />
+          </div>
+          {locationSearching ? (
+            <Loader2 size={18} className="text-slate-400 animate-spin" />
+          ) : locationQuery ? (
+            <button onClick={clearLocationSearch} aria-label="Limpiar búsqueda">
+              <X size={18} className="text-slate-300" />
+            </button>
+          ) : (
+            <ChevronRight size={18} className="text-slate-300" />
+          )}
         </div>
-        <div className="flex-1">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tu ubicación</p>
-          <p className="text-sm font-bold text-slate-700">{cityName || 'Cargando...'}</p>
-        </div>
-        <ChevronRight size={18} className="text-slate-300" />
+
+        {/* Location search results dropdown */}
+        {showLocationResults && locationResults.length > 0 && (
+          <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            {locationResults.map((result, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSelectLocation(result)}
+                className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors border-b border-slate-50 last:border-b-0"
+              >
+                <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
+                <span className="text-sm text-slate-700 line-clamp-2">{result.display_name}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Buscador */}

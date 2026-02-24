@@ -836,3 +836,55 @@ export const CREATE_SERVICE_REQUEST = gql`
     }
   }
 `;
+
+// ============================================
+// INCENTIVE PRICING
+// ============================================
+
+export const INCREMENT_SERVICE_PRICE = gql`
+  mutation IncrementServicePrice($serviceRequestId: String!) {
+    incrementServicePrice(serviceRequestId: $serviceRequestId) {
+      id
+      estimatedFinalPrice
+      extraIncrement
+      incrementCount
+      maxIncrementCount
+      canIncrementAgain
+    }
+  }
+`;
+
+// ============================================
+// MY SERVICE REQUESTS
+// ============================================
+
+export const GET_MY_SERVICE_REQUESTS = gql`
+  query GetMyServiceRequests {
+    getMyJobs(role: "CLIENT") {
+      id
+      status
+      description
+      price
+      location {
+        address
+      }
+      completedAt
+    }
+  }
+`;
+
+export const GET_SERVICE_CATEGORIES_NEARBY = gql`
+  query GetServiceCategoriesNearby($latitude: Float!, $longitude: Float!, $radiusKm: Float) {
+    serviceCategoriesNearby(latitude: $latitude, longitude: $longitude, radiusKm: $radiusKm) {
+      id
+      slug
+      name
+      iconName
+      description
+      basePrice
+      hourlyRate
+      estimatedHours
+      active
+    }
+  }
+`;
